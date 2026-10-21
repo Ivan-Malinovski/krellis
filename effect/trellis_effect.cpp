@@ -1,4 +1,5 @@
 #include "trellis_effect.h"
+#include "core/renderviewport.h"
 
 #include <chrono>
 #include "input_geometry.h"
@@ -87,6 +88,7 @@ TrellisCanvas::~TrellisCanvas() = default;
 void TrellisCanvas::prepareUnload()
 {
     m_unloading = true;
+    for (const auto &t : m_windows) effects->setElevatedWindow(t.window, false);
     m_changed = {};
     m_transfer = {};
     for (auto *timer : findChildren<QTimer *>()) timer->stop();
@@ -421,6 +423,34 @@ std::optional<TRect> TrellisCanvas::floatScreen(const std::string &panel) const
     return std::nullopt;
 }
 
+// Closed drawers on one edge share it, in the order they sit along it, so each sliver is its own target.
+std::optional<TRect> TrellisCanvas::drawerSlice(const std::string &panel) const
+{
+    const auto self = m_drawers.find(panel);
+    if (self == m_drawers.end()) return std::nullopt;
+    const auto edge = self->second.edge;
+    const bool vertical = edge == trellis::Edge::Left || edge == trellis::Edge::Right;
+    std::vector<std::pair<double, std::string>> along;
+    for (const auto &f : m_doc.floating) {
+        const auto d = m_drawers.find(f.panel->id);
+        if (d == m_drawers.end() || d->second.edge != edge) continue;
+        along.emplace_back(vertical ? f.rect.y + f.rect.h / 2 : f.rect.x + f.rect.w / 2, f.panel->id);
+    }
+    std::sort(along.begin(), along.end());
+    const size_t n = along.size();
+    const size_t i = size_t(std::find_if(along.begin(), along.end(), [&](const auto &a) { return a.second == panel; }) - along.begin());
+    if (i >= n) return std::nullopt;
+    const double length = vertical ? m_area.height() : m_area.width(), start = vertical ? m_area.y() : m_area.x();
+    const double from = start + length * double(i) / double(n), size = length / double(n);
+    switch (edge) {
+    case trellis::Edge::Left: return TRect{m_area.x(), from, m_drawerStripPx, size};
+    case trellis::Edge::Right: return TRect{m_area.right() - m_drawerStripPx, from, m_drawerStripPx, size};
+    case trellis::Edge::Top: return TRect{from, m_area.y(), size, m_drawerStripPx};
+    case trellis::Edge::Bottom: return TRect{from, m_area.bottom() - m_drawerStripPx, size, m_drawerStripPx};
+    }
+    return std::nullopt;
+}
+
 TRect TrellisCanvas::screenRect(const std::string &panel) const
 {
     if (const auto f = floatScreen(panel))
@@ -484,7 +514,10 @@ void TrellisCanvas::relayout(bool animate)
     }
     for (auto it = m_drawers.begin(); it != m_drawers.end();) {
         const auto loc = trellis::locatePanel(m_doc, it->first);
-        it = loc.where == trellis::PanelLocation::Where::Floating ? std::next(it) : m_drawers.erase(it);
+        if (loc.where == trellis::PanelLocation::Where::Floating) { ++it; continue; }
+        const std::string gone = it->first;
+        ++it;
+        forgetDrawer(gone);
     }
     std::map<std::string, TRect> before;
     for (const auto &kv : m_rects)
@@ -1293,7 +1326,14 @@ void TrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp
         }
         data.multiplyOpacity(c->second.opacity * e);
     }
-    effects->paintWindow(rt, vp, w, mask, region, data);
+    Region clipped = region;
+    if (const auto *tracked = trackedFor(w)) {
+        const auto d = m_drawers.find(tracked->panel);
+        if (d != m_drawers.end() && !d->second.open && m_drawers.size() > 1)
+            if (const auto slice = drawerSlice(tracked->panel))
+                clipped = region & vp.mapToDeviceCoordinatesAligned(Region(RectF(slice->x, slice->y, slice->w, slice->h).toAlignedRect()));
+    }
+    effects->paintWindow(rt, vp, w, mask, clipped, data);
 }
 
 // With glide off, a window whose real geometry just changed plays a short move-and-scale from where it was.
@@ -1807,7 +1847,7 @@ void TrellisCanvas::startDrag(EffectWindow *w, QPointF pointer)
     const Tracked *t = trackedFor(w);
     if (!t || m_session)
         return;
-    m_drawers.erase(t->panel); // grabbed: it is a plain float from here on
+    forgetDrawer(t->panel); // grabbed: it is a plain float from here on
     refreshRects();
     const QPointF rel = pointer - m_area.topLeft();
     m_session = std::make_unique<trellis::DragSession>(*this, t->panel, std::string(), trellis::Point{rel.x(), rel.y()});
@@ -1969,6 +2009,13 @@ void TrellisCanvas::stashPanel(const std::string &panel, trellis::Edge edge, con
     m_drawers[panel] = {edge, false};
 }
 
+void TrellisCanvas::forgetDrawer(const std::string &panel)
+{
+    if (!m_drawers.erase(panel)) return;
+    for (const auto &t : m_windows)
+        if (t.panel == panel) effects->setElevatedWindow(t.window, false);
+}
+
 void TrellisCanvas::updateDrawerHover(const PointerMotionEvent &event)
 {
     if (m_drawers.empty() || m_session || m_resize || event.buttons != Qt::NoButton) return;
@@ -1977,13 +2024,18 @@ void TrellisCanvas::updateDrawerHover(const PointerMotionEvent &event)
         if (!r) continue;
         QRectF zone(r->x, r->y, r->w, r->h);
         if (d.open) zone.adjust(-8, -8, 8, 8);
+        else if (const auto slice = drawerSlice(panel)) zone = QRectF(slice->x, slice->y, slice->w, slice->h);
         const bool want = zone.contains(event.position);
         if (want == d.open) continue;
+        // Only one slides out at a time: one still open keeps the pointer until it leaves.
+        if (want && std::any_of(m_drawers.begin(), m_drawers.end(), [](const auto &o) { return o.second.open; })) continue;
         for (const auto &t : m_windows) {
             if (t.panel != panel) continue;
             double opacity = 1;
             const TRect from = visualRect(t.window, &opacity).value_or(*r);
             d.open = want;
+            effects->setElevatedWindow(t.window, want); // paint above the other slivers
+            if (want) m_doc = trellis::raiseFloat(m_doc, panel);
             relayout(true);
             startFlight(t.window, FlightKind::Glide, from, {}, opacity);
             break;

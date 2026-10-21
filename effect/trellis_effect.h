@@ -199,7 +199,9 @@ private:
     double m_drawerStripPx = 12;     // sliver left in view while closed
     double m_drawerCollapsePx = 40;  // an edge tile squeezed thinner than this collapses
     void stashPanel(const std::string &panel, trellis::Edge edge, const TRect &from);
+    std::optional<TRect> drawerSlice(const std::string &panel) const; // what a closed drawer shows of its edge: its share of it
     void updateDrawerHover(const PointerMotionEvent &event);
+    void forgetDrawer(const std::string &panel); // also drops the paint elevation an open one has
     struct Tracked {
         EffectWindow *window;
         std::string panel, view;

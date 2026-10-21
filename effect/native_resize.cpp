@@ -133,8 +133,20 @@ void TrellisCanvas::finishResize(bool commit)
         stashPanel(panel, *state.stash, state.painted);
     } else if (state.floating && state.window) {
         if (const auto *tracked = trackedFor(state.window))
-            for (const auto &floating : m_doc.floating)
-                if (floating.panel->id == tracked->panel) m_rememberedFloats[tracked->panel] = floating.rect;
+            for (auto &floating : m_doc.floating) {
+                if (floating.panel->id != tracked->panel) continue;
+                // A resized drawer stays hugging the edge it slides out of.
+                if (const auto d = m_drawers.find(tracked->panel); d != m_drawers.end()) {
+                    switch (d->second.edge) {
+                    case trellis::Edge::Left: floating.rect.x = 0; break;
+                    case trellis::Edge::Right: floating.rect.x = 1 - floating.rect.w; break;
+                    case trellis::Edge::Top: floating.rect.y = 0; break;
+                    case trellis::Edge::Bottom: floating.rect.y = 1 - floating.rect.h; break;
+                    }
+                } else {
+                    m_rememberedFloats[tracked->panel] = floating.rect;
+                }
+            }
     }
     relayout(true);
 }
