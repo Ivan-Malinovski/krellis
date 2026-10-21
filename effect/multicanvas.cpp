@@ -495,6 +495,7 @@ void TrellisEffect::previousPanel() { markSessionInteraction(); if (auto *canvas
 void TrellisEffect::cyclePanel(int step) { markSessionInteraction(); if (auto *canvas = current()) canvas->cyclePanel(step); }
 void TrellisEffect::toggleMaximizeActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleMaximizeActive(); }
 void TrellisEffect::toggleFloatActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleFloatActive(); }
+void TrellisEffect::stashActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->stashActive(); }
 void TrellisEffect::toggleHideActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleHideActive(); }
 std::vector<EffectWindow *> TrellisEffect::scratchWindows() const
 {

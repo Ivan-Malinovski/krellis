@@ -115,6 +115,7 @@ public Q_SLOTS:
     void cyclePanel(int step);
     void toggleMaximizeActive();
     void toggleFloatActive();
+    void stashActive(); // slide the active window into the nearest edge as a drawer; again docks it back
     void toggleHideActive();
     void closeActive();
     void back();
@@ -194,11 +195,18 @@ private:
     std::map<std::string, TRect> m_rememberedFloats;
     // Drawers: an edge tile resized to a sliver. It becomes an overlay float (its revealed rect) that rests mostly
     // past the screen edge, leaving `m_drawerStripPx` visible, and slides out while the pointer is over it.
-    struct Drawer { trellis::Edge edge; bool open = false; };
+    struct Drawer { trellis::Edge edge; bool open = false; int seq = 0; }; // seq: stash order, which is the order along the edge
     std::map<std::string, Drawer> m_drawers;
     double m_drawerStripPx = 12;     // sliver left in view while closed
     double m_drawerCollapsePx = 40;  // an edge tile squeezed thinner than this collapses
+    double m_drawerTabPx = 28, m_drawerTabLen = 150;  // the labelled tab a closed drawer wears: thickness, longest length
+    int m_drawerSeq = 0;
+    std::unique_ptr<class OffscreenQuickScene> m_drawerTabs;
+    QString m_drawerTabsSignature;
+    std::optional<TRect> drawerTab(const std::string &panel) const; // a closed drawer's tab on screen
+    void updateDrawerTabs();
     void stashPanel(const std::string &panel, trellis::Edge edge, const TRect &from);
+    TRect drawerMapRect(const std::string &panel, const trellis::Rect &open) const; // what the minimap draws of a float
     std::optional<TRect> drawerSlice(const std::string &panel) const; // what a closed drawer shows of its edge: its share of it
     void updateDrawerHover(const PointerMotionEvent &event);
     void forgetDrawer(const std::string &panel); // also drops the paint elevation an open one has
@@ -402,6 +410,7 @@ public Q_SLOTS:
     void cyclePanel(int step);
     void toggleMaximizeActive();
     void toggleFloatActive();
+    void stashActive(); // slide the active window into the nearest edge as a drawer; again docks it back
     void toggleHideActive();
     void closeActive();
     // Keyboard navigation: direction is left, right, up or down.
