@@ -35,6 +35,16 @@ KCM.SimpleKCM {
                 checked: kcm.floatFirst
                 onToggled: kcm.floatFirst = checked
             }
+            RowLayout {
+                Kirigami.FormData.label: i18n("Tiny windows:")
+                QQC2.SpinBox {
+                    from: 0; to: 1000; stepSize: 20
+                    value: kcm.iconBelow
+                    onValueModified: kcm.iconBelow = value
+                    textFromValue: (v) => v === 0 ? i18n("Always live") : i18n("Icon below %1 px", v)
+                    valueFromText: (t) => parseInt(t) || 0
+                }
+            }
             QQC2.Label {
                 Layout.fillWidth: true
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 18

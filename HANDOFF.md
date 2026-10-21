@@ -194,3 +194,6 @@ Alt/Meta+scroll and plain title-bar scroll now zoom one column and row per gestu
 
 All seven items of `docs/plans/05-polish-and-safety.md` are implemented, built and covered by nested scenarios; nothing is committed, installed or loaded live. See its "Implementation notes" for deviations and `AGENTS.md` ("Plan 05") for the mechanics. Open for Ivan: install and try it (`tools/install.sh`, `tools/live.sh on`), confirm Meta+Alt+Shift+Z as redo, and check by hand the three things the harness cannot (global chord dismissing the which-key sheet, no sheet on a fast Meta+Alt+Key, modifier delivery while another client holds the keyboard). Enable permanently only with the safe-mode guard in the build you enable.
 
+
+## 2026-10-21: tiny windows
+Ivan: tiles stop shrinking, so the fractal does not go deep. Measured in the nested harness (26 Alacritty on 2560 px): cutoff was the icon swap under 160x64 px; Brave (client min 540) was drawn letterboxed. Added `iconBelow` (0 = always live) and uniform scale-up of held clients in `restRect`; see AGENTS.md "Tiny windows". Not installed live. Ivan: run `tools/install.sh`, `tools/live.sh on`, and set `iconBelow=0` in `[General]` of `~/.config/trellisrc` (or the KCM) to try it; the default stays 160. Open: whether live should become the default; camera zoom-out is still capped at 1.35x the root.

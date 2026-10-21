@@ -14,7 +14,7 @@ private Q_SLOTS:
         QTemporaryDir dir;
         const QString file = dir.filePath("trellisrc");
         Settings s;
-        s.floatFirst = true; s.spawnTarget = SpawnTarget::Focused; s.peek = 12; s.map = false; s.mapPinned = true; s.glide = true; s.landMs = 90; s.scratchpad = true;
+        s.floatFirst = true; s.spawnTarget = SpawnTarget::Focused; s.peek = 12; s.map = false; s.mapPinned = true; s.glide = true; s.landMs = 90; s.iconBelow = 40; s.scratchpad = true;
         s.followTheme = false; s.toasts = false; s.flyTo = true; s.whichKey = false; s.whichKeyDelayMs = 750;
         QVERIFY(save(s, file));
         QCOMPARE(load(file), s);

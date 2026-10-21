@@ -21,5 +21,7 @@ struct ViewRules {
     }
     bool interactive(double scale) const { return scaling != ViewScaling::Inert || scale >= 0.999; }
 };
-inline bool iconTile(const Rect &rect) { return rect.w < 160 || rect.h < 64; }
+/// A tile too small to read shows the app icon instead of its contents. `below` is the width in pixels (the height
+/// limit is 40% of it); 0 or less keeps every window live however small it is drawn.
+inline bool iconTile(const Rect &rect, double below = 160) { return below > 0 && (rect.w < below || rect.h < below * 0.4); }
 }

@@ -40,6 +40,7 @@ constexpr double APPEAR_MS = 220;
 constexpr double CLOSE_MS = 180;
 constexpr double BAR_H = 48;
 constexpr double SteppingPatienceMs = 120; // longest a gliding client may sit on a size request before being asked again
+constexpr double MaxHeldSide = 8192;       // longest side asked of a client held above its tile size
 constexpr double LandingPatienceMs = 300; // longest a stale buffer is drawn at its own size while its client lays out
 }
 
@@ -606,8 +607,20 @@ TRect TrellisCanvas::restRect(const std::string &panel, const TRect *world) cons
     for (const auto &t : m_windows) if (t.panel == panel) {
         const auto rule = rulesFor(t.window);
         if (rule.scaling != trellis::ViewScaling::None) {
-            r.w = std::max(rule.minimum.x, std::min(r.w, m_area.width() * 2));
-            r.h = std::max(rule.minimum.y, std::min(r.h, m_area.height() * 2));
+            r.w = std::min(r.w, m_area.width() * 2);
+            r.h = std::min(r.h, m_area.height() * 2);
+            // A tile smaller than the client can be (the rule's minimum, or what the app itself refuses to go
+            // under) asks for the whole tile scaled up evenly, not one axis stretched: the paint transform
+            // shrinks it back to the tile, so the contents keep their proportions and fill it.
+            const auto floor = clientMinimum(t.window);
+            if (r.w > 0 && r.h > 0) {
+                const double up = std::max({1.0, floor.x / r.w, floor.y / r.h});
+                const double cap = std::max(1.0, MaxHeldSide / std::max(r.w, r.h)); // keeps buffers a sane size
+                r.w *= std::min(up, cap);
+                r.h *= std::min(up, cap);
+            }
+            r.w = std::max(floor.x, r.w); // only differs from the above when the cap bit
+            r.h = std::max(floor.y, r.h);
         }
         break;
     }

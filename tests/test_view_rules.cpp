@@ -30,6 +30,8 @@ private slots:
         QVERIFY(iconTile({0,0,200,63.9}));
         QVERIFY(!iconTile({0,0,160,64}));
         QVERIFY(!iconTile({-200,30,640,400}));
+        QVERIFY(iconTile({0,0,199,100}, 200));
+        QVERIFY(!iconTile({0,0,2,1}, 0));
     }
 };
 QTEST_APPLESS_MAIN(TestViewRules)

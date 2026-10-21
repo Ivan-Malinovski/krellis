@@ -197,6 +197,7 @@ void TrellisEffect::syncOutputs()
         canvas->m_scratchpad = m_scratchpad;
         canvas->m_glide = m_glide;
         canvas->m_landMs = m_landMs;
+        canvas->m_iconBelow = m_iconBelow;
         canvas->m_toasts = m_toastsOn;
         canvas->m_flyTo = m_flyToOn;
         canvas->m_nativeMutation = [this](EffectWindow *window, bool automatic) { rememberNative(window, automatic); };
@@ -824,6 +825,7 @@ void TrellisEffect::applySettings(const trellis::config::Settings &settings)
     m_showMap = settings.map;
     m_glide = settings.glide;
     m_landMs = settings.landMs;
+    m_iconBelow = settings.iconBelow;
     m_theme.setFollow(settings.followTheme);
     m_toastsOn = settings.toasts;
     m_whichKey = settings.whichKey;
@@ -849,6 +851,7 @@ void TrellisEffect::applySettings(const trellis::config::Settings &settings)
         canvas->m_scratchpad = m_scratchpad;
         canvas->m_glide = m_glide;
         canvas->m_landMs = m_landMs;
+        canvas->m_iconBelow = m_iconBelow;
         canvas->m_toasts = m_toastsOn;
         canvas->m_flyTo = m_flyToOn;
         canvas->m_nav.sync(); // the peek gutter changes the camera target

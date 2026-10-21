@@ -102,6 +102,17 @@ bool TrellisCanvas::floatForScratch(EffectWindow *w, int slot)
     startFlight(w, FlightKind::Glide, from, {}, opacity);
     return true;
 }
+Point TrellisCanvas::clientMinimum(EffectWindow *w) const
+{
+    const auto rule = rulesFor(w);
+    Point minimum = rule.minimum;
+    if (w && w->window()) { // what the app itself will not go under (Brave, Dolphin and the like)
+        const QSizeF own = w->window()->minSize();
+        minimum.x = std::max(minimum.x, own.width());
+        minimum.y = std::max(minimum.y, own.height());
+    }
+    return minimum;
+}
 Point TrellisCanvas::minSize(const std::vector<std::string> &views) const
 {
     Point minimum{0, 0};
@@ -126,7 +137,7 @@ bool TrellisCanvas::allowed(const std::vector<std::string> &views, trellis::Regi
 }
 bool TrellisCanvas::frameOnly(const std::string &panel) const
 {
-    return !(m_session && m_session->active() && m_session->lifted()->id == panel) && iconTile(screenRect(panel));
+    return !(m_session && m_session->active() && m_session->lifted()->id == panel) && iconTile(screenRect(panel), m_iconBelow);
 }
 
 void TrellisCanvas::toggleDockActive() { toggleDock(activeIndex()); }

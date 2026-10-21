@@ -27,6 +27,7 @@ Settings load(const QString &file)
     s.glide = c.value(QStringLiteral("glide"), s.glide).toBool();
     s.scratchpad = c.value(QStringLiteral("scratchpad"), s.scratchpad).toBool();
     s.landMs = std::max(0.0, c.value(QStringLiteral("landMs"), s.landMs).toDouble());
+    s.iconBelow = std::clamp(c.value(QStringLiteral("iconBelow"), s.iconBelow).toInt(), 0, 1000);
     s.followTheme = c.value(QStringLiteral("followTheme"), s.followTheme).toBool();
     s.toasts = c.value(QStringLiteral("toasts"), s.toasts).toBool();
     s.flyTo = c.value(QStringLiteral("flyTo"), s.flyTo).toBool();
@@ -48,6 +49,7 @@ bool save(const Settings &s, const QString &file)
     c.setValue(QStringLiteral("glide"), s.glide);
     c.setValue(QStringLiteral("scratchpad"), s.scratchpad);
     c.setValue(QStringLiteral("landMs"), s.landMs);
+    c.setValue(QStringLiteral("iconBelow"), s.iconBelow);
     c.setValue(QStringLiteral("followTheme"), s.followTheme);
     c.setValue(QStringLiteral("toasts"), s.toasts);
     c.setValue(QStringLiteral("flyTo"), s.flyTo);
