@@ -1,6 +1,6 @@
 # glide=false: the drawn rect is final from the first frame, so a client that has not landed its size yet must be
 # drawn at its own (frame) size, never stretched to the final rect (the content "blink"). Run with NEST_TRELLISRC
-# set to glide=false. Samples frame vs drawn vs screen width through a maximize and a Ctrl+scroll zoom.
+# set to glide=false. Samples frame vs drawn vs screen width through a maximize and a Alt+scroll zoom.
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET; unset DISPLAY
 call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
@@ -13,7 +13,7 @@ sample() {
 }
 call toggleMaximize 1; sample; sleep 1
 call toggleMaximize 1; sample; sleep 1
-call simAxis -120 640 400 67108864; sample; sleep 1
+call simAxis -120 640 400 134217728; sample; sleep 1
 rc=0
 # Every sample of every window: drawn is either exactly the client's own frame (held while a client lays out)
 # or exactly the final rect. Never a stretched or half-moved mixture, which would show gaps or a blink.

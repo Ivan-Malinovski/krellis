@@ -90,7 +90,7 @@ public:
     // Input (called by TrellisInput; return true when the event was consumed).
     bool handleButton(const PointerButtonEvent &e);
     bool handleMotion(const PointerMotionEvent &e);
-    bool handleAxis(const PointerAxisEvent &e);
+    bool handleAxis(const PointerAxisEvent &e, bool titleBar = false);
     bool handleKey(const KeyboardKeyEvent &e);
     void pinch(double scaleSinceLast, QPointF at, QPointF delta);
     void endPinch();
@@ -142,6 +142,9 @@ private:
     // A KWin-driven drag whose pointer left this output: the effect moves the live drag to the canvas under it.
     std::function<bool(EffectWindow *, QPointF)> m_handoff;
     std::function<void()> m_changed;
+    bool m_mapPinned = false;                // the minimap stays out instead of sliding off the edge
+    std::function<void()> m_togglePin;
+    std::function<void()> m_toggleMode; // the minimap pill: flips floating-first for every canvas
     QPointF m_windowPointer;
     bool m_applyingRest = false;
     bool m_steppingResize = false;
@@ -242,6 +245,14 @@ private:
     QRectF m_screen;          // KWin panel-aware rectangle; m_area also reserves the Trellis bar
     QString m_hoverKey, m_pressKey, m_barSignature;
     bool m_mapOn = false, m_pressBar = false;
+    // Dragging a square on the minimap frames the tiles it touches.
+    bool m_mapDragging = false;
+    QPointF m_mapAnchor;
+    QRectF m_mapBand;                       // in stage pixels
+    std::vector<std::string> m_mapPicks;
+    bool mapSelectKey(const QString &key) const;
+    void moveMapSelect(QPointF pointer);
+    void finishMapSelect(bool commit);
     bool m_barOn = false; // the bar is optional; Plasma's panel already covers most of it
     bool m_naming = false, m_nameError = false;
     double barHeight() const; // space reserved for the bar, 0 while it is hidden
@@ -358,6 +369,9 @@ public Q_SLOTS:
     void toggleFloatFirst();
     void setFloatFirst(bool on);
     bool floatFirst() const;
+    void setMapPinned(bool on);
+    void toggleMapPinned();
+    bool mapPinned() const;
     void toggleMap();
     void saveView();
     void back();
@@ -450,6 +464,7 @@ private:
     TrellisCanvas *m_pointerCanvas = nullptr, *m_pinchCanvas = nullptr;
     LogicalOutput *m_selectedOutput = nullptr;
     bool m_floatFirst = false; // loaded from trellisrc; mirrored into every canvas
+    bool m_mapPinned = false;  // likewise
     double m_landMs = 200; // loaded from trellisrc ([General] landMs); mirrored into every canvas
     bool m_glide = false; // loaded from trellisrc ([General] glide, default off); mirrored into every canvas
 };

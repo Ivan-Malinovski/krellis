@@ -186,3 +186,6 @@ Ivan: throttle only slightly better. Added `[General] glide=false` (see AGENTS.m
 
 ## 2026-10-21: landing animation
 Added `landMs` (default 200) short move-and-scale on real frame changes with glide off. Nested tests pass (land-anim, noglide-blink, zoom/maximize-blink, drag, resize, float-fill, anim; glide-on: zoom/maximize-blink, drag, interrupt; ctest 11/11). Needs live confirmation from Ivan. Open: why Geometry Change showed nothing alongside Trellis.
+
+## 2026-10-21: grid zoom and minimap help
+Alt/Meta+scroll and plain title-bar scroll now zoom one column and row per gesture (Ctrl+scroll released to apps); minimap shows Floating/Tiling and a hover (?) shortcut sheet; clicking a framed minimap tile zooms out. Details in AGENTS.md "Grid zoom...". Unit tests (18 navigator) and nested scenarios zoom-grid, map, input, zoom-blink, noglide-blink, bar-optional pass. Not committed, not installed live: Ivan runs `tools/install.sh` + `tools/live.sh off/on` (logout if status shows MISMATCH).

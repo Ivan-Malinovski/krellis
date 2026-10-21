@@ -48,6 +48,8 @@ public:
     enum class FrameAll { All, Stage };
     void frame(FrameAll which);
     void frameIds(const std::vector<std::string> &ids);
+    /// Frame exactly these tiles: their smallest node, boxed down to just them when that node holds more.
+    void frameTiles(const std::vector<std::string> &leaves) { frameSet(leaves); }
     void ensureVisible(const std::string &panelId);
     void include(const std::vector<std::string> &ids);
 
@@ -55,9 +57,12 @@ public:
     void zoom(double factor, Point p, Point panPixels = {0, 0});
     void finishGesture();
     void endGesture();
-    /// Wheel stepping: deltas add up until worth a step. Returns true if it stepped.
+    /// Wheel stepping: one grid step per scroll gesture (a flick sends many events). Returns true if it stepped.
     bool wheelStep(double delta, Point worldPoint, double nowMs);
     void resetStepWheel();
+    /// Zoom out grows the frame by one neighbouring column and one row, in: shrinks it by one of each. Both
+    /// favour the side away from `at`, so what is under the pointer stays in view. False if nothing changed.
+    bool zoomStep(bool out, Point at);
     /// The framing a release would choose right now (for the "Release to focus" preview).
     std::string gestureCandidate() const;
 
@@ -66,6 +71,9 @@ public:
 
     const Entries &entries() const { return m_entries; }
     const std::string &framed() const { return m_framed; }
+    /// A grid step can frame a block of tiles that is no node; `framed()` is then the smallest node holding it.
+    bool boxed() const { return m_boxed; }
+    bool overviewing() const { return m_framed.empty() && !m_boxed; }
     NodePtr framedNode() const;
     bool gestureActive() const { return m_gesture; }
     bool canGoBack() const { return m_visitIndex > 0; }
@@ -81,6 +89,9 @@ public:
 private:
     bool on() const { return m_host.mode() != NavMode::Off; }
     Rect rectOf(const std::string &id) const;
+    Rect framedRect() const;
+    /// Frame these leaves: their smallest node, plus a box when that node holds more tiles than they cover.
+    void frameSet(const std::vector<std::string> &leaves, bool record = true);
     void retarget();
     void historyGo(int direction);
 
@@ -88,7 +99,8 @@ private:
     RectSpring &m_camera;
     Entries m_entries;
     std::string m_framed; // empty = the whole layout
-    std::vector<std::string> m_framedLeaves;
+    std::vector<std::string> m_framedLeaves; // the framed tiles (the box's tiles while boxed)
+    bool m_boxed = false;
     std::vector<Visit> m_visits{{"", {}}};
     int m_visitIndex = 0;
     std::optional<MaximizeSession> m_session;
@@ -97,7 +109,7 @@ private:
     bool m_gesture = false;
 
     struct StepWheel {
-        double last = -1e18, total = 0, steppedAt = -1e18;
+        double last = -1e18;
         int direction = 0;
     } m_wheel;
 };

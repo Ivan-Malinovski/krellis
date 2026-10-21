@@ -1,4 +1,6 @@
 #include "trellis_effect.h"
+
+#include <chrono>
 #include "input_geometry.h"
 
 #include <QFile>
@@ -564,7 +566,14 @@ void TrellisCanvas::updateDock()
 
 static bool sceneContains(const std::unique_ptr<OffscreenQuickScene> &scene, QPointF p)
 {
-    return scene && QRectF(QRect(scene->geometry())).contains(p);
+    if (!scene || !QRectF(QRect(scene->geometry())).contains(p))
+        return false;
+    // A scene may keep transparent room around what it shows (the minimap's help sheet) and name the part
+    // that takes input; resizing a live scene does not re-render it, so it is sized for the largest state.
+    const QVariant input = scene->rootItem()->property("inputRect");
+    if (!input.isValid())
+        return true;
+    return input.toRectF().contains(p - QPointF(scene->geometry().x(), scene->geometry().y()));
 }
 
 static QString sceneKey(const std::unique_ptr<OffscreenQuickScene> &scene, QPointF p)
@@ -650,7 +659,7 @@ void TrellisCanvas::updateBar()
     const QString signature = QStringLiteral("%1|%2|%3|%4|%5|%6|%7|%8|%9")
                                   .arg(geo.x()).arg(geo.y()).arg(geo.width())
                                   .arg(framings.size() ? QString::number(qHash(QVariant(framings).toString())) : QString(), labels.join(QLatin1Char(',')), count)
-                                  .arg(m_nav.canGoBack() * 8 + m_nav.canGoForward() * 4 + m_mapOn * 2 + m_nav.framed().empty())
+                                  .arg(m_nav.canGoBack() * 8 + m_nav.canGoForward() * 4 + m_mapOn * 2 + m_nav.overviewing())
                                   .arg(m_hoverKey + m_pressKey);
     if (signature == m_barSignature && m_bar->geometry() == Rect(geo))
         return;
@@ -659,7 +668,7 @@ void TrellisCanvas::updateBar()
     m_bar->setGeometry(Rect(geo));
     item->setProperty("framings", framings);
     item->setProperty("labels", labels);
-    item->setProperty("overviewCurrent", m_nav.framed().empty());
+    item->setProperty("overviewCurrent", m_nav.overviewing());
     item->setProperty("canBack", m_nav.canGoBack());
     item->setProperty("canForward", m_nav.canGoForward());
     item->setProperty("mapOn", m_mapOn);
@@ -729,13 +738,22 @@ void TrellisCanvas::updateMap(bool force)
         tiles << m;
         sig << QStringLiteral("f%1:%2,%3").arg(QString::fromStdString(f.panel->id)).arg(f.rect.x, 0, 'f', 3).arg(f.rect.y, 0, 'f', 3);
     }
-    const QString signature = sig.join(QLatin1Char(';')) + QStringLiteral("|%1|%2").arg(aspect, 0, 'f', 3).arg(m_hoverKey);
+    const QString signature = sig.join(QLatin1Char(';')) + QStringLiteral("|%1|%2").arg(aspect, 0, 'f', 3).arg(m_hoverKey + (m_floatFirst ? QStringLiteral("F") : QStringLiteral("T")) + (m_mapPinned ? QStringLiteral("P") : QStringLiteral("U")))
+        + (m_mapDragging ? QStringLiteral("|%1,%2,%3,%4|%5").arg(m_mapBand.x()).arg(m_mapBand.y()).arg(m_mapBand.width()).arg(m_mapBand.height()).arg(m_mapPicks.size()) : QString());
     if (force || signature != m_mapSignature) {
         m_mapSignature = signature;
         item->setProperty("aspect", aspect);
         item->setProperty("tiles", tiles);
         item->setProperty("hoverKey", m_hoverKey);
-        item->setProperty("stateText", framed.empty() ? QStringLiteral("Overview") : QStringLiteral("Framed"));
+        item->setProperty("stateText", m_nav.overviewing() ? QStringLiteral("Overview") : QStringLiteral("Framed"));
+        item->setProperty("floatFirst", m_floatFirst);
+        item->setProperty("pinned", m_mapPinned);
+        item->setProperty("band", m_mapBand);
+        item->setProperty("bandOn", m_mapDragging);
+        QStringList picks;
+        for (const auto &id : m_mapPicks)
+            picks << QString::fromStdString(id);
+        item->setProperty("picks", picks);
     }
     const TRect c = m_camera.value;
     item->setProperty("camX", c.x);
@@ -744,11 +762,59 @@ void TrellisCanvas::updateMap(bool force)
     item->setProperty("camH", c.h);
     item->setProperty("shown", m_mapOn);
     const QSizeF size(item->implicitWidth(), item->implicitHeight());
-    const QRect geo(int(m_uiScreen.right() - size.width() - 12), int(m_uiScreen.bottom() - barHeight() - size.height() - 8), int(size.width()), int(size.height()));
+    // Flush with the screen edge: the card slides off it when the map auto-hides.
+    const QRect geo(int(m_uiScreen.right() - size.width()), int(m_uiScreen.bottom() - barHeight() - size.height() - 8), int(size.width()), int(size.height()));
     const Rect old = m_map->geometry();
     if (old != Rect(geo))
         m_map->setGeometry(Rect(geo));
     effects->addRepaint(Region(old) + Region(Rect(geo)));
+}
+
+bool TrellisCanvas::mapSelectKey(const QString &key) const
+{
+    return m_mapOn && m_map && (key == QLatin1String("map:overview") || key.startsWith(QLatin1String("map:frame:")) || key.startsWith(QLatin1String("map:focus:")));
+}
+
+// Drag a square on the minimap: the tiles it touches are what gets framed on release.
+void TrellisCanvas::moveMapSelect(QPointF pointer)
+{
+    const QRectF stage = m_map->rootItem()->property("stageRect").toRectF();
+    const QPointF origin(m_map->geometry().x(), m_map->geometry().y());
+    const auto toStage = [&](QPointF p) {
+        const QPointF q = p - origin - stage.topLeft();
+        return QPointF(std::clamp(q.x(), 0.0, stage.width()), std::clamp(q.y(), 0.0, stage.height()));
+    };
+    m_mapBand = QRectF(toStage(m_mapAnchor), toStage(pointer)).normalized();
+    m_mapPicks.clear();
+    if (stage.width() > 0 && stage.height() > 0) {
+        // Tiles are drawn inset by their gap, so only a square that reaches the drawn tile counts.
+        const double gx = 1.5 / stage.width(), gy = 1.5 / stage.height();
+        const double bx0 = m_mapBand.left() / stage.width(), bx1 = m_mapBand.right() / stage.width();
+        const double by0 = m_mapBand.top() / stage.height(), by1 = m_mapBand.bottom() / stage.height();
+        for (const auto &[id, entry] : m_nav.entries()) {
+            if (entry.node->kind != Node::Kind::Panel)
+                continue;
+            const auto &r = entry.rect;
+            if (bx1 > r.x + gx && bx0 < r.x + r.w - gx && by1 > r.y + gy && by0 < r.y + r.h - gy)
+                m_mapPicks.push_back(id);
+        }
+    }
+    updateMap(true);
+    schedule();
+}
+
+void TrellisCanvas::finishMapSelect(bool commit)
+{
+    const auto picks = std::move(m_mapPicks);
+    m_mapDragging = false;
+    m_mapPicks.clear();
+    m_mapBand = QRectF();
+    if (commit && !picks.empty()) {
+        m_nav.frameTiles(picks);
+        applyRest();
+    }
+    updateMap(true);
+    schedule();
 }
 
 void TrellisCanvas::barAction(const QString &key)
@@ -767,10 +833,21 @@ void TrellisCanvas::barAction(const QString &key)
         m_nameError = false;
     } else if (key == QLatin1String("map")) {
         m_mapOn = !m_mapOn;
+    } else if (key == QLatin1String("map:pin")) {
+        if (m_togglePin)
+            m_togglePin();
+    } else if (key == QLatin1String("map:mode")) {
+        if (m_toggleMode)
+            m_toggleMode();
     } else if (key == QLatin1String("map:overview")) {
         m_nav.overview();
     } else if (key.startsWith(QLatin1String("map:frame:"))) {
-        m_nav.focus(key.mid(10).toStdString());
+        // Clicking the tile that is already framed zooms back out a level instead of re-framing it.
+        const std::string id = key.mid(10).toStdString();
+        if (m_nav.framed() == id && !m_nav.boxed())
+            m_nav.stepOut();
+        else
+            m_nav.focus(id);
     } else if (key.startsWith(QLatin1String("map:focus:"))) {
         if (const auto *t = [&]() -> const Tracked * {
                 for (const auto &w : m_windows)
@@ -1205,6 +1282,14 @@ bool TrellisCanvas::handleKey(const KeyboardKeyEvent &e)
     }
     if (e.key == Qt::Key_V)
         m_keyV = e.state != KeyboardKeyState::Released;
+    if (e.key == Qt::Key_Escape && m_mapDragging) {
+        if (e.state == KeyboardKeyState::Pressed) {
+            m_pressBar = false;
+            m_pressKey.clear();
+            finishMapSelect(false);
+        }
+        return true;
+    }
     // Esc abandons a rectangle selection and returns to the current framing.
     if (e.key == Qt::Key_Escape && m_drag == Drag::Rect) {
         if (e.state == KeyboardKeyState::Pressed) {
@@ -1231,6 +1316,10 @@ bool TrellisCanvas::handleButton(const PointerButtonEvent &e)
             const QString pressed = m_pressKey;
             m_pressBar = false;
             m_pressKey.clear();
+            if (m_mapDragging) {
+                finishMapSelect(true);
+                return true;
+            }
             if (!pressed.isEmpty() && barKey(e.position) == pressed)
                 barAction(pressed);
             else
@@ -1253,12 +1342,16 @@ bool TrellisCanvas::handleButton(const PointerButtonEvent &e)
     if (const QString key = barKey(e.position); overUi(e.position)) {
         m_pressKey = key;
         m_pressBar = true;
+        m_mapAnchor = e.position;
+        m_mapDragging = false;
         updateBar();
         return true;
     }
-    if ((e.modifiers & GESTURE_MODS) == GESTURE_MODS) {
+    // Meta+drag draws the zoom-to-rectangle square; Ctrl+Alt+drag pans.
+    const bool square = (e.modifiers & Qt::MetaModifier) && !(e.modifiers & (Qt::ControlModifier | Qt::AltModifier));
+    if (square || (e.modifiers & GESTURE_MODS) == GESTURE_MODS) {
         m_dragLast = m_dragAnchor = e.position;
-        if (e.modifiers & Qt::ShiftModifier) {
+        if (square) {
             m_drag = Drag::Rect;
             m_nav.endGesture();
             m_rectView = m_camera.value;
@@ -1278,6 +1371,14 @@ bool TrellisCanvas::handleMotion(const PointerMotionEvent &e)
         auto event = e;
         m_bar->forwardPointerMotionEvent(&event);
         return true;
+    }
+    if (m_pressBar && mapSelectKey(m_pressKey)) {
+        if (!m_mapDragging && QLineF(m_mapAnchor, e.position).length() >= 5)
+            m_mapDragging = true;
+        if (m_mapDragging) {
+            moveMapSelect(e.position);
+            return true;
+        }
     }
     if (m_drag == Drag::None) {
         const QString key = barKey(e.position);
@@ -1303,19 +1404,23 @@ bool TrellisCanvas::handleMotion(const PointerMotionEvent &e)
     return true;
 }
 
-bool TrellisCanvas::handleAxis(const PointerAxisEvent &e)
+bool TrellisCanvas::handleAxis(const PointerAxisEvent &e, bool titleBar)
 {
     if (e.orientation != Qt::Vertical)
         return false;
-    // Ctrl+Alt+scroll, or Ctrl+scroll with a notched wheel, steps the hierarchy.
+    // Scrolling zooms one column and row at a time: with Alt or Meta held on a notched wheel (Ctrl is left to
+    // the apps, which zoom their contents with it), with Ctrl+Alt on anything, or with nothing held over a
+    // title bar.
     const bool chord = (e.modifiers & GESTURE_MODS) == GESTURE_MODS;
-    const bool ctrlWheel = (e.modifiers & Qt::ControlModifier) && e.source == PointerAxisSource::Wheel;
-    if (!chord && !ctrlWheel)
+    const bool keyWheel = (e.modifiers & (Qt::AltModifier | Qt::MetaModifier)) && e.source == PointerAxisSource::Wheel;
+    if (!chord && !keyWheel && !titleBar)
         return false;
     const QPointF a = e.position - m_area.topLeft();
     const TRect c = m_camera.value;
     const trellis::Point world{c.x + c.w * a.x() / m_area.width(), c.y + c.h * a.y() / m_area.height()};
-    if (m_nav.wheelStep(e.delta, world, m_nowMs))
+    // Wall clock, not m_nowMs: that only advances with paints, so it stands still between gestures.
+    const double wallMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    if (m_nav.wheelStep(e.delta, world, wallMs))
         applyRest();
     return true;
 }
@@ -1779,9 +1884,14 @@ QString TrellisCanvas::dump()
                          .arg(m_rectBand.x(), 0, 'f', 1).arg(m_rectBand.y(), 0, 'f', 1).arg(m_rectBand.width(), 0, 'f', 1).arg(m_rectBand.height(), 0, 'f', 1)
                          .arg(QString::fromStdString(m_rectCandidate), m_candLabel).arg(m_bandOpacity, 0, 'f', 2).arg(m_candOpacity, 0, 'f', 2);
         if (m_map)
-            lines << QStringLiteral("MAP geometry %1,%2 %3x%4 shown %5 settled %6")
+            lines << QStringLiteral("MAP geometry %1,%2 %3x%4 shown %5 settled %6 mode %7 help %8 view %9x%10 root %11x%12 open %13 pinned %14")
                          .arg(m_map->geometry().x()).arg(m_map->geometry().y()).arg(m_map->geometry().width()).arg(m_map->geometry().height())
-                         .arg(m_mapOn).arg(m_map->rootItem()->property("settled").toBool());
+                         .arg(m_mapOn).arg(m_map->rootItem()->property("settled").toBool())
+                         .arg(m_map->rootItem()->property("floatFirst").toBool() ? QStringLiteral("Floating") : QStringLiteral("Tiling"))
+                         .arg(m_map->rootItem()->property("helpOpen").toBool())
+                         .arg(m_map->size().width()).arg(m_map->size().height())
+                         .arg(m_map->rootItem()->width()).arg(m_map->rootItem()->height())
+                         .arg(m_map->rootItem()->property("slide").toDouble(), 0, 'f', 2).arg(m_mapPinned);
         lines << QStringLiteral("ORDER ") + order.join(QLatin1Char(' '));
     }
     for (EffectWindow *w : effects->stackingOrder()) {

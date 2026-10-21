@@ -27,7 +27,7 @@ t() {
     shift
     qdbus6 org.kde.KWin /Trellis "org.kde.kwin.KWin.TrellisEffect.$method" "$@"
 }
-printf '\n%s\n' 'Trellis preview — isolated desktop' 'Use Overview in the bottom bar, then Ctrl+Alt+drag to pan.' 'Hold Ctrl+Alt+V and drag to zoom; Ctrl+scroll steps the hierarchy.' 'Type t for panel controls. Exit the terminals to finish.' ''
+printf '\n%s\n' 'Trellis preview — isolated desktop' 'Use Overview in the bottom bar, then Ctrl+Alt+drag to pan.' 'Hold Ctrl+Alt+V and drag to zoom; Alt+scroll zooms a column and row.' 'Type t for panel controls. Exit the terminals to finish.' ''
 t help
 RC
 for name in 'Panel 0' 'Panel 1' 'Panel 2 — floating'; do

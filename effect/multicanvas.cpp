@@ -22,6 +22,7 @@ TrellisEffect::TrellisEffect()
     const QSettings config(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/trellisrc"), QSettings::IniFormat);
     // Qt's INI reader files [General] keys under their bare names, so "General/key" never matches on read.
     m_floatFirst = config.value(QStringLiteral("floatFirst"), false).toBool();
+    m_mapPinned = config.value(QStringLiteral("mapPinned"), false).toBool();
     m_glide = config.value(QStringLiteral("glide"), false).toBool();
     m_landMs = std::max(0.0, config.value(QStringLiteral("landMs"), 200).toDouble());
     initializeSession();
@@ -178,6 +179,9 @@ void TrellisEffect::syncOutputs()
             return std::nullopt;
         };
         canvas->m_changed = [this] { scheduleSave(); };
+        canvas->m_toggleMode = [this] { toggleFloatFirst(); };
+        canvas->m_mapPinned = m_mapPinned;
+        canvas->m_togglePin = [this] { toggleMapPinned(); };
         canvas->m_transfer = [this](EffectWindow *w, QPointF point) {
             if (auto *target = canvasAt(point))
                 transfer(w, target);
@@ -370,7 +374,14 @@ bool TrellisEffect::handleAxis(const PointerAxisEvent &e)
     if (auto *active = effects->activeWindow(); active && (active->isUserMove() || active->isUserResize()))
         return false; // KWin's interactive-move filter follows Effects in the chain.
     auto *canvas = canvasAt(e.position);
-    return (canvas && canvas->handleAxis(e)) || surfaceAxis(e);
+    // Scrolling over a server-side title bar zooms without any key held.
+    bool titleBar = false;
+    if (canvas && !m_clientGrab) {
+        if (const auto hit = surfaceHit(e.position); hit && hit->decoration && !hit->inert && hit->canvas == canvas
+            && hit->window->window())
+            titleBar = hit->mapped.y() < hit->window->window()->clientGeometry().top();
+    }
+    return (canvas && canvas->handleAxis(e, titleBar)) || surfaceAxis(e);
 }
 bool TrellisEffect::handleKey(const KeyboardKeyEvent &e)
 {
@@ -494,12 +505,28 @@ void TrellisEffect::setFloatFirst(bool on)
 {
     markSessionInteraction();
     m_floatFirst = on;
-    for (const auto &canvas : m_canvases) canvas->m_floatFirst = on;
+    for (const auto &canvas : m_canvases) {
+        canvas->m_floatFirst = on;
+        canvas->updateMap();
+    }
     QSettings config(configPath(), QSettings::IniFormat);
     config.setValue(QStringLiteral("General/floatFirst"), on);
     config.sync();
 }
 void TrellisEffect::toggleFloatFirst() { setFloatFirst(!m_floatFirst); }
+bool TrellisEffect::mapPinned() const { return m_mapPinned; }
+void TrellisEffect::setMapPinned(bool on)
+{
+    m_mapPinned = on;
+    for (const auto &canvas : m_canvases) {
+        canvas->m_mapPinned = on;
+        canvas->updateMap();
+    }
+    QSettings config(configPath(), QSettings::IniFormat);
+    config.setValue(QStringLiteral("General/mapPinned"), on);
+    config.sync();
+}
+void TrellisEffect::toggleMapPinned() { setMapPinned(!m_mapPinned); }
 void TrellisEffect::toggleMap() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleMap(); }
 void TrellisEffect::saveView() { markSessionInteraction(); if (auto *canvas = current()) canvas->beginFramingName(); }
 void TrellisEffect::closeActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->closeActive(); }

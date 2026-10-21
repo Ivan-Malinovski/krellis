@@ -8,6 +8,41 @@
 namespace trellis {
 
 constexpr int MAX_HISTORY = 100;
+constexpr double WHEEL_QUIET_MS = 180; // a pause this long ends a scroll gesture
+constexpr double GRID_EPS = 1e-6;
+
+namespace {
+struct Leaf {
+    std::string id;
+    Rect r;
+};
+bool inside(const Rect &outer, const Rect &r)
+{
+    return r.x >= outer.x - GRID_EPS && r.y >= outer.y - GRID_EPS && r.x + r.w <= outer.x + outer.w + GRID_EPS
+        && r.y + r.h <= outer.y + outer.h + GRID_EPS;
+}
+bool overlaps(const Rect &a, const Rect &b)
+{
+    return a.x < b.x + b.w - GRID_EPS && b.x < a.x + a.w - GRID_EPS && a.y < b.y + b.h - GRID_EPS
+        && b.y < a.y + a.h - GRID_EPS;
+}
+Rect unite(const Rect &a, const Rect &b)
+{
+    const double x = std::min(a.x, b.x), y = std::min(a.y, b.y);
+    return {x, y, std::max(a.x + a.w, b.x + b.w) - x, std::max(a.y + a.h, b.y + b.h) - y};
+}
+double lo(const Rect &r, int a) { return a == 0 ? r.x : r.y; }
+double hi(const Rect &r, int a) { return a == 0 ? r.x + r.w : r.y + r.h; }
+void setSpan(Rect &r, int a, double l, double h)
+{
+    (a == 0 ? r.x : r.y) = l;
+    (a == 0 ? r.w : r.h) = h - l;
+}
+double distanceTo(const Rect &r, Point p)
+{
+    return std::hypot(std::max({r.x - p.x, 0.0, p.x - (r.x + r.w)}), std::max({r.y - p.y, 0.0, p.y - (r.y + r.h)}));
+}
+} // namespace
 
 std::string Navigator::rootId() const
 {
@@ -31,11 +66,44 @@ NodePtr Navigator::framedNode() const
     return e ? e->node : nullptr;
 }
 
+Rect Navigator::framedRect() const
+{
+    if (!m_boxed)
+        return rectOf(m_framed);
+    std::optional<Rect> box;
+    for (const auto &id : m_framedLeaves)
+        if (const Entry *e = m_entries.find(id))
+            box = box ? unite(*box, e->rect) : e->rect;
+    return box.value_or(rectOf(m_framed));
+}
+
 void Navigator::sync()
 {
     const auto metrics = m_host.layoutMetrics();
     m_entries = focusLayout(m_host.doc().root, &metrics);
-    if (!m_framed.empty() && !m_entries.has(m_framed)) {
+    if (m_boxed) {
+        std::vector<std::string> surviving;
+        for (const auto &id : m_framedLeaves)
+            if (m_entries.has(id))
+                surviving.push_back(id);
+        m_framedLeaves = surviving;
+        m_boxed = !surviving.empty();
+        if (m_boxed) {
+            const std::string next = frameLeaves(m_host.doc().root, surviving);
+            m_framed = next != rootId() ? next : std::string();
+            auto whole = leafIds(m_framed.empty() ? m_host.doc().root : m_entries.at(m_framed).node);
+            std::sort(whole.begin(), whole.end());
+            std::sort(surviving.begin(), surviving.end());
+            m_boxed = whole != surviving;
+            if (!m_boxed)
+                m_framedLeaves = m_framed.empty() ? std::vector<std::string>{} : whole;
+        } else {
+            m_framed.clear();
+        }
+    }
+    if (m_boxed) {
+        // Keep the box; its node and tiles are already current.
+    } else if (!m_framed.empty() && !m_entries.has(m_framed)) {
         std::vector<std::string> surviving;
         for (const auto &id : m_framedLeaves)
             if (m_entries.has(id))
@@ -53,7 +121,7 @@ void Navigator::sync()
 
 void Navigator::retarget()
 {
-    const Rect target = rectOf(m_framed);
+    const Rect target = framedRect();
     if (!sameRect(m_camera.target, target)) {
         m_camera.target = target;
         if (m_host.reducedMotion())
@@ -94,7 +162,8 @@ void Navigator::focus(std::string id, bool record)
         }
     }
     endGesture();
-    const bool changed = m_framed != id;
+    const bool changed = m_framed != id || m_boxed;
+    m_boxed = false;
     m_framed = id;
     m_framedLeaves = id.empty() ? std::vector<std::string>{} : leafIds(m_entries.at(id).node);
     retarget();
@@ -128,9 +197,9 @@ bool Navigator::toggle(const std::string &id)
 
 void Navigator::stepOut()
 {
-    if (m_framed.empty())
+    if (overviewing())
         return;
-    focus(navParent(m_entries, m_framed));
+    focus(m_boxed ? m_framed : navParent(m_entries, m_framed));
 }
 
 void Navigator::stepIn(std::optional<Point> worldPoint)
@@ -156,18 +225,18 @@ void Navigator::historyGo(int direction)
 
 void Navigator::overview()
 {
-    if (!m_framed.empty())
+    if (!overviewing())
         m_overviewReturn = m_framedLeaves;
     focus({});
 }
 
 void Navigator::toggleOverview()
 {
-    if (m_framed.empty() && m_overviewReturn) {
+    if (overviewing() && m_overviewReturn) {
         auto leaves = *m_overviewReturn;
         m_overviewReturn.reset();
-        focus(savedFrameDestination(m_host.doc().root, leaves));
-    } else if (!m_framed.empty()) {
+        frameSet(leaves);
+    } else if (!overviewing()) {
         m_overviewReturn = m_framedLeaves;
         focus({});
     }
@@ -207,9 +276,17 @@ void Navigator::frameIds(const std::vector<std::string> &targets)
 
 void Navigator::ensureVisible(const std::string &panelId)
 {
-    if (m_framed.empty())
+    if (overviewing())
         return;
     const auto &doc = m_host.doc();
+    if (m_framed.empty()) { // a block inside the whole layout: a new tile outside it widens the frame
+        if (m_entries.has(panelId) && std::find(m_framedLeaves.begin(), m_framedLeaves.end(), panelId) == m_framedLeaves.end()) {
+            auto ids = m_framedLeaves;
+            ids.push_back(panelId);
+            focus(frameLeaves(doc.root, ids));
+        }
+        return;
+    }
     const Entry *fe = m_entries.find(m_framed);
     if (!fe)
         return;
@@ -230,7 +307,8 @@ void Navigator::ensureVisible(const std::string &panelId)
         focus(stage ? stage->id : std::string());
         return;
     }
-    if (containsNode(node, panelId))
+    if (m_boxed ? std::find(m_framedLeaves.begin(), m_framedLeaves.end(), panelId) != m_framedLeaves.end()
+                : containsNode(node, panelId))
         return;
     auto ids = m_framedLeaves;
     ids.push_back(panelId);
@@ -239,7 +317,7 @@ void Navigator::ensureVisible(const std::string &panelId)
 
 void Navigator::include(const std::vector<std::string> &ids)
 {
-    if (m_framed.empty())
+    if (overviewing())
         return;
     std::vector<std::string> all;
     for (const auto &id : m_framedLeaves)
@@ -297,26 +375,141 @@ bool Navigator::wheelStep(double delta, Point worldPoint, double nowMs)
     const int direction = delta > 0 ? 1 : delta < 0 ? -1 : 0;
     if (!direction)
         return false;
-    if (nowMs - m_wheel.last > 260 || direction != m_wheel.direction)
-        resetStepWheel();
+    // One step per gesture: a flick of a free-spinning wheel or a touchpad swipe keeps sending events
+    // until it dies away, and only the first one steps. A pause or a reversal starts a new gesture.
+    const bool fresh = nowMs - m_wheel.last > WHEEL_QUIET_MS || direction != m_wheel.direction;
     m_wheel.last = nowMs;
     m_wheel.direction = direction;
-    m_wheel.total += delta;
-    if (nowMs - m_wheel.steppedAt >= 140 && std::abs(m_wheel.total) >= 12) {
-        m_wheel.steppedAt = nowMs;
-        const bool out = m_wheel.total > 0;
-        m_wheel.total = 0;
-        focus(hierarchyStep(m_entries, m_framed.empty() ? rootId() : m_framed, out ? Direction::Out : Direction::In,
-                            worldPoint));
-        return true;
+    return fresh && zoomStep(direction > 0, worldPoint);
+}
+
+void Navigator::frameSet(const std::vector<std::string> &leaves, bool record)
+{
+    std::vector<std::string> survivors;
+    for (const auto &id : leaves)
+        if (m_entries.has(id))
+            survivors.push_back(id);
+    std::string destination = savedFrameDestination(m_host.doc().root, survivors);
+    focus(destination, record);
+    if (survivors.empty() || !on())
+        return;
+    auto whole = leafIds(m_framed.empty() ? m_host.doc().root : m_entries.at(m_framed).node);
+    std::sort(whole.begin(), whole.end());
+    std::sort(survivors.begin(), survivors.end());
+    if (whole == survivors)
+        return;
+    m_boxed = true;
+    m_framedLeaves = survivors;
+    retarget();
+    m_host.changed();
+}
+
+bool Navigator::zoomStep(bool out, Point at)
+{
+    if (!on() || m_entries.empty())
+        return false;
+    std::vector<Leaf> leaves;
+    for (const auto &id : leafIds(m_host.doc().root))
+        if (const Entry *e = m_entries.find(id))
+            leaves.push_back({id, e->rect});
+    if (leaves.empty())
+        return false;
+    const Rect box = framedRect();
+    const auto within = [&](const Rect &r) {
+        std::vector<std::string> ids;
+        for (const auto &l : leaves)
+            if (inside(r, l.r))
+                ids.push_back(l.id);
+        return ids;
+    };
+    // Tile edges, per axis: the "columns" and "rows" a step moves by.
+    std::vector<double> edges[2];
+    for (const auto &l : leaves)
+        for (int a = 0; a < 2; ++a) {
+            edges[a].push_back(lo(l.r, a));
+            edges[a].push_back(hi(l.r, a));
+        }
+    const double pointer[2] = {at.x, at.y};
+    Rect next = box;
+
+    if (out) {
+        for (int a = 0; a < 2; ++a) {
+            const double l = lo(next, a), h = hi(next, a);
+            double before = -1e18, after = 1e18;
+            for (double v : edges[a]) {
+                if (v < l - GRID_EPS) before = std::max(before, v);
+                if (v > h + GRID_EPS) after = std::min(after, v);
+            }
+            const bool canLow = before > -1e17, canHigh = after < 1e17;
+            if (!canLow && !canHigh)
+                continue;
+            const bool high = pointer[a] < (l + h) / 2 ? canHigh : !canLow;
+            setSpan(next, a, high ? l : before, high ? after : h);
+        }
+        // A tile the new edge cuts through joins the block whole.
+        for (bool grown = true; grown;) {
+            grown = false;
+            for (const auto &leaf : leaves)
+                if (overlaps(next, leaf.r) && !inside(next, leaf.r)) {
+                    next = unite(next, leaf.r);
+                    grown = true;
+                }
+        }
+    } else {
+        const Leaf *under = nullptr;
+        double best = 1e18;
+        for (const auto &l : leaves) {
+            if (!inside(box, l.r))
+                continue;
+            const double d = distanceTo(l.r, at);
+            if (d < best) {
+                best = d;
+                under = &l;
+            }
+        }
+        if (!under)
+            return false;
+        for (int a = 0; a < 2; ++a) {
+            const double l = lo(next, a), h = hi(next, a);
+            double after = 1e18, before = -1e18;
+            for (double v : edges[a]) {
+                if (v > l + GRID_EPS && v < h - GRID_EPS) {
+                    after = std::min(after, v);
+                    before = std::max(before, v);
+                }
+            }
+            if (after > 1e17)
+                continue;
+            const bool dropHighFirst = pointer[a] < (l + h) / 2;
+            for (int attempt = 0; attempt < 2; ++attempt) {
+                const bool dropHigh = (attempt == 0) == dropHighFirst;
+                Rect trial = next;
+                setSpan(trial, a, dropHigh ? l : after, dropHigh ? before : h);
+                const auto ids = within(trial);
+                if (std::find(ids.begin(), ids.end(), under->id) == ids.end())
+                    continue;
+                // Tiles cut by the new edge are dropped, so the block is what is left whole.
+                std::optional<Rect> kept;
+                for (const auto &leaf : leaves)
+                    if (inside(trial, leaf.r))
+                        kept = kept ? unite(*kept, leaf.r) : leaf.r;
+                next = *kept;
+                break;
+            }
+        }
     }
-    return false;
+    const auto before = within(box);
+    auto after = within(next);
+    if (after.empty() || after.size() == before.size())
+        return false;
+    frameSet(after);
+    return true;
 }
 
 Navigation Navigator::serialize() const
 {
     Navigation nav;
-    if (!m_framed.empty())
+    if (!overviewing())
         nav.frame = m_framedLeaves;
     nav.framings = m_framings;
     return nav;
@@ -332,8 +525,9 @@ void Navigator::restore(const Navigation &nav)
     m_overviewReturn.reset();
     m_framed.clear();
     m_framedLeaves.clear();
+    m_boxed = false;
     if (!destination.empty() && on())
-        focus(destination);
+        frameSet(nav.frame);
     else
         retarget();
 }
@@ -347,7 +541,7 @@ std::optional<Framing> Navigator::saveFraming(const std::string &name)
     Framing f;
     f.id = uid("framing");
     f.name = name.substr(begin, end - begin + 1);
-    f.frame = m_framed.empty() ? leafIds(m_host.doc().root) : m_framedLeaves;
+    f.frame = overviewing() ? leafIds(m_host.doc().root) : m_framedLeaves;
     m_framings.push_back(f);
     m_host.changed();
     return f;
@@ -357,7 +551,7 @@ void Navigator::goFraming(const std::string &id)
 {
     for (const auto &f : m_framings)
         if (f.id == id)
-            return focus(savedFrameDestination(m_host.doc().root, f.frame));
+            return frameSet(f.frame);
 }
 
 void Navigator::removeFraming(const std::string &id)
