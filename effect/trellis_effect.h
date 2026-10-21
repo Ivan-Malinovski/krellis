@@ -11,6 +11,7 @@
 #include "document.h"
 #include "view_rules.h"
 #include "session_store.h"
+#include "trellis_config.h"
 #include <QTimer>
 
 #include <QObject>
@@ -413,10 +414,12 @@ public Q_SLOTS:
     void selectOutput(int output);
     void moveToOutput(int window, int output);
     void reloadRules();
+    void reloadSettings();
     bool saveSession();
     QString sessionStatus() const;
     void restoreSession();
 private:
+    void applySettings(const trellis::config::Settings &settings);
     void syncOutputs();
     void initializeSession();
     void scheduleSave();

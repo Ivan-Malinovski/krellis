@@ -6,7 +6,6 @@
 #include "wayland_server.h"
 #include "wayland/seat.h"
 #include <QDBusConnection>
-#include <QSettings>
 #include <QStandardPaths>
 #include <QTimer>
 #include <algorithm>
@@ -19,14 +18,7 @@ QString TrellisEffect::version() const { return QString::fromLatin1(kBuildStamp)
 
 TrellisEffect::TrellisEffect()
 {
-    const QSettings config(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/trellisrc"), QSettings::IniFormat);
-    // Qt's INI reader files [General] keys under their bare names, so "General/key" never matches on read.
-    m_floatFirst = config.value(QStringLiteral("floatFirst"), false).toBool();
-    m_placeAtPointer = config.value(QStringLiteral("placeAtPointer"), true).toBool();
-    m_peekPx = std::max(0.0, config.value(QStringLiteral("peek"), 40).toDouble());
-    m_mapPinned = config.value(QStringLiteral("mapPinned"), false).toBool();
-    m_glide = config.value(QStringLiteral("glide"), false).toBool();
-    m_landMs = std::max(0.0, config.value(QStringLiteral("landMs"), 200).toDouble());
+    applySettings(trellis::config::load());
     initializeSession();
     syncOutputs();
     connect(effects, &EffectsHandler::windowAdded, this, [this](EffectWindow *w) {
@@ -503,7 +495,32 @@ void TrellisEffect::toggleBar()
     for (const auto &canvas : m_canvases) on = on || canvas->m_barOn;
     for (const auto &canvas : m_canvases) canvas->setBarOn(!on);
 }
-static QString configPath() { return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/trellisrc"); }
+void TrellisEffect::applySettings(const trellis::config::Settings &settings)
+{
+    m_floatFirst = settings.floatFirst;
+    m_placeAtPointer = settings.placeAtPointer;
+    m_peekPx = settings.peek;
+    m_mapPinned = settings.mapPinned;
+    m_glide = settings.glide;
+    m_landMs = settings.landMs;
+    for (const auto &canvas : m_canvases) {
+        canvas->m_floatFirst = m_floatFirst;
+        canvas->m_placeAtPointer = m_placeAtPointer;
+        canvas->m_peekPx = m_peekPx;
+        canvas->m_mapPinned = m_mapPinned;
+        canvas->m_glide = m_glide;
+        canvas->m_landMs = m_landMs;
+        canvas->m_nav.sync(); // the peek gutter changes the camera target
+        canvas->updateMap();
+        canvas->schedule();
+    }
+}
+// The settings module saves trellisrc, then calls this so the change applies without a re-login.
+void TrellisEffect::reloadSettings()
+{
+    applySettings(trellis::config::load());
+    reloadRules();
+}
 bool TrellisEffect::floatFirst() const { return m_floatFirst; }
 void TrellisEffect::setFloatFirst(bool on)
 {
@@ -513,9 +530,7 @@ void TrellisEffect::setFloatFirst(bool on)
         canvas->m_floatFirst = on;
         canvas->updateMap();
     }
-    QSettings config(configPath(), QSettings::IniFormat);
-    config.setValue(QStringLiteral("General/floatFirst"), on);
-    config.sync();
+    trellis::config::saveValue(QStringLiteral("floatFirst"), on);
 }
 void TrellisEffect::toggleFloatFirst() { setFloatFirst(!m_floatFirst); }
 bool TrellisEffect::mapPinned() const { return m_mapPinned; }
@@ -526,9 +541,7 @@ void TrellisEffect::setMapPinned(bool on)
         canvas->m_mapPinned = on;
         canvas->updateMap();
     }
-    QSettings config(configPath(), QSettings::IniFormat);
-    config.setValue(QStringLiteral("General/mapPinned"), on);
-    config.sync();
+    trellis::config::saveValue(QStringLiteral("mapPinned"), on);
 }
 void TrellisEffect::toggleMapPinned() { setMapPinned(!m_mapPinned); }
 void TrellisEffect::toggleMap() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleMap(); }

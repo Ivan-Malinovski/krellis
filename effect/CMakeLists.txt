@@ -13,12 +13,16 @@ set(CMAKE_AUTORCC ON)
 # mapped, so tools/install.sh builds each live install under a fresh id (trellis_<stamp>) and the new code loads
 # without a logout. The default id is what the nested harness uses.
 set(TRELLIS_ID trellis CACHE STRING "Effect plugin id, also the .so file name")
+# The effect's Configure button opens the settings module (kcm/), looked up under kwin/effects/configs.
+if(TRELLIS_BUILD_KCM)
+    set(TRELLIS_CONFIG_MODULE ",\n    \"X-KDE-ConfigModule\": \"kcm_trellis\"")
+endif()
 configure_file(metadata.json.in ${CMAKE_CURRENT_BINARY_DIR}/metadata.json @ONLY)
 configure_file(trellis.qrc.in ${CMAKE_CURRENT_BINARY_DIR}/${TRELLIS_ID}.qrc @ONLY)
 add_library(trellis MODULE native_resize.cpp trellis_effect.cpp multicanvas.cpp surface_input.cpp view_rules.cpp persistence.cpp session_store.cpp ${CMAKE_CURRENT_BINARY_DIR}/${TRELLIS_ID}.qrc)
 target_include_directories(trellis PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_compile_definitions(trellis PRIVATE TRELLIS_ID="${TRELLIS_ID}")
-target_link_libraries(trellis PRIVATE trellis_core KWin::kwin KDecoration3::KDecoration KF6::CoreAddons KF6::GlobalAccel Qt6::DBus Qt6::Quick)
+target_link_libraries(trellis PRIVATE trellis_core trellis_config KWin::kwin KDecoration3::KDecoration KF6::CoreAddons KF6::GlobalAccel Qt6::DBus Qt6::Quick)
 set_target_properties(trellis PROPERTIES PREFIX "" OUTPUT_NAME ${TRELLIS_ID})
 # Stage a plugin root the nested harness can point QT_PLUGIN_PATH at.
 add_custom_command(TARGET trellis POST_BUILD

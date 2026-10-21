@@ -6,5 +6,5 @@
         "Category": "Window Management",
         "EnabledByDefault": false,
         "License": "GPL"
-    }
+    }@TRELLIS_CONFIG_MODULE@
 }

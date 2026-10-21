@@ -12,9 +12,9 @@ export PATH=$HOME/.local/bin:$PATH
 id=trellis_$(date +%m%d%H%M%S)
 cmake -S "$project" -B "$project/build-live" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
   -DCMAKE_PREFIX_PATH="$project/third_party/ecm-prefix" \
-  -DVulkan_INCLUDE_DIR="$project/third_party/vulkan-headers/include" -DTRELLIS_BUILD_EFFECT=ON -DTRELLIS_ID="$id" >/dev/null
+  -DVulkan_INCLUDE_DIR="$project/third_party/vulkan-headers/include" -DTRELLIS_BUILD_EFFECT=ON -DTRELLIS_BUILD_KCM=ON -DTRELLIS_ID="$id" >/dev/null
 touch "$project/effect/multicanvas.cpp"   # refresh the build stamp
-cmake --build "$project/build-live" --target trellis
+cmake --build "$project/build-live" --target trellis kcm_trellis
 sudo "$(command -v cmake)" --install "$project/build-live" --prefix /usr
 # Unlinking a plugin KWin has mapped is safe; the running copy keeps its inode until it is swapped out.
 plugins=/usr/lib/qt6/plugins/kwin/effects/plugins

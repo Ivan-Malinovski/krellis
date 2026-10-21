@@ -19,3 +19,7 @@ trellis_test(test_more_semantics)
 trellis_test(test_session)
 target_sources(test_session PRIVATE ../effect/session_store.cpp)
 target_include_directories(test_session PRIVATE ../effect)
+
+add_executable(test_config test_config.cpp)
+target_link_libraries(test_config PRIVATE trellis_config Qt6::Test)
+add_test(NAME test_config COMMAND test_config)
