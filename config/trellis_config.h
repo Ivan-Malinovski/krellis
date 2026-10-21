@@ -20,6 +20,11 @@ struct Settings
     bool mapPinned = false;       // the minimap stays out instead of sliding off the edge
     bool glide = false;           // our own animations; off = windows jump to their final rects
     bool scratchpad = false;      // the scratch layer (Meta+G) and its minimap footer; off until asked for
+    bool followTheme = true;      // overlays take the Plasma colour scheme and accent; off = the built-in palette
+    bool toasts = true;           // a brief label on toggles, resize mode, undo and redo
+    bool flyTo = false;           // long camera jumps zoom out, pan and zoom in (needs glide)
+    bool whichKey = true;         // holding Meta+Alt shows the keyboard cheat sheet
+    int whichKeyDelayMs = 400;    // how long the chord is held before the cheat sheet shows
     double landMs = 200;          // glide off: duration of the move-and-scale after a real geometry change
     bool operator==(const Settings &) const = default;
 };

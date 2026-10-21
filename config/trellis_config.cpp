@@ -27,6 +27,11 @@ Settings load(const QString &file)
     s.glide = c.value(QStringLiteral("glide"), s.glide).toBool();
     s.scratchpad = c.value(QStringLiteral("scratchpad"), s.scratchpad).toBool();
     s.landMs = std::max(0.0, c.value(QStringLiteral("landMs"), s.landMs).toDouble());
+    s.followTheme = c.value(QStringLiteral("followTheme"), s.followTheme).toBool();
+    s.toasts = c.value(QStringLiteral("toasts"), s.toasts).toBool();
+    s.flyTo = c.value(QStringLiteral("flyTo"), s.flyTo).toBool();
+    s.whichKey = c.value(QStringLiteral("whichKey"), s.whichKey).toBool();
+    s.whichKeyDelayMs = std::clamp(c.value(QStringLiteral("whichKeyDelayMs"), s.whichKeyDelayMs).toInt(), 100, 2000);
     return s;
 }
 
@@ -43,6 +48,11 @@ bool save(const Settings &s, const QString &file)
     c.setValue(QStringLiteral("glide"), s.glide);
     c.setValue(QStringLiteral("scratchpad"), s.scratchpad);
     c.setValue(QStringLiteral("landMs"), s.landMs);
+    c.setValue(QStringLiteral("followTheme"), s.followTheme);
+    c.setValue(QStringLiteral("toasts"), s.toasts);
+    c.setValue(QStringLiteral("flyTo"), s.flyTo);
+    c.setValue(QStringLiteral("whichKey"), s.whichKey);
+    c.setValue(QStringLiteral("whichKeyDelayMs"), s.whichKeyDelayMs);
     c.sync();
     return c.status() == QSettings::NoError;
 }

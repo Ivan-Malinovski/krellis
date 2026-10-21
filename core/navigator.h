@@ -26,6 +26,10 @@ struct NavigationHost {
     virtual double peekPadding() const { return 0; }
     virtual LayoutMetrics layoutMetrics() const = 0;
     virtual bool busy() const { return false; }
+    /// Long jumps zoom out, pan and zoom in (needs the camera to glide).
+    virtual bool flyTo() const { return false; }
+    /// A real clock in ms, for rate-limiting flights (0 = none, never limits).
+    virtual double clockMs() const { return 0; }
     virtual void schedule() {}
     virtual void changed() {}
     virtual void gestureChanged(bool /*active*/) {}
@@ -38,6 +42,10 @@ public:
 
     /// Recompute targets after a layout change; the framing follows its views.
     void sync();
+    /// Advance a flight: once the camera has zoomed out far enough, head for the destination.
+    void tick(double dtSeconds, double nowMs);
+    bool flying() const { return m_pending.has_value(); }
+    const std::optional<Rect> &pendingTarget() const { return m_pending; }
     /// Frame a node or sibling range (empty = the whole layout). Floats frame their stage.
     void focus(std::string id, bool record = true);
     bool toggle(const std::string &id); // maximize / restore
@@ -117,6 +125,9 @@ private:
     std::optional<std::vector<std::string>> m_overviewReturn;
     std::vector<Framing> m_framings;
     bool m_gesture = false;
+    std::optional<Rect> m_pending; // where a flight is heading once it has zoomed out
+    Rect m_flightMid{};            // the camera target while zoomed out
+    double m_flightStartMs = 0, m_lastFlightMs = -1e18;
     double m_minTile = 0; // the smallest tile side, in layout units
 
     struct StepWheel {

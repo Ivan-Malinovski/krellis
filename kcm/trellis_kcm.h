@@ -41,6 +41,11 @@ class TrellisKcm : public KQuickConfigModule
     Q_PROPERTY(bool scratchpad READ scratchpad WRITE setScratchpad NOTIFY settingsChanged)
     Q_PROPERTY(bool glide READ glide WRITE setGlide NOTIFY settingsChanged)
     Q_PROPERTY(int landMs READ landMs WRITE setLandMs NOTIFY settingsChanged)
+    Q_PROPERTY(bool followTheme READ followTheme WRITE setFollowTheme NOTIFY settingsChanged)
+    Q_PROPERTY(bool toasts READ toasts WRITE setToasts NOTIFY settingsChanged)
+    Q_PROPERTY(bool flyTo READ flyTo WRITE setFlyTo NOTIFY settingsChanged)
+    Q_PROPERTY(bool whichKey READ whichKey WRITE setWhichKey NOTIFY settingsChanged)
+    Q_PROPERTY(int whichKeyDelayMs READ whichKeyDelayMs WRITE setWhichKeyDelayMs NOTIFY settingsChanged)
     Q_PROPERTY(RulesModel *rules READ rules CONSTANT)
 public:
     TrellisKcm(QObject *parent, const KPluginMetaData &data);
@@ -57,6 +62,11 @@ public:
     bool scratchpad() const { return m_current.scratchpad; }
     bool glide() const { return m_current.glide; }
     int landMs() const { return int(m_current.landMs); }
+    bool followTheme() const { return m_current.followTheme; }
+    bool toasts() const { return m_current.toasts; }
+    bool flyTo() const { return m_current.flyTo; }
+    bool whichKey() const { return m_current.whichKey; }
+    int whichKeyDelayMs() const { return m_current.whichKeyDelayMs; }
     void setFloatFirst(bool v) { edit([&] { m_current.floatFirst = v; }); }
     void setSpawnTarget(int v) { edit([&] { m_current.spawnTarget = trellis::config::SpawnTarget(std::clamp(v, 0, 2)); }); }
     void setPeek(int v) { edit([&] { m_current.peek = v; }); }
@@ -65,6 +75,11 @@ public:
     void setScratchpad(bool v) { edit([&] { m_current.scratchpad = v; }); }
     void setGlide(bool v) { edit([&] { m_current.glide = v; }); }
     void setLandMs(int v) { edit([&] { m_current.landMs = v; }); }
+    void setFollowTheme(bool v) { edit([&] { m_current.followTheme = v; }); }
+    void setToasts(bool v) { edit([&] { m_current.toasts = v; }); }
+    void setFlyTo(bool v) { edit([&] { m_current.flyTo = v; }); }
+    void setWhichKey(bool v) { edit([&] { m_current.whichKey = v; }); }
+    void setWhichKeyDelayMs(int v) { edit([&] { m_current.whichKeyDelayMs = std::clamp(v, 100, 2000); }); }
     RulesModel *rules() { return &m_rules; }
 
 Q_SIGNALS:

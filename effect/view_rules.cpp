@@ -140,6 +140,7 @@ void TrellisCanvas::toggleDock(int index)
     if (!location || location.where == PanelLocation::Where::Hidden) return;
     double opacity = 1;
     const TRect from = visualRect(t.window, &opacity).value_or(screenRect(t.panel));
+    EditScope edit(*this, location.where == PanelLocation::Where::Floating ? "tile window" : "float window");
     if (location.where == PanelLocation::Where::Floating) {
         if (!rule.side) return;
         m_rememberedFloats[t.panel] = location.floatState.rect;
@@ -176,9 +177,8 @@ void TrellisCanvas::updateTiles(double dt)
     for (const auto &t : m_windows) ids << QString::fromStdString(t.panel);
     if (ids.isEmpty() && !m_tileScene) return;
     if (!m_tileScene) {
-        m_tileScene = std::make_unique<OffscreenQuickScene>();
-        m_tileScene->setSource(QUrl(QStringLiteral("qrc:/" TRELLIS_ID "/tiles.qml")));
-        if (!m_tileScene->rootItem()) { m_tileScene.reset(); return; }
+        m_tileScene = makeScene(QStringLiteral("tiles.qml"));
+        if (!m_tileScene || !m_tileScene->rootItem()) { m_tileScene.reset(); return; }
     }
     m_tileScene->setGeometry(Rect(m_area.toAlignedRect()));
     auto *root = m_tileScene->rootItem();

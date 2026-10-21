@@ -7,6 +7,8 @@ find_package(KWin REQUIRED)
 find_package(KDecoration3 REQUIRED)
 find_package(KF6CoreAddons REQUIRED)
 find_package(KF6GlobalAccel REQUIRED)
+find_package(KF6ColorScheme REQUIRED)
+find_package(KF6Config REQUIRED)
 
 set(CMAKE_AUTORCC ON)
 # The plugin id doubles as the file name and the resource prefix. KWin never re-reads a plugin file it has already
@@ -19,10 +21,10 @@ if(TRELLIS_BUILD_KCM)
 endif()
 configure_file(metadata.json.in ${CMAKE_CURRENT_BINARY_DIR}/metadata.json @ONLY)
 configure_file(trellis.qrc.in ${CMAKE_CURRENT_BINARY_DIR}/${TRELLIS_ID}.qrc @ONLY)
-add_library(trellis MODULE native_resize.cpp trellis_effect.cpp multicanvas.cpp surface_input.cpp view_rules.cpp persistence.cpp session_store.cpp ${CMAKE_CURRENT_BINARY_DIR}/${TRELLIS_ID}.qrc)
+add_library(trellis MODULE native_resize.cpp trellis_effect.cpp multicanvas.cpp surface_input.cpp view_rules.cpp persistence.cpp session_store.cpp theme.cpp boot_guard.cpp ${CMAKE_CURRENT_BINARY_DIR}/${TRELLIS_ID}.qrc)
 target_include_directories(trellis PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_compile_definitions(trellis PRIVATE TRELLIS_ID="${TRELLIS_ID}")
-target_link_libraries(trellis PRIVATE trellis_core trellis_config KWin::kwin KDecoration3::KDecoration KF6::CoreAddons KF6::GlobalAccel Qt6::DBus Qt6::Quick)
+target_link_libraries(trellis PRIVATE trellis_core trellis_config KWin::kwin KDecoration3::KDecoration KF6::CoreAddons KF6::GlobalAccel KF6::ColorScheme KF6::ConfigCore KF6::ConfigGui Qt6::DBus Qt6::Quick)
 set_target_properties(trellis PROPERTIES PREFIX "" OUTPUT_NAME ${TRELLIS_ID})
 # Stage a plugin root the nested harness can point QT_PLUGIN_PATH at.
 add_custom_command(TARGET trellis POST_BUILD

@@ -15,10 +15,26 @@ private Q_SLOTS:
         const QString file = dir.filePath("trellisrc");
         Settings s;
         s.floatFirst = true; s.spawnTarget = SpawnTarget::Focused; s.peek = 12; s.map = false; s.mapPinned = true; s.glide = true; s.landMs = 90; s.scratchpad = true;
+        s.followTheme = false; s.toasts = false; s.flyTo = true; s.whichKey = false; s.whichKeyDelayMs = 750;
         QVERIFY(save(s, file));
         QCOMPARE(load(file), s);
         QVERIFY(!Settings{}.scratchpad);
         QVERIFY(Settings{}.map);
+    }
+    void polishSettingsDefaultsAndClamps()
+    {
+        const Settings d;
+        QVERIFY(d.followTheme && d.toasts && d.whichKey);
+        QVERIFY(!d.flyTo);
+        QCOMPARE(d.whichKeyDelayMs, 400);
+        QTemporaryDir dir;
+        const QString file = dir.filePath("trellisrc");
+        QVERIFY(saveValue("whichKeyDelayMs", 5, file));
+        QCOMPARE(load(file).whichKeyDelayMs, 100);
+        QVERIFY(saveValue("whichKeyDelayMs", 99999, file));
+        QCOMPARE(load(file).whichKeyDelayMs, 2000);
+        QVERIFY(saveValue("followTheme", false, file));
+        QVERIFY(!load(file).followTheme);
     }
     void spawnTargetValuesAndLegacyKey()
     {

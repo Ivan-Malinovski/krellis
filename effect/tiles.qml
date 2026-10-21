@@ -1,5 +1,6 @@
 import QtQuick
 Item {
+    required property QtObject theme
     id: root
     clip: true
     property var panels: []
@@ -28,11 +29,11 @@ Item {
                     clip: true
                     Rectangle {
                         x: -modelData.x; y: -modelData.y; width: tile.width; height: tile.height
-                        color: "#242b3b"; border.color: "#56627f"
+                        color: root.theme.card; border.color: root.theme.cardBorder
                         radius: Math.min(12, width / 4, height / 4)
                         readonly property real iconSize: Math.max(0, Math.min(40, width - 12, height - 12))
                         Image { anchors.centerIn: parent; width: parent.iconSize; height: width; source: tile.icon; fillMode: Image.PreserveAspectFit; visible: source != "" }
-                        Text { anchors.centerIn: parent; text: tile.title.slice(0, 1).toUpperCase(); color: "#e6e9f2"; font.pixelSize: parent.iconSize * 0.7; visible: tile.icon === "" }
+                        Text { anchors.centerIn: parent; text: tile.title.slice(0, 1).toUpperCase(); color: root.theme.text; font.pixelSize: parent.iconSize * 0.7; visible: tile.icon === "" }
                     }
                 }
             }

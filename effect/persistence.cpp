@@ -161,6 +161,7 @@ void TrellisEffect::restoreSession()
         auto restored=rebindSession(m_savedSession[savedFor.at(canvas)].document,replacement);
         const auto navigation=restored.navigation;
         canvas->m_doc=std::move(restored);
+        canvas->clearHistory(); // the saved layout is the new starting point
         for (const auto &panel : panelsOf(remaining.root)) canvas->dockAtEnd(panel);
         canvas->m_doc.floating.insert(canvas->m_doc.floating.end(),remaining.floating.begin(),remaining.floating.end());
         canvas->m_doc.hidden.insert(canvas->m_doc.hidden.end(),remaining.hidden.begin(),remaining.hidden.end());

@@ -6,5 +6,7 @@
     <file alias="drawertabs.qml">@CMAKE_CURRENT_SOURCE_DIR@/drawertabs.qml</file>
     <file alias="slot.qml">@CMAKE_CURRENT_SOURCE_DIR@/slot.qml</file>
     <file alias="marquee.qml">@CMAKE_CURRENT_SOURCE_DIR@/marquee.qml</file>
+    <file alias="toast.qml">@CMAKE_CURRENT_SOURCE_DIR@/toast.qml</file>
+    <file alias="whichkey.qml">@CMAKE_CURRENT_SOURCE_DIR@/whichkey.qml</file>
   </qresource>
 </RCC>

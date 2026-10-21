@@ -18,7 +18,13 @@ work=${NEST_WORK:-/tmp/trellis-nest}; rm -rf "$work"; mkdir -p "$work/config" "$
   IFS=, read -ra ids <<<"$effects"; for e in "${ids[@]}"; do echo "${e}Enabled=true"; done
   echo "blurEnabled=false"; echo "[Compositing]"; echo "Backend=OpenGL"
 } > "$work/config/kwinrc"
-if [ -n "${NEST_TRELLISRC:-}" ]; then cp "$NEST_TRELLISRC" "$work/config/trellisrc"; else printf "[General]\nglide=true\nmap=false\n" >"$work/config/trellisrc"; fi
+if [ -n "${NEST_TRELLISRC:-}" ]; then cp "$NEST_TRELLISRC" "$work/config/trellisrc"; else printf "[General]\nglide=true\nmap=false\nfollowTheme=false\ntoasts=false\nwhichKey=false\n" >"$work/config/trellisrc"; fi
+# NEST_KDEGLOBALS: a colour scheme for the nested session (theme scenarios); without it the built-in palette is used.
+if [ -n "${NEST_KDEGLOBALS:-}" ]; then cp "$NEST_KDEGLOBALS" "$work/config/kdeglobals"; fi
+# NEST_BOOT_STRIKES=N: seed the crash-loop marker as if the last start died N times in a row, just now (safe-mode scenario).
+if [ -n "${NEST_BOOT_STRIKES:-}" ]; then
+  printf '{"startedAtMs":%s,"cleanExit":false,"survived":false,"strikes":%s,"notified":true}\n' "$(( $(date +%s%3N) - 1000 ))" "$NEST_BOOT_STRIKES" >"$work/state/kwin-trellis/boot.json"
+fi
 if [ -n "${NEST_SESSION_FILE:-}" ]; then cp "$NEST_SESSION_FILE" "$work/state/kwin-trellis/session.json"; fi
 export NEST_OUTPUTS=${NEST_OUTPUTS:-1}
 export NEST_BACKEND_FLAG=

@@ -1,0 +1,7 @@
+[General]
+glide=true
+map=true
+mapPinned=true
+followTheme=true
+toasts=false
+whichKey=false

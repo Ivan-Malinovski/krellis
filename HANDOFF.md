@@ -189,3 +189,8 @@ Added `landMs` (default 200) short move-and-scale on real frame changes with gli
 
 ## 2026-10-21: grid zoom and minimap help
 Alt/Meta+scroll and plain title-bar scroll now zoom one column and row per gesture (Ctrl+scroll released to apps); minimap shows Floating/Tiling and a hover (?) shortcut sheet; clicking a framed minimap tile zooms out. Details in AGENTS.md "Grid zoom...". Unit tests (18 navigator) and nested scenarios zoom-grid, map, input, zoom-blink, noglide-blink, bar-optional pass. Not committed, not installed live: Ivan runs `tools/install.sh` + `tools/live.sh off/on` (logout if status shows MISMATCH).
+
+## 2026-10-21: plan 05 implemented (polish and safety)
+
+All seven items of `docs/plans/05-polish-and-safety.md` are implemented, built and covered by nested scenarios; nothing is committed, installed or loaded live. See its "Implementation notes" for deviations and `AGENTS.md` ("Plan 05") for the mechanics. Open for Ivan: install and try it (`tools/install.sh`, `tools/live.sh on`), confirm Meta+Alt+Shift+Z as redo, and check by hand the three things the harness cannot (global chord dismissing the which-key sheet, no sheet on a fast Meta+Alt+Key, modifier delivery while another client holds the keyboard). Enable permanently only with the safe-mode guard in the build you enable.
+

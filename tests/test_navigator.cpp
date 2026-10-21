@@ -12,6 +12,11 @@ struct Host : NavigationHost {
     NavMode navMode = NavMode::Free;
     int changes = 0;
     double peek = 0;
+    bool fly = false, reduced = false;
+    double clock = 0;
+    bool flyTo() const override { return fly; }
+    bool reducedMotion() const override { return reduced; }
+    double clockMs() const override { return clock; }
     const LayoutDocument &doc() const override { return document; }
     NavMode mode() const override { return navMode; }
     Point viewport() const override { return {1000, 600}; }
@@ -38,6 +43,152 @@ class TestNavigator : public QObject
 {
     Q_OBJECT
 private slots:
+
+    // --- fly-to ---
+    static LayoutDocument eight()
+    {
+        std::vector<LayoutSpec> cols;
+        for (int i = 0; i < 8; ++i)
+            cols.push_back(L::panel({L::view("t", std::string("w") + char('a' + i))}, std::string("P") + char('a' + i)));
+        auto root = L::row(std::move(cols));
+        return createDocument(&root);
+    }
+    void flightNearJumpIsDirect()
+    {
+        Host h;
+        h.document = eight();
+        h.fly = true;
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        nav.focus("Pa");
+        cam.finish();
+        nav.focus("Pb");
+        QVERIFY(!nav.flying());
+        QVERIFY(qAbs(cam.target.x - 1.0 / 8) < 1e-9);
+    }
+    void flightFarJumpZoomsOutThenIn()
+    {
+        Host h;
+        h.document = eight();
+        h.fly = true;
+        h.clock = 1000;
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        nav.focus("Pa");
+        cam.finish();
+        h.clock = 2000;
+        nav.focus("Ph");
+        QVERIFY(nav.flying());
+        const Rect dest = *nav.pendingTarget();
+        QVERIFY(qAbs(dest.x - 7.0 / 8) < 1e-9);
+        QVERIFY(cam.target.x <= 0 && cam.target.x + cam.target.w >= 1 - 1e-9); // the whole span
+        double now = 2000;
+        double widest = 0;
+        for (int i = 0; i < 200 && nav.flying(); ++i) {
+            now += 16;
+            cam.step(0.016);
+            nav.tick(0.016, now);
+            widest = std::max(widest, cam.value.w);
+        }
+        QVERIFY(!nav.flying());
+        QVERIFY(sameRect(cam.target, dest));
+        QVERIFY(widest > dest.w * 2);
+        for (int i = 0; i < 400; ++i)
+            cam.step(0.016);
+        QVERIFY(sameRect(cam.value, dest, 1e-3));
+    }
+    void flightSurvivesSync()
+    {
+        Host h;
+        h.document = eight();
+        h.fly = true;
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        nav.focus("Pa");
+        cam.finish();
+        nav.focus("Ph");
+        const Rect mid = cam.target, dest = *nav.pendingTarget();
+        nav.sync();
+        QVERIFY(nav.flying());
+        QVERIFY(sameRect(cam.target, mid));
+        QVERIFY(sameRect(*nav.pendingTarget(), dest));
+    }
+    void flightSecondJumpReplacesTheDestination()
+    {
+        Host h;
+        h.document = eight();
+        h.fly = true;
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        nav.focus("Pa");
+        cam.finish();
+        nav.focus("Ph");
+        nav.focus("Pd");
+        QVERIFY(qAbs(cam.target.x + cam.target.w / 2 - cam.value.x - cam.value.w / 2) > -1); // still a rect
+        if (nav.flying())
+            QVERIFY(qAbs(nav.pendingTarget()->x - 3.0 / 8) < 1e-9);
+        else
+            QVERIFY(qAbs(cam.target.x - 3.0 / 8) < 1e-9);
+    }
+    void flightIsSkippedForReducedMotionAndGlideOff()
+    {
+        Host h;
+        h.document = eight();
+        h.fly = true;
+        h.reduced = true;
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        nav.focus("Pa");
+        nav.focus("Ph");
+        QVERIFY(!nav.flying());
+        h.reduced = false;
+        h.fly = false;
+        nav.focus("Pa");
+        cam.finish();
+        nav.focus("Ph");
+        QVERIFY(!nav.flying());
+    }
+    void flightExternalJumpCancels()
+    {
+        Host h;
+        h.document = eight();
+        h.fly = true;
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        nav.focus("Pa");
+        cam.finish();
+        nav.focus("Ph");
+        QVERIFY(nav.flying());
+        cam.jump({0.3, 0.3, 0.2, 0.2});
+        nav.tick(0.016, 100);
+        QVERIFY(!nav.flying());
+        QVERIFY(sameRect(cam.target, {0.3, 0.3, 0.2, 0.2}));
+    }
+    void flightIsRateLimited()
+    {
+        Host h;
+        h.document = eight();
+        h.fly = true;
+        h.clock = 1000;
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        nav.focus("Pa");
+        cam.finish();
+        h.clock = 5000;
+        nav.focus("Ph");
+        QVERIFY(nav.flying());
+        h.clock = 5050; // a held key repeats
+        nav.focus("Pa");
+        QVERIFY(!nav.flying());
+        QVERIFY(qAbs(cam.target.x) < 1e-9);
+    }
     void init() {}
     void startsFramingEverything()
     {

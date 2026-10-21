@@ -1,4 +1,5 @@
 #include "trellis_effect.h"
+#include "boot_guard.h"
 #include "core/renderviewport.h"
 
 #include <chrono>
@@ -122,6 +123,14 @@ void TrellisCanvas::prepareUnload()
     m_slot.reset();
     m_marquee.reset();
     m_drawerTabs.reset();
+    m_toast.reset();
+    m_toastText.clear();
+    m_toastBusy = m_toastHoldArmed = m_toastHoldDone = false;
+    ++m_toastGen;
+    m_sheet.reset();
+    m_sheetWanted = false;
+    m_sheetOpacity = 0;
+    m_sheetBusy = false;
     m_animating = false;
 }
 
@@ -186,6 +195,7 @@ void TrellisCanvas::moveDirection(trellis::Edge dir)
     bool moved = false;
     auto next = trellis::moveInDirection(m_doc, panel, dir, layoutMetrics(), &moved);
     if (!moved) return;
+    EditScope edit(*this, "move tile");
     m_doc = std::move(next);
     relayout(true);
     m_nav.reveal(panel);
@@ -201,6 +211,7 @@ bool TrellisCanvas::resizeStep(trellis::Edge dir, double fraction)
     if (panel.empty() || m_session) return false;
     const auto root = trellis::resizeInDirection(m_doc.root, layoutMetrics(), panel, dir, fraction);
     if (!root) return false;
+    EditScope edit(*this, "resize tile", "resize:" + panel);
     m_doc.root = root;
     relayout(false);
     return true;
@@ -254,13 +265,15 @@ void TrellisEffect::registerShortcuts()
         {"TrellisMoveDown", "Trellis: Move Panel Down", Qt::META | Qt::CTRL | Qt::SHIFT | Qt::Key_Down, &TrellisEffect::moveDown},
         {"TrellisResizeMode", "Trellis: Resize Mode", Qt::META | Qt::CTRL | Qt::Key_R, &TrellisEffect::toggleResizeMode},
         {"TrellisSaveView", "Trellis: Save View", Qt::META | Qt::ALT | Qt::Key_S, &TrellisEffect::saveView},
+        {"TrellisUndo", "Trellis: Undo Layout Edit", Qt::META | Qt::ALT | Qt::Key_Z, &TrellisEffect::undo},
+        {"TrellisRedo", "Trellis: Redo Layout Edit", Qt::META | Qt::ALT | Qt::SHIFT | Qt::Key_Z, &TrellisEffect::redo},
     };
     for (const Binding &b : bindings) {
         auto *a = new QAction(this);
         a->setObjectName(QString::fromLatin1(b.id));
         a->setText(QString::fromLatin1(b.text));
         KGlobalAccel::self()->setGlobalShortcut(a, b.keys);
-        connect(a, &QAction::triggered, this, b.slot);
+        connect(a, &QAction::triggered, this, [this, slot = b.slot] { hideHint(); (this->*slot)(); });
     }
 }
 
@@ -287,7 +300,7 @@ void TrellisEffect::syncScratchShortcuts()
         a->setObjectName(QString::fromLatin1(b.id));
         a->setText(QString::fromLatin1(b.text));
         KGlobalAccel::self()->setGlobalShortcut(a, b.keys);
-        connect(a, &QAction::triggered, this, b.slot);
+        connect(a, &QAction::triggered, this, [this, slot = b.slot] { hideHint(); (this->*slot)(); });
         m_scratchActions << a;
     }
 }
@@ -377,6 +390,22 @@ LayoutMetrics TrellisCanvas::layoutMetrics() const
         return minOf(minOf, n, axis);
     };
     return m;
+}
+
+std::unique_ptr<OffscreenQuickScene> TrellisCanvas::makeScene(const QString &file)
+{
+    auto scene = std::make_unique<OffscreenQuickScene>();
+    scene->setSource(QUrl(QStringLiteral("qrc:/" TRELLIS_ID "/") + file), QVariantMap{{QStringLiteral("theme"), QVariant::fromValue(static_cast<QObject *>(m_theme))}});
+    if (!scene->rootItem()) {
+        qCWarning(trellisLog) << file << "failed to load";
+        return nullptr;
+    }
+    return scene;
+}
+
+void TrellisCanvas::themeChanged()
+{
+    schedule(); // the scenes' bindings follow the tokens by themselves; this only repaints
 }
 
 void TrellisCanvas::schedule()
@@ -524,9 +553,8 @@ void TrellisCanvas::updateDrawerTabs()
         return;
     }
     if (!m_drawerTabs) {
-        m_drawerTabs = std::make_unique<OffscreenQuickScene>();
-        m_drawerTabs->setSource(QUrl(QStringLiteral("qrc:/" TRELLIS_ID "/drawertabs.qml")));
-        if (!m_drawerTabs->rootItem()) {
+        m_drawerTabs = makeScene(QStringLiteral("drawertabs.qml"));
+        if (!m_drawerTabs || !m_drawerTabs->rootItem()) {
             qCWarning(trellisLog) << "drawertabs.qml failed to load";
             m_drawerTabs.reset();
             return;
@@ -942,9 +970,8 @@ void TrellisCanvas::updateBar()
         return;
     }
     if (!m_bar) {
-        m_bar = std::make_unique<OffscreenQuickScene>();
-        m_bar->setSource(QUrl(QStringLiteral("qrc:/" TRELLIS_ID "/bar.qml")));
-        if (!m_bar->rootItem()) {
+        m_bar = makeScene(QStringLiteral("bar.qml"));
+        if (!m_bar || !m_bar->rootItem()) {
             qCWarning(trellisLog) << "bar.qml failed to load";
             m_bar.reset();
             return;
@@ -1003,9 +1030,8 @@ void TrellisCanvas::updateMap(bool force)
     if (!m_mapOn && !m_map)
         return;
     if (!m_map) {
-        m_map = std::make_unique<OffscreenQuickScene>();
-        m_map->setSource(QUrl(QStringLiteral("qrc:/" TRELLIS_ID "/minimap.qml")));
-        if (!m_map->rootItem()) {
+        m_map = makeScene(QStringLiteral("minimap.qml"));
+        if (!m_map || !m_map->rootItem()) {
             qCWarning(trellisLog) << "minimap.qml failed to load";
             m_map.reset();
             return;
@@ -1353,6 +1379,7 @@ void TrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
             }
         }
         if (m_resize) m_camera.jump(m_resize->camera);
+        m_nav.tick(dt, realMs()); // may hand a pending flight its destination
         const bool springing = m_camera.step(dt);
         const bool tweening = m_tween.step(m_nowMs);
         if (!m_session && !m_resize) {
@@ -1397,6 +1424,8 @@ void TrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
         refreshRects();
         updateSlot(dt);
         updateMarquee(dt);
+        updateToast();
+        updateSheet(dt);
         const double areaProgress = std::clamp((m_nowMs - m_areaChangedMs) / trellis::Motion::layoutMs, 0.0, 1.0);
         if (!m_uiFrom.isEmpty()) {
             const double t = trellis::easeOutQuint(areaProgress);
@@ -1408,7 +1437,7 @@ void TrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
         updateMap();
         updateDrawerTabs();
         const bool tilesMoving = std::any_of(m_tiles.begin(), m_tiles.end(), [](const auto &t) { return std::abs(t.second.velocity) > 0.001 || std::abs(t.second.target - t.second.amount) > 0.0001; });
-        m_animating = tilesMoving || areaProgress < 1 || springing || (m_map && !m_map->rootItem()->property("settled").toBool()) || tweening || !m_flights.empty() || !m_popups.empty() || !m_closing.empty() || m_session || m_slot || m_marquee || m_layerDim != m_layerTarget || (!m_glide && layoutAwaitingLanding()) || !m_landings.empty();
+        m_animating = tilesMoving || areaProgress < 1 || springing || (m_map && !m_map->rootItem()->property("settled").toBool()) || tweening || !m_flights.empty() || !m_popups.empty() || !m_closing.empty() || m_session || m_slot || m_marquee || m_nav.flying() || m_toastBusy || m_sheetBusy || m_layerDim != m_layerTarget || (!m_glide && layoutAwaitingLanding()) || !m_landings.empty();
     }
 }
 
@@ -1678,7 +1707,10 @@ bool TrellisCanvas::handleButton(const PointerButtonEvent &e)
         std::string split;
         int index = 0;
         if (overUi(e.position) || !seamAt(e.position, &split, &index)) return false;
-        m_doc.root = trellis::flipBoundary(m_doc.root, split, index, trellis::uid("split"));
+        {
+            EditScope edit(*this, "flip split");
+            m_doc.root = trellis::flipBoundary(m_doc.root, split, index, trellis::uid("split"));
+        }
         m_swallowMiddle = true;
         relayout(true);
         applyRest();
@@ -1879,9 +1911,8 @@ void TrellisCanvas::updateMarquee(double dt)
     if (!m_marquee) {
         if (!live && !hinting)
             return;
-        m_marquee = std::make_unique<OffscreenQuickScene>();
-        m_marquee->setSource(QUrl(QStringLiteral("qrc:/" TRELLIS_ID "/marquee.qml")));
-        if (!m_marquee->rootItem()) {
+        m_marquee = makeScene(QStringLiteral("marquee.qml"));
+        if (!m_marquee || !m_marquee->rootItem()) {
             qCWarning(trellisLog) << "marquee.qml failed to load";
             m_marquee.reset();
             return;
@@ -2087,8 +2118,10 @@ void TrellisCanvas::endDrag(bool commit)
         schedule();
         return;
     }
-    if (out.committed)
+    if (out.committed) {
+        EditScope edit(*this, "move window");
         m_doc = out.next;
+    }
     // Everything, including the lifted window, glides from where it was just drawn. The tween starts
     // before the relayout so the first size request is the drawn one, not the final one.
     std::map<std::string, TRect> from;
@@ -2144,9 +2177,8 @@ void TrellisCanvas::updateSlot(double dt)
         want = std::clamp(size / 40.0, 0.0, 1.0);
         if (r.w >= 1 && r.h >= 1) {
             if (!m_slot) {
-                m_slot = std::make_unique<OffscreenQuickScene>();
-                m_slot->setSource(QUrl(QStringLiteral("qrc:/" TRELLIS_ID "/slot.qml")));
-                if (!m_slot->rootItem()) {
+                m_slot = makeScene(QStringLiteral("slot.qml"));
+                if (!m_slot || !m_slot->rootItem()) {
                     qCWarning(trellisLog) << "slot.qml failed to load";
                     m_slot.reset();
                     return;
@@ -2173,6 +2205,162 @@ void TrellisCanvas::updateSlot(double dt)
     }
     m_slot->rootItem()->setProperty("slotOpacity", m_slotOpacity);
     effects->addRepaint(Region(m_slot->geometry()));
+}
+
+double TrellisCanvas::realMs()
+{
+    using namespace std::chrono;
+    return double(duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count());
+}
+
+void TrellisCanvas::commitEdit(const char *label, const trellis::LayoutDocument &before, const trellis::LayoutDocument &next, const std::string &key)
+{
+    if (trellis::sameLayout(before, next)) return;
+    m_history.record(before, label, key, std::int64_t(realMs()));
+}
+
+bool TrellisCanvas::undoRedo(bool redo)
+{
+    if (m_session || m_resize) {
+        toast(QStringLiteral("Finish the drag first"));
+        return false;
+    }
+    const auto entry = redo ? m_history.redo(m_doc) : m_history.undo(m_doc);
+    if (!entry) {
+        toast(redo ? QStringLiteral("Nothing to redo") : QStringLiteral("Nothing to undo"));
+        return false;
+    }
+    std::set<std::string> fromNow; // scratch windows belong to the scratchpad, not to the edit history
+    for (const auto &t : m_windows)
+        if (scratchWindow(t.window)) fromNow.insert(t.panel);
+    m_doc = trellis::reconcile(entry->doc, m_doc, fromNow);
+    relayout(true);
+    updateDock();
+    applyRest();
+    toast(QStringLiteral("%1: %2").arg(redo ? QStringLiteral("Redid") : QStringLiteral("Undid"), QString::fromStdString(entry->label)));
+    return true;
+}
+
+void TrellisCanvas::toast(const QString &text)
+{
+    if (!m_toasts || m_unloading) return;
+    ++m_toastGen;
+    m_toastHoldArmed = m_toastHoldDone = false;
+    if (text == m_toastText && m_toast) {
+        m_toastPending = true;
+        m_toastResume = true; // already up: the timer restarts without sliding in again
+    } else {
+        m_toastResume = m_toast != nullptr;
+        m_toastText = text;
+        m_toastPending = true;
+    }
+    schedule();
+}
+
+// One message at a time. It slides up and fades in, holds, then fades out and the scene goes away so an idle
+// desktop stays idle. A message that replaces a visible one skips the slide and just swaps the text.
+void TrellisCanvas::showSheet(const QVariantList &groups)
+{
+    if (m_unloading) return;
+    m_sheetGroups = groups;
+    m_sheetWanted = true;
+    schedule();
+}
+
+void TrellisCanvas::hideSheet()
+{
+    if (!m_sheetWanted && !m_sheet) return;
+    m_sheetWanted = false;
+    schedule();
+}
+
+void TrellisCanvas::updateSheet(double dt)
+{
+    constexpr double IN_MS = 160, OUT_MS = 120; // a fade only: nothing moves, so reduced motion needs no variant
+    m_sheetBusy = false;
+    if (!m_sheetWanted && !m_sheet) return;
+    if (!m_sheet) {
+        m_sheet = makeScene(QStringLiteral("whichkey.qml"));
+        if (!m_sheet || !m_sheet->rootItem()) {
+            qCWarning(trellisLog) << "whichkey.qml failed to load";
+            m_sheet.reset();
+            m_sheetWanted = false;
+            return;
+        }
+        m_sheet->setGeometry(Rect(QRect(int(m_area.left()), int(m_area.top()), int(m_area.width()), int(m_area.height()))));
+    }
+    const double step = dt * 1000 / (m_sheetWanted ? IN_MS : OUT_MS);
+    m_sheetOpacity = std::clamp(m_sheetOpacity + (m_sheetWanted ? step : -step), 0.0, 1.0);
+    if (!m_sheetWanted && m_sheetOpacity <= 0) {
+        const Rect g = m_sheet->geometry();
+        m_sheet.reset();
+        effects->addRepaint(Region(g));
+        return;
+    }
+    QQuickItem *item = m_sheet->rootItem();
+    item->setProperty("groups", m_sheetGroups);
+    item->setProperty("hintOpacity", m_sheetOpacity);
+    effects->addRepaint(Region(m_sheet->geometry()));
+    m_sheetBusy = !m_sheetWanted || m_sheetOpacity < 1;
+}
+
+void TrellisCanvas::updateToast()
+{
+    constexpr double IN = 180, HOLD = 1400, OUT = 220, RISE = 12;
+    m_toastBusy = false;
+    if (m_toastText.isEmpty()) {
+        if (m_toast) {
+            const Rect g = m_toast->geometry();
+            m_toast.reset();
+            effects->addRepaint(Region(g));
+        }
+        return;
+    }
+    if (!m_toast) {
+        m_toast = makeScene(QStringLiteral("toast.qml"));
+        if (!m_toast || !m_toast->rootItem()) {
+            qCWarning(trellisLog) << "toast.qml failed to load";
+            m_toast.reset();
+            m_toastText.clear();
+            return;
+        }
+        const QRect band(m_area.left(), int(m_area.bottom()) - 96, int(m_area.width()), 96);
+        m_toast->setGeometry(Rect(band));
+    }
+    if (m_toastPending) {
+        m_toastPending = false;
+        m_toastStartMs = m_nowMs - (m_toastResume ? IN : 0);
+    }
+    if (m_toastHoldDone) { // the hold timer fired: start fading out from here
+        m_toastHoldDone = false;
+        m_toastStartMs = m_nowMs - (IN + HOLD) - 1; // just past the hold, so this frame already counts as fading
+    }
+    const double age = m_nowMs - m_toastStartMs;
+    if (age >= IN + HOLD + OUT) {
+        m_toastText.clear();
+        updateToast();
+        return;
+    }
+    const double in = std::clamp(age / IN, 0.0, 1.0);
+    const double out = age > IN + HOLD ? std::clamp((age - IN - HOLD) / OUT, 0.0, 1.0) : 0;
+    QQuickItem *item = m_toast->rootItem();
+    item->setProperty("text", m_toastText);
+    item->setProperty("toastOpacity", trellis::easeOutQuint(in) * (1 - out));
+    item->setProperty("rise", reducedMotion() ? 0.0 : RISE * (1 - trellis::easeOutQuint(in)));
+    effects->addRepaint(Region(m_toast->geometry()));
+    if (age >= IN && age <= IN + HOLD) {
+        if (!m_toastHoldArmed) {
+            m_toastHoldArmed = true;
+            const int gen = m_toastGen;
+            QTimer::singleShot(std::chrono::milliseconds(int(IN + HOLD - age)), Qt::PreciseTimer, this, [this, gen] {
+                if (gen != m_toastGen || m_unloading) return;
+                m_toastHoldDone = true;
+                schedule();
+            });
+        }
+    } else {
+        m_toastBusy = true; // sliding in or fading out
+    }
 }
 
 bool TrellisCanvas::drawerEdgeFree(trellis::Edge edge) const
@@ -2209,7 +2397,10 @@ void TrellisCanvas::stashPanel(const std::string &panel, trellis::Edge edge, con
     }
     const trellis::Rect rect{(open.x - m_area.x()) / m_area.width(), (open.y - m_area.y()) / m_area.height(),
                              open.w / m_area.width(), open.h / m_area.height()};
-    m_doc = trellis::floatPanel(m_doc, loc.panel, rect, trellis::FloatingLayer::Overlay);
+    {
+        EditScope edit(*this, "stash as drawer");
+        m_doc = trellis::floatPanel(m_doc, loc.panel, rect, trellis::FloatingLayer::Overlay);
+    }
     m_drawers[panel] = {edge, false, ++m_drawerSeq};
 }
 
@@ -2222,6 +2413,7 @@ void TrellisCanvas::flipActive()
     if (panel.empty() || m_session) return;
     auto next = trellis::flipPanel(m_doc, panel);
     if (!next) return;
+    EditScope edit(*this, "flip split");
     m_doc = std::move(*next);
     relayout(true);
     m_nav.reveal(panel);
@@ -2368,6 +2560,7 @@ void TrellisCanvas::toggleFloat(int i)
     const auto loc = trellis::locatePanel(m_doc, t.panel);
     double opacity = 1;
     const TRect from = visualRect(t.window, &opacity).value_or(screenRect(t.panel));
+    EditScope edit(*this, loc.where == trellis::PanelLocation::Where::Floating ? "tile window" : "float window");
     if (loc.where == trellis::PanelLocation::Where::Floating) {
         if (!rulesFor(t.window).side) return;
         m_doc = trellis::removePanel(m_doc, t.panel);
@@ -2471,6 +2664,13 @@ QString TrellisCanvas::dump()
         const auto s = m_scratchState();
         lines << QStringLiteral("SCRATCH count %1 shown %2 active %3 enabled %4").arg(s.value("count").toInt()).arg(s.value("shown").toBool()).arg(s.value("active").toBool()).arg(s.value("enabled").toBool());
         lines << QStringLiteral("LAYER dim %1").arg(m_layerDim, 0, 'f', 2);
+    }
+    lines << QStringLiteral("HISTORY undo %1 redo %2").arg(m_history.size()).arg(m_history.redoSize());
+    if (m_sheetWanted || m_sheet)
+        lines << QStringLiteral("WHICHKEY %1 opacity %2").arg(m_sheetWanted ? "shown" : "hiding").arg(m_sheetOpacity, 0, 'f', 2);
+    if (!m_toastText.isEmpty()) {
+        lines << QStringLiteral("TOAST %1 age %2 opacity %3").arg(m_toastText).arg(m_toastPending ? 0.0 : m_nowMs - m_toastStartMs, 0, 'f', 0)
+                     .arg(m_toast ? m_toast->rootItem()->property("toastOpacity").toDouble() : 0.0, 0, 'f', 2);
     }
     for (const auto &t : m_windows)
         if (scratchWindow(t.window)) lines << QStringLiteral("SCRATCHWIN %1 %2").arg(QString::fromStdString(t.panel), t.window->isMinimized() ? QStringLiteral("hidden") : QStringLiteral("shown"));
@@ -2631,6 +2831,17 @@ void TrellisEffect::simKey(int qtKey, bool press)
     KeyboardKeyEvent e{};
     e.key = Qt::Key(qtKey);
     e.state = press ? KeyboardKeyState::Pressed : KeyboardKeyState::Released;
+    // The compositor fills the modifier mask from its keyboard state; a simulated key keeps its own.
+    Qt::KeyboardModifier flag = Qt::NoModifier;
+    switch (e.key) {
+    case Qt::Key_Meta: case Qt::Key_Super_L: case Qt::Key_Super_R: flag = Qt::MetaModifier; break;
+    case Qt::Key_Alt: flag = Qt::AltModifier; break;
+    case Qt::Key_Shift: flag = Qt::ShiftModifier; break;
+    case Qt::Key_Control: flag = Qt::ControlModifier; break;
+    default: break;
+    }
+    m_simMods.setFlag(flag, press);
+    e.modifiers = m_simMods;
     handleKey(e);
 }
 
@@ -2643,7 +2854,7 @@ void TrellisEffect::simText(const QString &text)
     handleKey(event);
 }
 
-KWIN_EFFECT_FACTORY(TrellisEffect, "metadata.json")
+KWIN_EFFECT_FACTORY_SUPPORTED(TrellisEffect, "metadata.json", return trellisBootAllowed();)
 
 } // namespace KWin
 

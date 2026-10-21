@@ -130,8 +130,10 @@ void TrellisCanvas::finishResize(bool commit)
     if (!commit && state.window && !state.window->isDeleted() && state.window->window()
         && state.window->window()->isInteractiveResize())
         state.window->window()->cancelInteractiveMoveResize();
+    bool stashed = false;
     if (!commit) m_doc = std::move(state.before);
     else if (state.stash && state.window && trackedFor(state.window)) {
+        stashed = true; // stashPanel records its own step
         const std::string panel = trackedFor(state.window)->panel;
         m_doc = state.before;
         stashPanel(panel, *state.stash, state.painted);
@@ -152,6 +154,7 @@ void TrellisCanvas::finishResize(bool commit)
                 }
             }
     }
+    if (commit && !stashed) commitEdit("resize window", state.before, m_doc);
     relayout(true);
 }
 

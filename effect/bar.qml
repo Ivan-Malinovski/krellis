@@ -4,6 +4,7 @@ import QtQuick
 // on the right. Input is routed by the effect: it calls hit() for the item under the pointer and
 // sets hoverKey, so the QML never has to receive real events.
 Item {
+    required property QtObject theme
     id: root
     property var framings: []        // [{id, name, current}]
     property var labels: []          // dock chips (hidden windows)
@@ -21,9 +22,9 @@ Item {
     function beginName() { nameInput.text = ""; nameInput.forceActiveFocus(); }
 
 
-    readonly property color ink: "#e6e9f2"
-    readonly property color dim: "#8c93a8"
-    readonly property color well: "#3a4054"
+    readonly property color ink: theme.text
+    readonly property color dim: theme.textDim
+    readonly property color well: theme.well
     readonly property var curve: [0.2, 0.75, 0.2, 1, 1, 1]
 
     // The key of the deepest item under (px, py) that declares a hitKey.
@@ -51,8 +52,8 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: "#e61a1d26"
-        Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: "#26ffffff" }
+        color: Qt.alpha(theme.surface, 0.9)
+        Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Qt.alpha(theme.wash, 0.15) }
     }
 
     component Pill: Rectangle {
@@ -67,7 +68,7 @@ Item {
         radius: 9
         scale: root.pressKey === hitKey && hitKey !== "" ? 0.94 : 1
         opacity: enabledLook ? 1 : 0.4
-        color: current ? "#4a5fb4" : (root.hoverKey === hitKey && hitKey !== "" && enabledLook ? "#4b5270" : root.well)
+        color: current ? theme.accentStrong : (root.hoverKey === hitKey && hitKey !== "" && enabledLook ? theme.wellHover : root.well)
         Behavior on color { ColorAnimation { duration: 120 } }
         Behavior on scale { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
         Text {
@@ -118,14 +119,14 @@ Item {
             Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.BezierSpline; easing.bezierCurve: [0.22, 1, 0.36, 1, 1, 1] } }
             Rectangle {
                 width: 220; height: 30; radius: 9
-                color: "#252b3d"
-                border.color: root.nameError ? "#eb8b9c" : "#8496ec"
+                color: theme.card
+                border.color: root.nameError ? theme.error : theme.accentSoft
                 TextInput {
                     id: nameInput
                     property string hitKey: "name-edit"
                     anchors.fill: parent; anchors.margins: 7
                     enabled: root.naming
-                    color: root.ink; selectionColor: "#4a5fb4"; selectedTextColor: "white"
+                    color: root.ink; selectionColor: theme.accentStrong; selectedTextColor: theme.text
                     font.pixelSize: 13
                     maximumLength: 80
                     selectByMouse: true; clip: true
@@ -142,7 +143,7 @@ Item {
             verticalAlignment: Text.AlignVCenter
             visible: !root.naming
             text: root.hint !== "" ? root.hint : root.countText
-            color: root.hint !== "" ? "#8496ec" : root.dim
+            color: root.hint !== "" ? theme.accentSoft : root.dim
             font.pixelSize: 12
         }
     }
@@ -161,7 +162,7 @@ Item {
                 height: 30
                 width: chipText.implicitWidth + 24
                 radius: 9
-                color: root.hoverKey === hitKey ? "#4b5270" : root.well
+                color: root.hoverKey === hitKey ? theme.wellHover : root.well
                 opacity: 0
                 scale: 0.6
                 Component.onCompleted: { opacity = 1; scale = 1 }

@@ -3,6 +3,7 @@ import QtQuick
 // The workspace minimap: every panel as a tile, the live camera as a frame. The effect feeds
 // `tiles` when the layout changes and the camera every frame; clicks are routed through hit().
 Item {
+    required property QtObject theme
     id: root
     property var tiles: []           // [{id, x, y, w, h, focused, floating, vacant, tint}] in 0..1 units
     property real camX: 0
@@ -104,13 +105,13 @@ Item {
         width: parent.width - root.edge
         height: root.helpH
         radius: 14
-        color: "#f21a1d26"
+        color: Qt.alpha(theme.surface, 0.95)
         border.width: 1
-        border.color: "#26ffffff"
+        border.color: Qt.alpha(theme.wash, 0.15)
         opacity: root.helpOpen ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: 120 } }
         property string hitKey: "map:help"
-        Text { x: 12; y: 9; text: "Trellis shortcuts"; color: "#c9cee0"; font.pixelSize: 12; font.bold: true }
+        Text { x: 12; y: 9; text: "Trellis shortcuts"; color: theme.textSoft; font.pixelSize: 12; font.bold: true }
         Column {
             x: 12; y: 30
             spacing: 0
@@ -120,8 +121,8 @@ Item {
                     required property var modelData
                     height: 15
                     spacing: 8
-                    Text { width: 150; text: modelData[0]; color: "#e6e9f5"; font.pixelSize: 10; elide: Text.ElideRight }
-                    Text { text: modelData[1]; color: "#8c93a8"; font.pixelSize: 10 }
+                    Text { width: 150; text: modelData[0]; color: theme.text; font.pixelSize: 10; elide: Text.ElideRight }
+                    Text { text: modelData[1]; color: theme.textDim; font.pixelSize: 10 }
                 }
             }
         }
@@ -135,9 +136,9 @@ Item {
         width: root.cardW
         height: root.cardH
         radius: 14
-        color: "#e61a1d26"
+        color: Qt.alpha(theme.surface, 0.9)
         border.width: 1
-        border.color: "#26ffffff"
+        border.color: Qt.alpha(theme.wash, 0.15)
         opacity: root.shown ? 1 : 0
         transform: Translate { y: root.shown ? 0 : 14; Behavior on y { NumberAnimation { duration: 300; easing.type: Easing.BezierSpline; easing.bezierCurve: [0.2, 0.75, 0.2, 1, 1, 1] } } }
         Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.BezierSpline; easing.bezierCurve: [0.2, 0.75, 0.2, 1, 1, 1] } }
@@ -145,8 +146,8 @@ Item {
         Row {
             x: 12; y: 8
             spacing: 6
-            Text { text: "Workspace"; color: "#8c93a8"; font.pixelSize: 11 }
-            Text { text: "·  " + root.stateText; color: "#c9cee0"; font.pixelSize: 11 }
+            Text { text: "Workspace"; color: theme.textDim; font.pixelSize: 11 }
+            Text { text: "·  " + root.stateText; color: theme.textSoft; font.pixelSize: 11 }
         }
 
         Rectangle {
@@ -157,14 +158,14 @@ Item {
             width: modeText.width + 14
             height: 16
             radius: 8
-            color: root.floatFirst ? (root.hoverKey === "map:mode" ? "#66d8ab35" : "#40d8ab35") : (root.hoverKey === "map:mode" ? "#663f8fd6" : "#403f8fd6")
+            color: Qt.alpha(root.floatFirst ? theme.warm : theme.cool, root.hoverKey === "map:mode" ? 0.4 : 0.25)
             border.width: 1
-            border.color: root.floatFirst ? "#80d8ab35" : "#803f8fd6"
+            border.color: Qt.alpha(root.floatFirst ? theme.warm : theme.cool, 0.5)
             Text {
                 id: modeText
                 anchors.centerIn: parent
                 text: root.floatFirst ? "Floating" : "Tiling"
-                color: "#e6e9f5"
+                color: theme.text
                 font.pixelSize: 10
             }
         }
@@ -177,15 +178,15 @@ Item {
             y: 7
             width: 16; height: 16
             radius: 8
-            color: root.pinned ? "#4d99b4ff" : (root.hoverKey === "map:pin" ? "#40ffffff" : "#26ffffff")
+            color: root.pinned ? Qt.alpha(theme.accent, 0.3) : Qt.alpha(theme.wash, root.hoverKey === "map:pin" ? 0.25 : 0.15)
             border.width: 1
-            border.color: root.pinned ? "#99b4ff" : "#33ffffff"
+            border.color: root.pinned ? theme.accent : Qt.alpha(theme.wash, 0.2)
             Item {
                 anchors.centerIn: parent
                 width: 10; height: 10
                 rotation: root.pinned ? 0 : 40
                 Behavior on rotation { NumberAnimation { duration: 140 } }
-                readonly property color ink: root.pinned ? "#cfdcff" : "#c9cee0"
+                readonly property color ink: root.pinned ? theme.accent : theme.textSoft
                 Rectangle { x: 3; y: 0; width: 4; height: 4; radius: 1; color: parent.ink }
                 Rectangle { x: 1; y: 4; width: 8; height: 1.5; color: parent.ink }
                 Rectangle { x: 4.25; y: 5.5; width: 1.5; height: 4.5; color: parent.ink }
@@ -206,10 +207,10 @@ Item {
                 x: 6; y: 7
                 width: 16; height: 16
                 radius: 8
-                color: root.helpOpen ? "#4d99b4ff" : "#26ffffff"
+                color: root.helpOpen ? Qt.alpha(theme.accent, 0.3) : Qt.alpha(theme.wash, 0.15)
                 border.width: 1
-                border.color: root.helpOpen ? "#99b4ff" : "#33ffffff"
-                Text { anchors.centerIn: parent; text: "?"; color: "#e6e9f5"; font.pixelSize: 10; font.bold: true }
+                border.color: root.helpOpen ? theme.accent : Qt.alpha(theme.wash, 0.2)
+                Text { anchors.centerIn: parent; text: "?"; color: theme.text; font.pixelSize: 10; font.bold: true }
             }
         }
 
@@ -222,28 +223,28 @@ Item {
                 property string hitKey: "map:scratch"
                 width: scratchText.width + 18; height: 18; radius: 9
                 opacity: root.scratchCount > 0 ? 1 : 0.5
-                color: root.scratchShown ? (root.hoverKey === "map:scratch" ? "#668496ec" : "#408496ec") : (root.hoverKey === "map:scratch" ? "#40ffffff" : "#26ffffff")
+                color: root.scratchShown ? Qt.alpha(theme.accentSoft, root.hoverKey === "map:scratch" ? 0.4 : 0.25) : Qt.alpha(theme.wash, root.hoverKey === "map:scratch" ? 0.25 : 0.15)
                 border.width: 1
-                border.color: root.scratchShown ? "#808496ec" : "#33ffffff"
+                border.color: root.scratchShown ? Qt.alpha(theme.accentSoft, 0.5) : Qt.alpha(theme.wash, 0.2)
                 Text {
                     id: scratchText
                     anchors.centerIn: parent
                     text: root.scratchCount === 0 ? "Scratchpad" : "Scratchpad  ·  " + (root.scratchShown ? "hide" : "show" + (root.scratchCount > 1 ? " (" + root.scratchCount + ")" : ""))
-                    color: "#e6e9f5"; font.pixelSize: 10
+                    color: theme.text; font.pixelSize: 10
                 }
             }
             Rectangle {
                 property string hitKey: "map:scratch-mark"
                 width: markText.width + 18; height: 18; radius: 9
                 opacity: root.scratchCanMark ? 1 : 0.5
-                color: root.hoverKey === "map:scratch-mark" ? "#40ffffff" : "#26ffffff"
+                color: Qt.alpha(theme.wash, root.hoverKey === "map:scratch-mark" ? 0.25 : 0.15)
                 border.width: 1
-                border.color: "#33ffffff"
+                border.color: Qt.alpha(theme.wash, 0.2)
                 Text {
                     id: markText
                     anchors.centerIn: parent
                     text: root.scratchActive ? "Unmark" : "Mark active"
-                    color: "#e6e9f5"; font.pixelSize: 10
+                    color: theme.text; font.pixelSize: 10
                 }
             }
         }
@@ -255,7 +256,7 @@ Item {
             height: root.mapH
             property string hitKey: "map:overview"
 
-            Rectangle { anchors.fill: parent; radius: 6; color: "#2a2f3d" }
+            Rectangle { anchors.fill: parent; radius: 6; color: theme.stage }
 
             Repeater {
                 model: root.tiles
@@ -271,13 +272,13 @@ Item {
                     readonly property bool picked: root.bandOn && root.picks.indexOf(modelData.id) >= 0
                     opacity: modelData.vacant ? 0.7 : picked ? 1 : (root.bandOn ? 0.4 : (root.hoverKey === hitKey ? 1 : (modelData.focused ? 0.95 : 0.75)))
                     border.width: modelData.vacant ? 1 : picked ? 1.5 : (modelData.focused ? 1.5 : 0)
-                    border.color: modelData.vacant ? "#8b94b3" : "#ffffff"
+                    border.color: modelData.vacant ? theme.textDim : theme.tileOutline
                     Behavior on x { NumberAnimation { duration: 460; easing.type: Easing.OutQuint } }
                     Behavior on y { NumberAnimation { duration: 460; easing.type: Easing.OutQuint } }
                     Behavior on width { NumberAnimation { duration: 460; easing.type: Easing.OutQuint } }
                     Behavior on height { NumberAnimation { duration: 460; easing.type: Easing.OutQuint } }
                     Behavior on opacity { NumberAnimation { duration: 120 } }
-                    Rectangle { visible: !modelData.vacant; width: parent.width; height: Math.min(parent.height, 3.5); radius: 1.5; color: "#38ffffff" }
+                    Rectangle { visible: !modelData.vacant; width: parent.width; height: Math.min(parent.height, 3.5); radius: 1.5; color: Qt.alpha(theme.wash, 0.22) }
                 }
             }
 
@@ -286,20 +287,34 @@ Item {
                 x: root.band.x; y: root.band.y
                 width: root.band.width; height: root.band.height
                 radius: 2
-                color: "#2699b4ff"
+                color: Qt.alpha(theme.accent, 0.15)
                 border.width: 1
-                border.color: "#99b4ff"
+                border.color: theme.accent
             }
 
+            // The camera frame: an accent line with a dark halo, sitting just outside the tiles it frames so it
+            // never merges with the focused tile's border. The card's margin around the stage leaves room for both.
             Rectangle {
-                x: root.camX * stage.width + 0.75
-                y: root.camY * stage.height + 0.75
-                width: Math.max(1, root.camW * stage.width - 1.5)
-                height: Math.max(1, root.camH * stage.height - 1.5)
-                radius: 4
+                readonly property real inflate: 2
+                x: root.camX * stage.width - inflate - 1
+                y: root.camY * stage.height - inflate - 1
+                width: Math.max(4, root.camW * stage.width + 2 * inflate + 2)
+                height: Math.max(4, root.camH * stage.height + 2 * inflate + 2)
+                radius: 6
                 color: "transparent"
+                border.width: 1
+                border.color: Qt.alpha(theme.halo, 0.7)
+            }
+            Rectangle {
+                readonly property real inflate: 2
+                x: root.camX * stage.width - inflate
+                y: root.camY * stage.height - inflate
+                width: Math.max(2, root.camW * stage.width + 2 * inflate)
+                height: Math.max(2, root.camH * stage.height + 2 * inflate)
+                radius: 5
+                color: Qt.alpha(theme.accent, 0.08)
                 border.width: 1.5
-                border.color: "#99b4ff"
+                border.color: theme.accent
             }
         }
     }
@@ -322,10 +337,10 @@ Item {
         y: root.height - height - 8
         width: 24; height: 44
         radius: 8
-        color: root.hoverKey === "map:tab" ? "#e62c3142" : "#b31a1d26"
+        color: root.hoverKey === "map:tab" ? Qt.alpha(theme.surfaceHover, 0.9) : Qt.alpha(theme.surface, 0.7)
         border.width: 1
-        border.color: "#33ffffff"
+        border.color: Qt.alpha(theme.wash, 0.2)
         opacity: root.shown ? 1 - root.slide * 2 : 0
-        Text { x: 4; anchors.verticalCenter: parent.verticalCenter; text: "‹"; color: "#c9cee0"; font.pixelSize: 18 }
+        Text { x: 4; anchors.verticalCenter: parent.verticalCenter; text: "‹"; color: theme.textSoft; font.pixelSize: 18 }
     }
 }

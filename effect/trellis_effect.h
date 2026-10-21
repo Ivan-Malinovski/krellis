@@ -13,7 +13,12 @@
 #include "session_store.h"
 #include "trellis_config.h"
 #include "keynav.h"
+#include "theme.h"
+#include "chord_hint.h"
+#include "history.h"
+#include "reconcile.h"
 #include <QTimer>
+#include <QVariantList>
 
 #include <QObject>
 #include <QPointer>
@@ -87,6 +92,8 @@ public:
     bool allowed(const std::vector<std::string> &views, trellis::Region region) const override;
     bool frameOnly(const std::string &panel) const override;
     bool reducedMotion() const override { return !m_glide; }
+    bool flyTo() const override { return m_flyTo; }
+    double clockMs() const override { return realMs(); }
     bool tabsAllowed() const override { return false; }
     const trellis::RectMap &lastRects() const override;
     void beginTween(const trellis::RectMap &previous, double nowMs) override;
@@ -130,6 +137,11 @@ public Q_SLOTS:
     void focusDirection(trellis::Edge dir);
     void moveDirection(trellis::Edge dir);
     bool resizeStep(trellis::Edge dir, double fraction);
+    bool undoRedo(bool redo); // false when there is nothing to do or an edit is in progress (both say so in a toast)
+    void clearHistory() { m_history.clear(); }
+    void toast(const QString &text); // no-op with toasts off; a repeat of the visible text only restarts its timer
+    void showSheet(const QVariantList &groups); // the which-key sheet; fades in
+    void hideSheet();
     void setHint(const QString &hint) { if (hint != m_hint) { m_hint = hint; updateBar(); } }
     QString barHit(double x, double y) { return barKey({x, y}); }
     // Drive a window drag without KWin's interactive move: press on window `index` at (x, y).
@@ -164,6 +176,8 @@ private:
     bool m_applyingRest = false;
     bool m_steppingResize = false;
     bool m_unloading = false;
+    bool m_toasts = true;
+    bool m_flyTo = false; // long camera jumps zoom out, pan and zoom in (needs glide)
     struct ResizeBoundary { std::string split; int index; trellis::Axis axis; double start; };
     struct NativeResize {
         QPointer<EffectWindow> window;
@@ -231,6 +245,10 @@ private:
     bool scratchWindow(EffectWindow *w) const;
     // Turn the docked window into a centred overlay float. False when it can't (nothing left to tile, or not docked).
     bool m_scratchpad = false; // [General] scratchpad, mirrored from the effect; off, no window counts as scratch
+    trellis::Theme *m_theme = nullptr; // owned by the effect; the tokens every overlay scene binds to
+    // An overlay scene with the theme handed in as its `theme` property; null (and logged) when the QML fails to load.
+    std::unique_ptr<OffscreenQuickScene> makeScene(const QString &file);
+    void themeChanged(); // the colours moved: repaint every overlay
     bool floatForScratch(EffectWindow *w, int slot = 0); // slot offsets the default rect so marked windows cascade
     // The scratch layer is up while any scratch window is shown on this output; the rest of the canvas dims under it.
     bool layerShown() const;
@@ -276,6 +294,32 @@ private:
     bool flightRect(EffectWindow *w, const Tracked &t, TRect &rect, double &opacity) const;
 
     trellis::LayoutDocument m_doc;
+    // Undo/redo of layout edits the user made. Window opens and closes, minimizing and scratchpad show/hide are not
+    // edits; undo restores the arrangement and keeps what the compositor owns (see trellis::reconcile).
+    trellis::History m_history;
+    int m_editDepth = 0;
+    static double realMs();
+    void commitEdit(const char *label, const trellis::LayoutDocument &before, const trellis::LayoutDocument &next, const std::string &key = {});
+    // Records the document as it was on entry, if it differs on exit. Nested scopes leave the recording to the outermost.
+    class EditScope
+    {
+    public:
+        EditScope(TrellisCanvas &canvas, const char *label, std::string key = {})
+            : m_canvas(canvas), m_label(label), m_key(std::move(key)), m_outer(canvas.m_editDepth++ == 0), m_before(canvas.m_doc) {}
+        ~EditScope()
+        {
+            --m_canvas.m_editDepth;
+            if (m_outer) m_canvas.commitEdit(m_label, m_before, m_canvas.m_doc, m_key);
+        }
+        EditScope(const EditScope &) = delete;
+        EditScope &operator=(const EditScope &) = delete;
+    private:
+        TrellisCanvas &m_canvas;
+        const char *m_label;
+        std::string m_key;
+        bool m_outer;
+        trellis::LayoutDocument m_before;
+    };
     trellis::RectSpring m_camera;
     trellis::Navigator m_nav;
     trellis::LayoutTween m_tween;
@@ -358,6 +402,23 @@ private:
     void refreshRects();
     std::unique_ptr<class OffscreenQuickScene> m_slot;
     double m_slotOpacity = 0;
+    // Action toast: text, the frame-clock time it started, and whether it replaces a visible one.
+    std::unique_ptr<class OffscreenQuickScene> m_toast;
+    QString m_toastText;
+    double m_toastStartMs = 0;
+    bool m_toastPending = true; // start the clock on the next frame (m_nowMs can be small, so no sentinel value)
+    bool m_toastResume = false;
+    // The frame clock only runs while a toast fades or slides. The hold waits on a real-time timer (the animation
+    // clock advances at most one frame per tick, so it cannot time a pause); m_toastGen drops a stale timer.
+    bool m_toastBusy = false, m_toastHoldArmed = false, m_toastHoldDone = false;
+    int m_toastGen = 0;
+    void updateToast();
+    std::unique_ptr<class OffscreenQuickScene> m_sheet;
+    QVariantList m_sheetGroups;
+    bool m_sheetWanted = false;
+    double m_sheetOpacity = 0;
+    bool m_sheetBusy = false; // fading in or out; a fully shown sheet needs no frames
+    void updateSheet(double dt);
     TRect m_lifted; // the lifted window's screen rect this frame (absolute)
     void watch(EffectWindow *w);
     // Rectangle-select gesture (Ctrl+Alt+Shift drag): a rubber band plus the framing a release would pick.
@@ -429,6 +490,8 @@ public Q_SLOTS:
     void moveDirection(const QString &direction);
     bool resizeStep(const QString &direction, double fraction);
     void toggleResizeMode();
+    void undo();
+    void redo();
     // Scratchpad: floating overlays summoned over the current view and dismissed again. An empty name means any.
     void toggleScratch(const QString &name);
     void toggleScratchPad() { toggleScratch(QString()); }
@@ -447,6 +510,8 @@ public Q_SLOTS:
     bool resizeModeActive() const { return m_resizeMode; }
     void turnOff();
     QString version() const;
+    void toast(const QString &text); // on the output the user is working on
+    QString dumpTheme() const { return m_theme.dump(); }
     void toggleBar();
     void toggleFloatFirst();
     void setFloatFirst(bool on);
@@ -555,6 +620,15 @@ private:
     bool m_grabDecoration = false;
     QPointF m_decorPosition;
     void registerShortcuts();
+    void trackChord(const KeyboardKeyEvent &e);
+    void showHint();
+    void hideHint(); // the hold turned into something else: drop the sheet and stay quiet until the chord is released
+    void hideHintUi();
+    QVariantList helpGroups() const;
+    trellis::ChordHint m_chord;
+    QTimer *m_chordTimer = nullptr;
+    Qt::KeyboardModifiers m_simMods; // held modifiers of simKey, standing in for the compositor's keyboard state
+    bool m_whichKey = true;
     void syncScratchShortcuts(); // Meta+G and Meta+Shift+G exist only while the scratchpad is enabled
     QList<QAction *> m_scratchActions;
     bool m_scratchpad = false;
@@ -562,6 +636,7 @@ private:
     TrellisCanvas *canvasAt(QPointF point) const;
     TrellisCanvas *owner(EffectWindow *window) const;
     TrellisCanvas *current() const;
+    trellis::Theme m_theme; // before the canvases: their scenes read it while they are destroyed
     std::vector<std::unique_ptr<TrellisCanvas>> m_canvases;
     std::unique_ptr<TrellisInput> m_input;
     TrellisCanvas *m_pointerCanvas = nullptr, *m_pinchCanvas = nullptr;
@@ -572,6 +647,7 @@ private:
     bool m_mapPinned = false;  // likewise
     bool m_showMap = true;     // [General] map, default on; the minimap shortcut flips and saves it
     double m_landMs = 200; // loaded from trellisrc ([General] landMs); mirrored into every canvas
+    bool m_toastsOn = true, m_flyToOn = false; // loaded from trellisrc; mirrored into every canvas
     bool m_glide = false; // loaded from trellisrc ([General] glide, default off); mirrored into every canvas
 };
 

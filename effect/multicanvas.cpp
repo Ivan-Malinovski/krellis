@@ -8,6 +8,12 @@
 #include <QDBusConnection>
 #include <QStandardPaths>
 #include <QTimer>
+#include <KGlobalAccel>
+#include <QAction>
+#include <chrono>
+#include "shortcut_help.h"
+#include "boot_guard.h"
+#include "safemode.h"
 #include <algorithm>
 
 namespace KWin {
@@ -16,8 +22,26 @@ namespace KWin {
 static const char kBuildStamp[] = "build " __DATE__ " " __TIME__; // ASCII so tools can grep the .so
 QString TrellisEffect::version() const { return QString::fromLatin1(kBuildStamp); }
 
+static qint64 chordNowMs()
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
 TrellisEffect::TrellisEffect()
 {
+    trellisBootStarted();
+    QTimer::singleShot(int(trellis::BOOT_SURVIVE_MS), this, [] { trellisBootSurvived(); }); // one write, no heartbeat
+    m_chordTimer = new QTimer(this);
+    m_chordTimer->setSingleShot(true);
+    m_chordTimer->setTimerType(Qt::PreciseTimer);
+    connect(m_chordTimer, &QTimer::timeout, this, [this] {
+        const qint64 now = chordNowMs();
+        if (m_chord.tick(now)) showHint();
+        else if (m_chord.pending()) m_chordTimer->start(int(std::max<qint64>(1, m_chord.deadline() - now))); // fired a little early
+    });
+    connect(&m_theme, &trellis::Theme::changed, this, [this] {
+        for (const auto &canvas : m_canvases) canvas->themeChanged();
+    });
     applySettings(trellis::config::load());
     initializeSession();
     syncOutputs();
@@ -63,6 +87,7 @@ TrellisEffect::TrellisEffect()
 
 TrellisEffect::~TrellisEffect()
 {
+    trellisBootClean();
     m_shuttingDown = true;
     m_saveTimer->stop();
     m_restoreTimer->stop();
@@ -165,12 +190,15 @@ void TrellisEffect::syncOutputs()
         if (std::any_of(m_canvases.begin(), m_canvases.end(), [output](const auto &c) { return c->m_output == output; }))
             continue;
         auto canvas = std::make_unique<TrellisCanvas>(output);
+        canvas->m_theme = &m_theme;
         canvas->m_floatFirst = m_floatFirst;
         canvas->m_spawnTarget = m_spawnTarget;
         canvas->m_peekPx = m_peekPx;
         canvas->m_scratchpad = m_scratchpad;
         canvas->m_glide = m_glide;
         canvas->m_landMs = m_landMs;
+        canvas->m_toasts = m_toastsOn;
+        canvas->m_flyTo = m_flyToOn;
         canvas->m_nativeMutation = [this](EffectWindow *window, bool automatic) { rememberNative(window, automatic); };
         canvas->m_hiddenNativeRect = [this](EffectWindow *window) -> std::optional<RectF> {
             if (auto it = m_nativeStates.find(window->window()); it != m_nativeStates.end()) return it->second.geometry;
@@ -334,6 +362,7 @@ void TrellisEffect::paintWindow(const RenderTarget &rt, const RenderViewport &vp
 
 bool TrellisEffect::handleButton(const PointerButtonEvent &e)
 {
+    if (m_whichKey && (m_chord.pending() || m_chord.shown())) hideHint();
     if (e.state == PointerButtonState::Pressed) markSessionInteraction();
     if (auto *active = effects->activeWindow(); active && (active->isUserMove() || active->isUserResize())) {
         // A decoration press was delivered by us, so its release belongs to the
@@ -391,8 +420,87 @@ bool TrellisEffect::handleAxis(const PointerAxisEvent &e)
     }
     return (canvas && canvas->handleAxis(e, titleBar)) || surfaceAxis(e);
 }
+// Follows Meta and Alt (and Shift/Ctrl, which cancel the hold) from the key stream. Never consumes anything.
+// The flags are re-read from the event's modifier mask every time, so a release swallowed by a filter ahead of us
+// (TabBox, a grab) cannot leave one stuck; the event's own key wins because the mask may be sampled before or after it.
+void TrellisEffect::trackChord(const KeyboardKeyEvent &e)
+{
+    if (!m_whichKey) return;
+    const bool pressed = e.state != KeyboardKeyState::Released;
+    bool meta = e.modifiers.testFlag(Qt::MetaModifier), alt = e.modifiers.testFlag(Qt::AltModifier);
+    bool shift = e.modifiers.testFlag(Qt::ShiftModifier), ctrl = e.modifiers.testFlag(Qt::ControlModifier);
+    bool *own = nullptr;
+    switch (e.key) {
+    case Qt::Key_Meta: case Qt::Key_Super_L: case Qt::Key_Super_R: own = &meta; break;
+    case Qt::Key_Alt: own = &alt; break;
+    case Qt::Key_Shift: own = &shift; break;
+    case Qt::Key_Control: own = &ctrl; break;
+    default: break;
+    }
+    if (!own) {
+        if (pressed) hideHint();
+        return;
+    }
+    if (e.state == KeyboardKeyState::Repeated) return;
+    *own = pressed;
+    const qint64 now = chordNowMs();
+    m_chord.setModifiers(meta, alt, shift || ctrl, now);
+    if (pressed && (own == &shift || own == &ctrl)) {
+        hideHint(); // Meta+Alt+Shift is a chord of its own; releasing Shift must not start a new hold
+    } else if (m_chord.pending()) {
+        m_chordTimer->start(int(std::max<qint64>(0, m_chord.deadline() - now)));
+    } else if (!m_chord.shown()) {
+        hideHintUi();
+    }
+}
+
+void TrellisEffect::hideHintUi()
+{
+    m_chordTimer->stop();
+    for (const auto &canvas : m_canvases) canvas->hideSheet();
+}
+
+void TrellisEffect::hideHint()
+{
+    m_chord.dismiss();
+    hideHintUi();
+}
+
+void TrellisEffect::showHint()
+{
+    if (auto *canvas = current()) canvas->showSheet(helpGroups());
+}
+
+QVariantList TrellisEffect::helpGroups() const
+{
+    auto rowsOf = [this](const trellis::HelpRow *rows, int count) {
+        QVariantList out;
+        for (int i = 0; i < count; ++i) {
+            const auto *action = findChild<QAction *>(QString::fromLatin1(rows[i].id), Qt::FindDirectChildrenOnly);
+            if (!action) continue;
+            const auto keys = KGlobalAccel::self()->shortcut(action);
+            if (keys.isEmpty()) continue;
+            QString text = keys.first().toString(QKeySequence::NativeText);
+            if (rows[i].arrows) {
+                const qsizetype plus = text.lastIndexOf(QLatin1Char('+'));
+                text = (plus >= 0 ? text.left(plus + 1) : QString()) + QStringLiteral("Arrows");
+            }
+            out << QVariantMap{{QStringLiteral("label"), QString::fromLatin1(rows[i].label)}, {QStringLiteral("keys"), text}};
+        }
+        return out;
+    };
+    QVariantList groups;
+    for (const auto &group : trellis::kHelpGroups)
+        groups << QVariantMap{{QStringLiteral("name"), QString::fromLatin1(group.name)}, {QStringLiteral("rows"), rowsOf(group.rows, group.count)}};
+    if (m_scratchpad)
+        groups << QVariantMap{{QStringLiteral("name"), QStringLiteral("Scratchpad")},
+                              {QStringLiteral("rows"), rowsOf(trellis::kHelpScratch, int(sizeof(trellis::kHelpScratch) / sizeof(trellis::HelpRow)))}};
+    return groups;
+}
+
 bool TrellisEffect::handleKey(const KeyboardKeyEvent &e)
 {
+    trackChord(e);
     if (auto *active = effects->activeWindow(); active && (active->isUserMove() || active->isUserResize())) {
         if (e.key == Qt::Key_Escape && e.state == KeyboardKeyState::Pressed)
             if (auto *canvas = owner(active); canvas && canvas->m_resize) canvas->m_resize->decision = false;
@@ -569,6 +677,7 @@ void TrellisEffect::toggleScratch(const QString &name)
     if (up) hideScratch(windows);
     else showScratch(windows);
     refreshScratchUi();
+    toast(up ? QStringLiteral("Scratchpad hidden") : QStringLiteral("Scratchpad shown"));
 }
 void TrellisEffect::hideScratch(const std::vector<EffectWindow *> &windows)
 {
@@ -669,6 +778,8 @@ void TrellisEffect::setResizeMode(bool on)
     for (const auto &canvas : m_canvases)
         canvas->setHint(on ? QStringLiteral("Resize  ·  arrows  ·  Shift = bigger  ·  Esc = done") : QString());
 }
+void TrellisEffect::undo() { markSessionInteraction(); if (auto *canvas = current()) canvas->undoRedo(false); }
+void TrellisEffect::redo() { markSessionInteraction(); if (auto *canvas = current()) canvas->undoRedo(true); }
 void TrellisEffect::toggleResizeMode() { markSessionInteraction(); setResizeMode(!m_resizeMode); }
 bool TrellisEffect::handleResizeKey(const KeyboardKeyEvent &e)
 {
@@ -697,6 +808,12 @@ void TrellisEffect::toggleBar()
     bool on = false;
     for (const auto &canvas : m_canvases) on = on || canvas->m_barOn;
     for (const auto &canvas : m_canvases) canvas->setBarOn(!on);
+    toast(on ? QStringLiteral("Bar off") : QStringLiteral("Bar on"));
+}
+// A toast on the output the user is working on.
+void TrellisEffect::toast(const QString &text)
+{
+    if (auto *canvas = current()) canvas->toast(text);
 }
 void TrellisEffect::applySettings(const trellis::config::Settings &settings)
 {
@@ -707,6 +824,12 @@ void TrellisEffect::applySettings(const trellis::config::Settings &settings)
     m_showMap = settings.map;
     m_glide = settings.glide;
     m_landMs = settings.landMs;
+    m_theme.setFollow(settings.followTheme);
+    m_toastsOn = settings.toasts;
+    m_whichKey = settings.whichKey;
+    m_chord.setDelay(settings.whichKeyDelayMs);
+    if (!m_whichKey && m_chordTimer) hideHint();
+    m_flyToOn = settings.flyTo;
     if (m_scratchpad && !settings.scratchpad) {
         // Switched off with the layer up or down: bring every scratch window back as an ordinary float and forget the marks.
         m_scratchBusy = true;
@@ -726,6 +849,8 @@ void TrellisEffect::applySettings(const trellis::config::Settings &settings)
         canvas->m_scratchpad = m_scratchpad;
         canvas->m_glide = m_glide;
         canvas->m_landMs = m_landMs;
+        canvas->m_toasts = m_toastsOn;
+        canvas->m_flyTo = m_flyToOn;
         canvas->m_nav.sync(); // the peek gutter changes the camera target
         canvas->updateMap();
         canvas->schedule();
@@ -735,6 +860,7 @@ void TrellisEffect::applySettings(const trellis::config::Settings &settings)
 void TrellisEffect::reloadSettings()
 {
     applySettings(trellis::config::load());
+    m_theme.reload(); // the harness changes kdeglobals without the D-Bus notification KConfigWatcher listens for
     reloadRules();
 }
 bool TrellisEffect::floatFirst() const { return m_floatFirst; }
@@ -747,6 +873,7 @@ void TrellisEffect::setFloatFirst(bool on)
         canvas->updateMap();
     }
     trellis::config::saveValue(QStringLiteral("floatFirst"), on);
+    toast(on ? QStringLiteral("Floating first") : QStringLiteral("Tiling first"));
 }
 void TrellisEffect::toggleFloatFirst() { setFloatFirst(!m_floatFirst); }
 bool TrellisEffect::mapPinned() const { return m_mapPinned; }
@@ -758,6 +885,7 @@ void TrellisEffect::setMapPinned(bool on)
         canvas->updateMap();
     }
     trellis::config::saveValue(QStringLiteral("mapPinned"), on);
+    toast(on ? QStringLiteral("Map pinned") : QStringLiteral("Map unpinned"));
 }
 void TrellisEffect::toggleMapPinned() { setMapPinned(!m_mapPinned); }
 void TrellisEffect::toggleMap()
@@ -772,6 +900,7 @@ void TrellisEffect::toggleMap()
         other->toggleMap();
     }
     trellis::config::saveValue(QStringLiteral("map"), m_showMap);
+    canvas->toast(m_showMap ? QStringLiteral("Map on") : QStringLiteral("Map off"));
 }
 void TrellisEffect::saveView() { markSessionInteraction(); if (auto *canvas = current()) canvas->beginFramingName(); }
 void TrellisEffect::closeActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->closeActive(); }

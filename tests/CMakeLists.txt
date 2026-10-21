@@ -11,6 +11,8 @@ trellis_test(test_motion)
 trellis_test(test_navigator)
 trellis_test(test_drag)
 trellis_test(test_keynav)
+trellis_test(test_history)
+trellis_test(test_chord_safemode)
 
 trellis_test(test_input_geometry)
 
@@ -24,3 +26,10 @@ target_include_directories(test_session PRIVATE ../effect)
 add_executable(test_config test_config.cpp)
 target_link_libraries(test_config PRIVATE trellis_config Qt6::Test)
 add_test(NAME test_config COMMAND test_config)
+
+add_executable(test_theme test_theme.cpp)
+target_link_libraries(test_theme PRIVATE Qt6::Gui Qt6::Test)
+target_include_directories(test_theme PRIVATE ../effect)
+add_test(NAME test_theme COMMAND test_theme)
+
+add_test(NAME qml_colour_literals COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/check_qml_colors.sh ${CMAKE_CURRENT_SOURCE_DIR}/../effect)

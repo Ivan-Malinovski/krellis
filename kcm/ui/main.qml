@@ -129,6 +129,45 @@ KCM.SimpleKCM {
                 font: Kirigami.Theme.smallFont
                 text: i18n("With animations off, windows jump to their final place; this is how long the short move-and-scale after a resize takes.")
             }
+            QQC2.CheckBox {
+                Kirigami.FormData.label: i18n("Long jumps:")
+                text: i18n("Zoom out and back in when focus jumps far")
+                enabled: kcm.glide
+                checked: kcm.flyTo
+                onToggled: kcm.flyTo = checked
+            }
+
+            Kirigami.Separator { Kirigami.FormData.isSection: true; Kirigami.FormData.label: i18n("Appearance and help") }
+
+            QQC2.CheckBox {
+                Kirigami.FormData.label: i18n("Colours:")
+                text: i18n("Follow the Plasma colour scheme and accent")
+                checked: kcm.followTheme
+                onToggled: kcm.followTheme = checked
+            }
+            QQC2.CheckBox {
+                Kirigami.FormData.label: i18n("Notices:")
+                text: i18n("Show a brief label for toggles, resize mode, undo and redo")
+                checked: kcm.toasts
+                onToggled: kcm.toasts = checked
+            }
+            QQC2.CheckBox {
+                Kirigami.FormData.label: i18n("Shortcut hints:")
+                text: i18n("Hold Meta+Alt to see the keyboard shortcuts")
+                checked: kcm.whichKey
+                onToggled: kcm.whichKey = checked
+            }
+            RowLayout {
+                Kirigami.FormData.label: i18n("Hint delay:")
+                enabled: kcm.whichKey
+                QQC2.SpinBox {
+                    from: 100; to: 2000; stepSize: 100
+                    value: kcm.whichKeyDelayMs
+                    onValueModified: kcm.whichKeyDelayMs = value
+                    textFromValue: (v) => i18n("%1 ms", v)
+                    valueFromText: (t) => parseInt(t) || 400
+                }
+            }
         }
 
         Kirigami.Separator { Layout.fillWidth: true }

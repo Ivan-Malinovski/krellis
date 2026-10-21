@@ -3,6 +3,7 @@ import QtQuick
 // The rectangle-select gesture: the rubber band, and the framing releasing it would choose.
 // The scene covers the work area; the effect drives every property each frame.
 Item {
+    required property QtObject theme
     property real mX: 0
     property real mY: 0
     property real mW: 0
@@ -30,9 +31,9 @@ Item {
         height: mH
         opacity: mOpacity
         radius: 6
-        color: Qt.rgba(0.45, 0.62, 1.0, 0.10)
+        color: Qt.alpha(theme.accent, 0.10)
         border.width: 1
-        border.color: Qt.rgba(0.55, 0.70, 1.0, 0.9)
+        border.color: Qt.alpha(theme.accent, 0.9)
     }
 
     Rectangle {
@@ -42,9 +43,9 @@ Item {
         height: cH
         opacity: cOpacity
         radius: 10
-        color: Qt.rgba(0.30, 0.45, 0.95, 0.14)
+        color: Qt.alpha(theme.accent, 0.14)
         border.width: 2
-        border.color: Qt.rgba(0.45, 0.62, 1.0, 0.85)
+        border.color: Qt.alpha(theme.accent, 0.85)
 
         Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
@@ -53,12 +54,12 @@ Item {
             width: label.implicitWidth + 24
             height: label.implicitHeight + 12
             radius: height / 2
-            color: Qt.rgba(0.10, 0.12, 0.18, 0.88)
+            color: Qt.alpha(theme.surface, 0.88)
             Text {
                 id: label
                 anchors.centerIn: parent
                 text: cLabel
-                color: "white"
+                color: theme.text
                 font.pixelSize: 13
             }
         }
@@ -71,9 +72,9 @@ Item {
         height: hH
         opacity: hOpacity
         radius: 8
-        color: Qt.rgba(0.30, 0.45, 0.95, 0.30)
+        color: Qt.alpha(theme.accent, 0.30)
         border.width: 2
-        border.color: Qt.rgba(0.45, 0.62, 1.0, 0.95)
+        border.color: Qt.alpha(theme.accent, 0.95)
     }
 
     Rectangle {
@@ -81,14 +82,14 @@ Item {
         width: hText.implicitWidth + 24
         height: hText.implicitHeight + 12
         radius: height / 2
-        color: Qt.rgba(0.10, 0.12, 0.18, 0.88)
+        color: Qt.alpha(theme.surface, 0.88)
         x: hEdge === 0 ? hX + hW + 10 : hEdge === 1 ? hX - width - 10 : hX + (hW - width) / 2
         y: hEdge === 2 ? hY + hH + 10 : hEdge === 3 ? hY - height - 10 : hY + (hH - height) / 2
         Text {
             id: hText
             anchors.centerIn: parent
             text: hLabel
-            color: "white"
+            color: theme.text
             font.pixelSize: 13
         }
     }
