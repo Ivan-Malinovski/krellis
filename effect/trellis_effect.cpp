@@ -238,6 +238,7 @@ void TrellisEffect::registerShortcuts()
         {"TrellisMaximize", "Trellis: Maximize Panel", Qt::META | Qt::SHIFT | Qt::Key_Return, &TrellisEffect::toggleMaximizeActive},
         {"TrellisFloat", "Trellis: Float Panel", Qt::META | Qt::SHIFT | Qt::Key_F, &TrellisEffect::toggleFloatActive},
         {"TrellisStash", "Trellis: Stash Window in Edge Drawer", Qt::META | Qt::SHIFT | Qt::Key_X, &TrellisEffect::stashActive},
+        {"TrellisFlip", "Trellis: Flip Stacked / Side by Side", Qt::META | Qt::SHIFT | Qt::Key_T, &TrellisEffect::flipActive},
         {"TrellisHide", "Trellis: Hide Panel to Dock", Qt::META | Qt::SHIFT | Qt::Key_H, &TrellisEffect::toggleHideActive},
         {"TrellisDock", "Trellis: Toggle Dock", Qt::META | Qt::SHIFT | Qt::Key_D, &TrellisEffect::toggleDockActive},
         {"TrellisClose", "Trellis: Close Panel", Qt::META | Qt::SHIFT | Qt::Key_W, &TrellisEffect::closeActive},
@@ -1631,6 +1632,21 @@ bool TrellisCanvas::handleButton(const PointerButtonEvent &e)
         m_bar->forwardPointerButtonEvent(&event);
         return true;
     }
+    if (e.button == Qt::MiddleButton) {
+        if (e.state == PointerButtonState::Released) {
+            const bool ours = m_swallowMiddle;
+            m_swallowMiddle = false;
+            return ours;
+        }
+        std::string split;
+        int index = 0;
+        if (overUi(e.position) || !seamAt(e.position, &split, &index)) return false;
+        m_doc.root = trellis::flipBoundary(m_doc.root, split, index, trellis::uid("split"));
+        m_swallowMiddle = true;
+        relayout(true);
+        applyRest();
+        return true;
+    }
     if (e.button != Qt::LeftButton)
         return false;
     if (e.state == PointerButtonState::Released) {
@@ -2160,6 +2176,53 @@ void TrellisCanvas::stashPanel(const std::string &panel, trellis::Edge edge, con
     m_drawers[panel] = {edge, false, ++m_drawerSeq};
 }
 
+void TrellisCanvas::flipActive()
+{
+    if (m_resize) finishResize(false);
+    std::vector<std::string> panels;
+    for (const auto &t : m_windows) panels.push_back(t.panel);
+    const std::string panel = dockedPanelOf(*this, m_doc, activeIndex(), panels);
+    if (panel.empty() || m_session) return;
+    auto next = trellis::flipPanel(m_doc, panel);
+    if (!next) return;
+    m_doc = std::move(*next);
+    relayout(true);
+    m_nav.ensureVisible(panel);
+    applyRest();
+}
+
+// The gap between two siblings, as the split that holds them and the index of the first. The gap is
+// 2 * GAP wide; a couple of pixels more are allowed so a click that just misses it still counts.
+bool TrellisCanvas::seamAt(QPointF pos, std::string *split, int *index) const
+{
+    if (m_session || m_resize || !m_doc.root) return false;
+    const TRect &cam = m_camera.value;
+    const double reach = GAP + 2;
+    std::function<bool(const trellis::NodePtr &)> walk = [&](const trellis::NodePtr &node) {
+        if (!node) return false;
+        if (node->kind == trellis::Node::Kind::Stage) return walk(node->child);
+        if (node->kind != trellis::Node::Kind::Split) return false;
+        for (size_t i = 0; i + 1 < node->children.size(); ++i) {
+            const Entry *a = m_rects.find(node->children[i]->id);
+            if (!a) continue;
+            const TRect r = panelAt(a->rect, cam);
+            const bool x = node->axis == trellis::Axis::X;
+            const double seam = x ? r.x + r.w + GAP : r.y + r.h + GAP;
+            const double along = x ? pos.x() : pos.y(), across = x ? pos.y() : pos.x();
+            const double lo = (x ? r.y : r.x) - GAP, hi = lo + (x ? r.h : r.w) + 2 * GAP;
+            if (std::abs(along - seam) <= reach && across >= lo && across <= hi) {
+                *split = node->id;
+                *index = int(i);
+                return true;
+            }
+        }
+        for (const auto &c : node->children)
+            if (walk(c)) return true;
+        return false;
+    };
+    return walk(m_doc.root);
+}
+
 void TrellisCanvas::stashActive()
 {
     if (m_resize) finishResize(false);
@@ -2495,6 +2558,16 @@ bool TrellisEffect::simButton(double x, double y, bool press, int modifiers)
     e.nativeButton = 272; // BTN_LEFT, matching real libinput events
     e.buttons = press ? Qt::LeftButton : Qt::NoButton;
     e.modifiers = Qt::KeyboardModifiers(modifiers);
+    return handleButton(e);
+}
+bool TrellisEffect::simMiddleButton(double x, double y, bool press)
+{
+    PointerButtonEvent e{};
+    e.position = {x, y};
+    e.state = press ? PointerButtonState::Pressed : PointerButtonState::Released;
+    e.button = Qt::MiddleButton;
+    e.nativeButton = 274; // BTN_MIDDLE
+    e.buttons = press ? Qt::MiddleButton : Qt::NoButton;
     return handleButton(e);
 }
 bool TrellisEffect::simMotion(double x, double y)

@@ -19,6 +19,36 @@ private slots:
         QCOMPARE(e.at("b").rect.w, 0.75);
         QCOMPARE(e.at("b").parent, std::string("s"));
     }
+    void flipTogglesATwoSplitInPlace()
+    {
+        auto root = makeSplit("r", Axis::X, {P("a"), P("b")}, {1, 3});
+        auto flipped = flipBoundary(root, "r", 0, "w");
+        QCOMPARE(flipped->axis, Axis::Y);
+        QCOMPARE(flipped->children[0]->id, std::string("a"));
+        QCOMPARE(flipped->weights[1], 0.75);
+        QCOMPARE(flipBoundary(flipped, "r", 0, "w")->axis, Axis::X);
+    }
+    void flipWrapsAPairInALongerSplitAndUndoes()
+    {
+        auto root = makeSplit("r", Axis::X, {P("a"), P("b"), P("c")}, {1, 1, 2});
+        auto flipped = flipBoundary(root, "r", 1, "w");
+        QCOMPARE(flipped->children.size(), size_t(2));
+        QCOMPARE(flipped->children[1]->id, std::string("w"));
+        QCOMPARE(flipped->children[1]->axis, Axis::Y);
+        QCOMPARE(flipped->weights[1], 0.75);
+        // The pair is stacked in the right two thirds; flipping the wrapper again dissolves it.
+        auto back = flipBoundary(flipped, "w", 0, "x");
+        QCOMPARE(back->children.size(), size_t(3));
+        QCOMPARE(back->axis, Axis::X);
+        QCOMPARE(back->weights[0], 0.25);
+        QCOMPARE(back->weights[2], 0.5);
+    }
+    void flipIgnoresABadBoundary()
+    {
+        auto root = makeSplit("r", Axis::X, {P("a"), P("b")});
+        QVERIFY(flipBoundary(root, "r", 1, "w") == root);
+        QVERIFY(flipBoundary(root, "nope", 0, "w") == root);
+    }
     void stageOccupiesChildRect()
     {
         auto root = makeSplit("s", Axis::X, {P("a"), makeStage("stage", P("b"))});

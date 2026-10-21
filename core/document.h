@@ -77,6 +77,9 @@ LayoutDocument raiseFloat(LayoutDocument doc, const std::string &panelId);
 
 std::optional<RestoreTarget> restoreTargetFor(const LayoutDocument &doc, const std::string &panelId);
 NodePtr parentSplit(const NodePtr &root, const std::string &id);
+/// Flips a docked panel and its next sibling (the previous one for the last) between side-by-side and stacked.
+/// Null when the panel is not docked in a split.
+std::optional<LayoutDocument> flipPanel(const LayoutDocument &doc, const std::string &panelId);
 
 LayoutDocument hidePanel(LayoutDocument doc, const std::string &panelId);
 LayoutDocument restorePanel(LayoutDocument doc, const std::string &panelId, FloatingLayer fallbackLayer);

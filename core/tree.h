@@ -41,6 +41,10 @@ NodePtr removeNode(const NodePtr &root, const std::string &id, bool keepProporti
 NodePtr insertBeside(const NodePtr &root, const std::string &targetId, const NodePtr &incoming, Edge edge,
                      const std::string &splitId, double share = 0.5);
 NodePtr replaceNode(const NodePtr &root, const std::string &id, const NodePtr &replacement);
+/// Turns the pair of siblings either side of a boundary from side-by-side to stacked or back. A split of exactly
+/// two is toggled in place; in a longer one the pair is wrapped in a new split of the other axis (`wrapperId`),
+/// which a second flip dissolves again. Returns the root unchanged when there is no such boundary.
+NodePtr flipBoundary(const NodePtr &root, const std::string &splitId, int index, const std::string &wrapperId);
 NodePtr resizeBoundary(const NodePtr &split, int index, double position,
                        const std::function<double(int)> &min = nullptr);
 

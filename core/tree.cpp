@@ -409,6 +409,30 @@ NodePtr replaceNode(const NodePtr &root, const std::string &id, const NodePtr &r
     return changed ? withSplit(*root, children, root->weights) : root;
 }
 
+NodePtr flipBoundary(const NodePtr &root, const std::string &splitId, int index, const std::string &wrapperId)
+{
+    const NodePtr split = findNode(root, splitId);
+    const int n = split ? int(split->children.size()) : 0;
+    if (!split || split->kind != Node::Kind::Split || index < 0 || index + 1 >= n)
+        return root;
+    const Axis other = split->axis == Axis::X ? Axis::Y : Axis::X;
+    if (n == 2)
+        return normalize(replaceNode(root, splitId, makeSplit(split->id, other, split->children, split->weights)));
+    const double a = split->weights[index], b = split->weights[index + 1];
+    std::vector<NodePtr> children;
+    std::vector<double> weights;
+    for (int i = 0; i < n; ++i) {
+        if (i == index) {
+            children.push_back(makeSplit(wrapperId, other, {split->children[i], split->children[i + 1]}, {a, b}));
+            weights.push_back(a + b);
+        } else if (i != index + 1) {
+            children.push_back(split->children[i]);
+            weights.push_back(split->weights[i]);
+        }
+    }
+    return normalize(replaceNode(root, splitId, makeSplit(split->id, split->axis, children, weights)));
+}
+
 NodePtr resizeBoundary(const NodePtr &split, int index, double position, const std::function<double(int)> &min)
 {
     auto minOf = [&](int i) { return min ? min(i) : 0.04; };

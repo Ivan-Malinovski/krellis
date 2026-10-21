@@ -116,6 +116,7 @@ public Q_SLOTS:
     void toggleMaximizeActive();
     void toggleFloatActive();
     void stashActive(); // slide the active window into the nearest edge as a drawer; again docks it back
+    void flipActive(); // turn the active window and its neighbour from stacked to side-by-side, or back
     void toggleHideActive();
     void closeActive();
     void back();
@@ -289,6 +290,8 @@ private:
     QRectF m_screen;          // KWin panel-aware rectangle; m_area also reserves the Trellis bar
     QString m_hoverKey, m_pressKey, m_barSignature;
     bool m_mapOn = false, m_pressBar = false;
+    bool m_swallowMiddle = false; // a middle press flipped a seam: its release is ours too
+    bool seamAt(QPointF pos, std::string *split, int *index) const;
     // Dragging a square on the minimap frames the tiles it touches.
     bool m_mapDragging = false;
     QPointF m_mapAnchor;
@@ -415,6 +418,7 @@ public Q_SLOTS:
     void toggleMaximizeActive();
     void toggleFloatActive();
     void stashActive(); // slide the active window into the nearest edge as a drawer; again docks it back
+    void flipActive();
     void toggleHideActive();
     void closeActive();
     // Keyboard navigation: direction is left, right, up or down.
@@ -455,6 +459,7 @@ public Q_SLOTS:
     void finishGesture();
     // Synthetic input for the nested test harness (no input injector is available there).
     bool simButton(double x, double y, bool press, int modifiers);
+    bool simMiddleButton(double x, double y, bool press);
     bool simMotion(double x, double y);
     bool simAxis(double delta, double x, double y, int modifiers);
     void simPinch(double scale, double x, double y);

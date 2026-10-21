@@ -303,6 +303,21 @@ LayoutDocument raiseFloat(LayoutDocument doc, const std::string &panelId)
     return doc;
 }
 
+std::optional<LayoutDocument> flipPanel(const LayoutDocument &doc, const std::string &panelId)
+{
+    const NodePtr parent = parentSplit(doc.root, panelId);
+    if (!parent)
+        return std::nullopt;
+    int at = 0;
+    while (parent->children[at]->id != panelId)
+        ++at;
+    LayoutDocument out = doc;
+    out.root = flipBoundary(doc.root, parent->id, at + 1 < int(parent->children.size()) ? at : at - 1, uid("split"));
+    if (out.root == doc.root)
+        return std::nullopt;
+    return out;
+}
+
 NodePtr parentSplit(const NodePtr &root, const std::string &id)
 {
     if (!root || root->kind == Node::Kind::Panel)
