@@ -281,6 +281,16 @@ void DragSession::retarget()
             }
         }
     NodePtr hoveredNode = hovered.empty() ? nullptr : findNode(doc.root, hovered);
+    // An empty slot takes the window whole; it never splits or tabs.
+    std::optional<DropTarget> vacancy;
+    if (isVacant(hoveredNode)) {
+        DropTarget t;
+        t.kind = DropTarget::Kind::Tab;
+        t.panel = hovered;
+        vacancy = t;
+        hoveredNode = nullptr;
+        next = vacancy;
+    }
     const std::string collapsedGroup = hovered.empty() ? std::string() : m_host.collapsedGroupOf(hovered);
     if (!collapsedGroup.empty()) {
         const Entry *e = m_dropBase.find(collapsedGroup);
@@ -430,7 +440,18 @@ void DragSession::retarget()
     if (within && m_floatFirst != m_forceFloat) {
         // Float-first docks only at screen edges and corners; the force modifier floats in tiling-first.
         next = m_floatFirst ? edgeDock() : std::nullopt;
-        if (!next) {
+        if (!next && vacancy) {
+            next = vacancy;
+        } else if (!next) {
+            DropTarget t;
+            t.kind = DropTarget::Kind::Float;
+            next = t;
+        }
+    }
+    // Past the usable area but still on screen (under a panel) a float stays a float; nothing docks there.
+    if (!next && !within && layer == FloatingLayer::Overlay && (overlayMove || stageMove || m_floatFirst != m_forceFloat)) {
+        const FloatMargin fm = m_host.floatMargin();
+        if (p.x >= -fm.left * viewport.x && p.x <= (1 + fm.right) * viewport.x && p.y >= -fm.top * viewport.y && p.y <= (1 + fm.bottom) * viewport.y) {
             DropTarget t;
             t.kind = DropTarget::Kind::Float;
             next = t;
@@ -455,6 +476,8 @@ std::optional<DropTarget> DragSession::filter(const std::optional<DropTarget> &n
     auto inStage = [&](const std::string &id) {
         return stage && stage->child && id != stage->id && containsNode(stage->child, id);
     };
+    if (next->kind == K::Tab && isVacant(findNode(doc.root, next->panel)))
+        return m_host.allowed(views, Region::Side) ? next : std::nullopt;
     if (next->kind == K::Tab) {
         if (!m_host.tabsAllowed())
             return std::nullopt;
@@ -600,6 +623,15 @@ RectMap DragSession::restingLayout() const
     return rects;
 }
 
+bool DragSession::leavesVacancy(const DropTarget &target) const
+{
+    if (!m_floatFirst || !m_inDoc || m_fromFloat)
+        return false;
+    if (target.kind == DropTarget::Kind::Float)
+        return true;
+    return target.kind == DropTarget::Kind::Tab && isVacant(findNode(m_host.doc().root, target.panel));
+}
+
 void DragSession::apply(const std::optional<DropTarget> &next, double nowMs)
 {
     if (sameTarget(next, m_target))
@@ -609,7 +641,9 @@ void DragSession::apply(const std::optional<DropTarget> &next, double nowMs)
     const Entries originEntries = layoutRects(m_origin.root, &metrics);
     const Entry *originEntry = originEntries.find(m_lifted->id);
     const bool hasParent = originEntry && !originEntry->parent.empty();
-    if (next && m_inDoc && !m_fromFloat && !m_collapsed && hasParent) {
+    // Float-first leaves a hole where the window was instead of reflowing the neighbours, for a float or a vacancy fill.
+    const bool leavesHole = next && leavesVacancy(*next);
+    if (next && m_inDoc && !m_fromFloat && !m_collapsed && hasParent && !leavesHole) {
         // Latch removal on the first target; leaving it never reopens the source.
         m_collapsed = true;
         m_pdoc = removePanel(m_pdoc, m_lifted->id, true);
@@ -731,10 +765,12 @@ Rect DragSession::liftedRect(double nowMs)
     m_floating = {m_pointer.x - w * m_grabX, m_pointer.y - grabY, w, h};
     // A card on its way to becoming an overlay float stays inside the usable area, as the float will.
     if (m_candidate && m_candidate->kind == DropTarget::Kind::Float && m_host.floatingLayer() == FloatingLayer::Overlay) {
-        m_floating.w = std::min(m_floating.w, vp.x);
-        m_floating.h = std::min(m_floating.h, vp.y);
-        m_floating.x = std::clamp(m_floating.x, 0.0, vp.x - m_floating.w);
-        m_floating.y = std::clamp(m_floating.y, 0.0, vp.y - m_floating.h);
+        const FloatMargin m = m_host.floatMargin();
+        const double minX = -m.left * vp.x, maxX = (1 + m.right) * vp.x, minY = -m.top * vp.y, maxY = (1 + m.bottom) * vp.y;
+        m_floating.w = std::min(m_floating.w, maxX - minX);
+        m_floating.h = std::min(m_floating.h, maxY - minY);
+        m_floating.x = std::clamp(m_floating.x, minX, maxX - m_floating.w);
+        m_floating.y = std::clamp(m_floating.y, minY, maxY - m_floating.h);
     }
     return m_floating;
 }
@@ -877,11 +913,13 @@ Rect DragSession::floatRect(const LayoutDocument &next, FloatingLayer layer) con
     const double y = m_pointer.y - grabY;
     Rect r{(x - container.x) / container.w, (y - container.y) / container.h, w / container.w, h / container.h};
     if (layer == FloatingLayer::Overlay) {
-        // An overlay float stays inside the usable area, so it never covers a panel or leaves the screen.
-        r.w = std::min(r.w, 1.0);
-        r.h = std::min(r.h, 1.0);
-        r.x = std::clamp(r.x, 0.0, 1.0 - r.w);
-        r.y = std::clamp(r.y, 0.0, 1.0 - r.h);
+        // An overlay float stays inside the usable area, so it can reach under a panel but never leaves the screen.
+        const FloatMargin m = next.floatMargin;
+        const double minX = -m.left, maxX = 1 + m.right, minY = -m.top, maxY = 1 + m.bottom;
+        r.w = std::min(r.w, maxX - minX);
+        r.h = std::min(r.h, maxY - minY);
+        r.x = std::clamp(r.x, minX, maxX - r.w);
+        r.y = std::clamp(r.y, minY, maxY - r.h);
     }
     return r;
 }
@@ -910,10 +948,15 @@ DragOutcome DragSession::end(bool commit, double nowMs)
     }
     const LayoutDocument base = m_host.doc();
     LayoutDocument without = m_inDoc ? removePanel(base, m_lifted->id, true) : base;
+    if (leavesVacancy(*target))
+        if (auto vacated = vacatePanel(base, m_lifted->id))
+            without = *vacated;
     LayoutDocument next;
     const FloatingLayer layer = m_host.floatingLayer().value_or(FloatingLayer::Overlay);
     using K = DropTarget::Kind;
-    if (target->kind == K::Tab) {
+    if (target->kind == K::Tab && isVacant(findNode(without.root, target->panel))) {
+        next = fillVacancy(without, target->panel, m_lifted);
+    } else if (target->kind == K::Tab) {
         next = insertPanel(without, m_lifted, DockTarget::intoPanel(target->panel, target->index));
     } else if (target->kind == K::Stage) {
         next = insertPanel(without, m_lifted, DockTarget::intoPanel(target->stage));

@@ -12,6 +12,7 @@ Item {
     property bool canForward: false
     property bool mapOn: false
     property string countText: ""
+    property string hint: ""         // a modal hint (resize mode) shown in place of the count
     property string hoverKey: ""
     property string pressKey: ""
     property bool naming: false
@@ -140,8 +141,8 @@ Item {
             height: 30
             verticalAlignment: Text.AlignVCenter
             visible: !root.naming
-            text: root.countText
-            color: root.dim
+            text: root.hint !== "" ? root.hint : root.countText
+            color: root.hint !== "" ? "#8496ec" : root.dim
             font.pixelSize: 12
         }
     }

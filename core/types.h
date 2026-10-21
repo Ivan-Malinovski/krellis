@@ -37,11 +37,13 @@ struct Node {
     // Panel
     std::vector<std::string> views;
     std::string selected;
+    bool vacant = false; // an empty slot kept in the tree (float-first), not a panel to prune
     // Stage
     NodePtr child;
 };
 
 NodePtr makePanel(std::string id, std::vector<std::string> views, std::string selected = {});
+NodePtr makeVacancy(std::string id);
 NodePtr makeSplit(std::string id, Axis axis, std::vector<NodePtr> children, std::vector<double> weights = {});
 NodePtr makeStage(std::string id, NodePtr child = nullptr);
 
@@ -88,12 +90,19 @@ struct Navigation {
     std::vector<Framing> framings;
 };
 
+/// How far an overlay float may reach past the usable area, as fractions of it: under a panel, to the screen edge.
+struct FloatMargin {
+    double left = 0, top = 0, right = 0, bottom = 0;
+    bool operator==(const FloatMargin &) const = default;
+};
+
 struct LayoutDocument {
     NodePtr root;
     std::vector<FloatingPanel> floating;
     std::vector<HiddenPanel> hidden;
     std::map<std::string, ViewRecord> views;
     Navigation navigation;
+    FloatMargin floatMargin;
 };
 
 /// Insertion-ordered map, matching JS `Map` iteration (a `set` on an existing key keeps its place).

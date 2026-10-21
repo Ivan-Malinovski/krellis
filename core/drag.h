@@ -50,6 +50,8 @@ struct DragHost {
     virtual std::optional<Rect> floatWorld(const std::string &panelId) const = 0;
     /// The layer floats currently live in, if any.
     virtual std::optional<FloatingLayer> floatingLayer() const = 0;
+    /// How far an overlay float may reach past the viewport (under a panel), as fractions of it.
+    virtual FloatMargin floatMargin() const { return {}; }
     virtual bool frameOnly(const std::string &) const { return false; }
     virtual LayoutMetrics layoutMetrics() const = 0;
     virtual std::string collapsedGroupOf(const std::string &) const { return {}; }
@@ -131,6 +133,7 @@ private:
     std::optional<Edge> overlayEdge(Point p, const Rect &r) const;
     std::optional<DropTarget> edgeDock() const;
     std::optional<DropTarget> filter(const std::optional<DropTarget> &next) const;
+    bool leavesVacancy(const DropTarget &target) const;
     void settle(const std::optional<DropTarget> &next, double nowMs);
     void apply(const std::optional<DropTarget> &next, double nowMs);
     Rect seamOrigin(const Entries &preview, const Rect &slot) const;

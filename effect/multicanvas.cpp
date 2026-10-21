@@ -41,6 +41,7 @@ TrellisEffect::TrellisEffect()
     });
     connect(effects, &EffectsHandler::windowActivated, this, [this](EffectWindow *w) {
         if (owner(w)) m_selectedOutput = nullptr;
+        scratchActivated(w);
     });
     for (auto *window : effects->stackingOrder()) {
         watchOutput(window);
@@ -167,6 +168,7 @@ void TrellisEffect::syncOutputs()
         canvas->m_floatFirst = m_floatFirst;
         canvas->m_placeAtPointer = m_placeAtPointer;
         canvas->m_peekPx = m_peekPx;
+        canvas->m_scratchpad = m_scratchpad;
         canvas->m_glide = m_glide;
         canvas->m_landMs = m_landMs;
         canvas->m_nativeMutation = [this](EffectWindow *window, bool automatic) { rememberNative(window, automatic); };
@@ -175,8 +177,17 @@ void TrellisEffect::syncOutputs()
             return std::nullopt;
         };
         canvas->m_changed = [this] { scheduleSave(); };
+        canvas->m_markedScratch = [this](EffectWindow *window) {
+            return std::any_of(m_scratchMarks.begin(), m_scratchMarks.end(), [window](const QPointer<EffectWindow> &p) { return p == window; });
+        };
+        canvas->m_scratchState = [this] { return scratchState(); };
+        canvas->m_scratchAction = [this](const QString &action) {
+            if (action == QLatin1String("mark")) toggleScratchMarkActive();
+            else toggleScratch(QString());
+        };
         canvas->m_toggleMode = [this] { toggleFloatFirst(); };
         canvas->m_mapPinned = m_mapPinned;
+        canvas->m_mapOn = m_showMap;
         canvas->m_togglePin = [this] { toggleMapPinned(); };
         canvas->m_transfer = [this](EffectWindow *w, QPointF point) {
             if (auto *target = canvasAt(point))
@@ -331,6 +342,7 @@ bool TrellisEffect::handleButton(const PointerButtonEvent &e)
             return surfaceButton(e);
         return false; // KWin's interactive-move filter follows Effects in the chain.
     }
+    if (e.state == PointerButtonState::Pressed) scratchClick(e.position);
     if (m_clientGrab && !m_pointerCanvas && !m_pinchCanvas) return surfaceButton(e);
     auto *canvas = m_pointerCanvas ? m_pointerCanvas : canvasAt(e.position);
     if (!canvas) return surfaceButton(e);
@@ -387,6 +399,7 @@ bool TrellisEffect::handleKey(const KeyboardKeyEvent &e)
         return false; // Let KWin handle Escape, Return and keyboard resize steps.
     }
     if (e.state == KeyboardKeyState::Pressed) markSessionInteraction();
+    if (m_resizeMode) return handleResizeKey(e);
     TrellisCanvas *editing = nullptr;
     for (const auto &canvas : m_canvases) if (canvas->m_naming) { editing = canvas.get(); break; }
     if (e.state == KeyboardKeyState::Released && m_inertKeys.erase(e.key)) {
@@ -483,6 +496,194 @@ void TrellisEffect::cyclePanel(int step) { markSessionInteraction(); if (auto *c
 void TrellisEffect::toggleMaximizeActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleMaximizeActive(); }
 void TrellisEffect::toggleFloatActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleFloatActive(); }
 void TrellisEffect::toggleHideActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleHideActive(); }
+std::vector<EffectWindow *> TrellisEffect::scratchWindows() const
+{
+    std::vector<EffectWindow *> out;
+    for (const auto &canvas : m_canvases)
+        for (const auto &t : canvas->m_windows)
+            if (canvas->scratchWindow(t.window)) out.push_back(t.window);
+    return out;
+}
+int TrellisEffect::scratchCount() const { return int(scratchWindows().size()); }
+QVariantMap TrellisEffect::scratchState() const
+{
+    const auto windows = scratchWindows();
+    QVariantMap m;
+    m[QStringLiteral("enabled")] = m_scratchpad;
+    m[QStringLiteral("count")] = int(windows.size());
+    m[QStringLiteral("shown")] = std::any_of(windows.begin(), windows.end(), [](EffectWindow *w) { return !w->isMinimized(); });
+    EffectWindow *active = effects->activeWindow();
+    m[QStringLiteral("active")] = active && std::find(windows.begin(), windows.end(), active) != windows.end();
+    m[QStringLiteral("canMark")] = active && owner(active);
+    return m;
+}
+void TrellisEffect::refreshScratchUi()
+{
+    for (const auto &canvas : m_canvases) {
+        canvas->updateDock();
+        canvas->updateMap(true);
+    }
+}
+bool TrellisEffect::toggleScratchMarkActive()
+{
+    if (!m_scratchpad) return false;
+    markSessionInteraction();
+    EffectWindow *w = effects->activeWindow();
+    auto *canvas = w ? owner(w) : nullptr;
+    if (!canvas) return false;
+    const auto marked = std::find_if(m_scratchMarks.begin(), m_scratchMarks.end(), [w](const QPointer<EffectWindow> &p) { return p == w; });
+    if (marked != m_scratchMarks.end()) {
+        m_scratchMarks.erase(marked); // stays a float; Meta+Shift+D docks it again
+        refreshScratchUi();
+        return true;
+    }
+    if (canvas->scratchWindow(w)) return false; // flagged by a rule in trellisrc
+    m_scratchMarks.erase(std::remove_if(m_scratchMarks.begin(), m_scratchMarks.end(), [](const QPointer<EffectWindow> &p) { return p.isNull(); }), m_scratchMarks.end());
+    const int slot = int(std::count_if(m_scratchMarks.begin(), m_scratchMarks.end(), [](const QPointer<EffectWindow> &p) { return !p.isNull(); }));
+    if (!canvas->floatForScratch(w, slot)) return false;
+    m_scratchMarks.emplace_back(w);
+    refreshScratchUi();
+    return true;
+}
+bool TrellisEffect::scratchLayerShown() const
+{
+    return std::any_of(m_canvases.begin(), m_canvases.end(), [](const auto &canvas) { return canvas->layerShown(); });
+}
+// One shortcut for the whole layer: if any scratch window is up they all go away together, otherwise they all come up
+// together on the output under the pointer, in the positions they were left in, the one used last on top. A name picks
+// out the windows of one app (or caption) for a shortcut of its own.
+void TrellisEffect::toggleScratch(const QString &name)
+{
+    markSessionInteraction();
+    auto windows = scratchWindows();
+    if (!name.isEmpty()) {
+        const QString needle = name.toLower();
+        windows.erase(std::remove_if(windows.begin(), windows.end(), [&](EffectWindow *w) {
+            return TrellisCanvas::appId(w).toLower() != needle && !w->caption().toLower().contains(needle);
+        }), windows.end());
+    }
+    if (windows.empty()) return;
+    const bool up = std::any_of(windows.begin(), windows.end(), [](EffectWindow *w) { return !w->isMinimized(); });
+    if (up) hideScratch(windows);
+    else showScratch(windows);
+    refreshScratchUi();
+}
+void TrellisEffect::hideScratch(const std::vector<EffectWindow *> &windows)
+{
+    m_scratchBusy = true;
+    for (EffectWindow *w : windows)
+        if (!w->isMinimized()) w->minimize();
+    m_scratchBusy = false;
+}
+void TrellisEffect::showScratch(const std::vector<EffectWindow *> &windows)
+{
+    m_scratchBusy = true;
+    auto *target = canvasAt(effects->cursorPos());
+    for (EffectWindow *w : windows) {
+        if (target && owner(w) != target) transfer(w, target);
+        w->unminimize();
+    }
+    // Raise in turn so the window used last ends up on top and keeps the focus.
+    EffectWindow *top = nullptr;
+    for (EffectWindow *w : windows) if (w == m_scratchLast) top = w;
+    for (EffectWindow *w : windows) if (w != top) effects->activateWindow(w);
+    effects->activateWindow(top ? top : windows.back());
+    m_scratchBusy = false;
+}
+// Focus moving to a tiled window outside the layer (alt-tab, a click, a shortcut) puts the layer away; a dialog of a
+// scratch window, or anything the effect does not manage, leaves it alone.
+void TrellisEffect::scratchActivated(EffectWindow *w)
+{
+    if (!w || m_scratchBusy) return;
+    const auto windows = scratchWindows();
+    if (windows.empty()) return;
+    if (std::find(windows.begin(), windows.end(), w) != windows.end()) {
+        m_scratchLast = w;
+        return;
+    }
+    if (!owner(w)) return;
+    for (EffectWindow *parent = w->transientFor(); parent; parent = parent->transientFor())
+        if (std::find(windows.begin(), windows.end(), parent) != windows.end()) return;
+    if (!scratchLayerShown()) return;
+    hideScratch(windows);
+    refreshScratchUi();
+}
+// A click on bare canvas, with no window of any kind under it, also puts the layer away. The bar and the minimap
+// are the effect's own surfaces and keep their buttons.
+void TrellisEffect::scratchClick(QPointF point)
+{
+    if (m_scratchBusy || !scratchLayerShown()) return;
+    auto *canvas = canvasAt(point);
+    if (!canvas || !canvas->layerShown() || canvas->overUi(point) || surfaceHit(point)) return;
+    for (const auto *w : effects->stackingOrder())
+        if (!w->isDeleted() && !w->isMinimized() && !w->isHidden() && !w->isDesktop() && w->frameGeometry().contains(point)) return;
+    hideScratch(scratchWindows());
+    refreshScratchUi();
+}
+
+static std::optional<trellis::Edge> parseDirection(const QString &name)
+{
+    const QString d = name.trimmed().toLower();
+    if (d == QLatin1String("left")) return trellis::Edge::Left;
+    if (d == QLatin1String("right")) return trellis::Edge::Right;
+    if (d == QLatin1String("up") || d == QLatin1String("top")) return trellis::Edge::Top;
+    if (d == QLatin1String("down") || d == QLatin1String("bottom")) return trellis::Edge::Bottom;
+    return std::nullopt;
+}
+void TrellisEffect::focusDirection(const QString &direction)
+{
+    markSessionInteraction();
+    if (const auto dir = parseDirection(direction)) if (auto *canvas = current()) canvas->focusDirection(*dir);
+}
+void TrellisEffect::moveDirection(const QString &direction)
+{
+    markSessionInteraction();
+    if (const auto dir = parseDirection(direction)) if (auto *canvas = current()) canvas->moveDirection(*dir);
+}
+bool TrellisEffect::resizeStep(const QString &direction, double fraction)
+{
+    markSessionInteraction();
+    const auto dir = parseDirection(direction);
+    auto *canvas = current();
+    return dir && canvas && canvas->resizeStep(*dir, std::clamp(fraction, 0.005, 0.5));
+}
+// Resize mode swallows the keyboard so arrows resize the tile instead of reaching the application. It leaves on
+// Escape, Return, the shortcut again, or after a few idle seconds, so it can never trap the keyboard.
+void TrellisEffect::setResizeMode(bool on)
+{
+    if (on == m_resizeMode) return;
+    m_resizeMode = on;
+    if (!m_resizeModeTimer) {
+        m_resizeModeTimer = new QTimer(this);
+        m_resizeModeTimer->setSingleShot(true);
+        m_resizeModeTimer->setInterval(8000);
+        connect(m_resizeModeTimer, &QTimer::timeout, this, [this] { setResizeMode(false); });
+    }
+    if (on) {
+        m_resizeModeTimer->start();
+    } else {
+        m_resizeModeTimer->stop();
+    }
+    for (const auto &canvas : m_canvases)
+        canvas->setHint(on ? QStringLiteral("Resize  ·  arrows  ·  Shift = bigger  ·  Esc = done") : QString());
+}
+void TrellisEffect::toggleResizeMode() { markSessionInteraction(); setResizeMode(!m_resizeMode); }
+bool TrellisEffect::handleResizeKey(const KeyboardKeyEvent &e)
+{
+    if (e.state == KeyboardKeyState::Released) return m_inertKeys.erase(e.key) != 0;
+    m_inertKeys.insert(e.key);
+    m_resizeModeTimer->start();
+    const bool big = e.modifiers & Qt::ShiftModifier;
+    switch (e.key) {
+    case Qt::Key_Escape: case Qt::Key_Return: case Qt::Key_Enter: setResizeMode(false); break;
+    case Qt::Key_Left: resizeStep(QStringLiteral("left"), big ? 0.2 : 0.05); break;
+    case Qt::Key_Right: resizeStep(QStringLiteral("right"), big ? 0.2 : 0.05); break;
+    case Qt::Key_Up: resizeStep(QStringLiteral("up"), big ? 0.2 : 0.05); break;
+    case Qt::Key_Down: resizeStep(QStringLiteral("down"), big ? 0.2 : 0.05); break;
+    default: break;
+    }
+    return true;
+}
 void TrellisEffect::turnOff()
 {
     // Emergency exit: unload after the shortcut handler returns, since unloading destroys this object.
@@ -501,13 +702,26 @@ void TrellisEffect::applySettings(const trellis::config::Settings &settings)
     m_placeAtPointer = settings.placeAtPointer;
     m_peekPx = settings.peek;
     m_mapPinned = settings.mapPinned;
+    m_showMap = settings.map;
     m_glide = settings.glide;
     m_landMs = settings.landMs;
+    if (m_scratchpad && !settings.scratchpad) {
+        // Switched off with the layer up or down: bring every scratch window back as an ordinary float and forget the marks.
+        m_scratchBusy = true;
+        for (EffectWindow *w : scratchWindows())
+            if (w->isMinimized()) w->unminimize();
+        m_scratchBusy = false;
+        m_scratchMarks.clear();
+    }
+    m_scratchpad = settings.scratchpad;
+    syncScratchShortcuts();
     for (const auto &canvas : m_canvases) {
         canvas->m_floatFirst = m_floatFirst;
         canvas->m_placeAtPointer = m_placeAtPointer;
         canvas->m_peekPx = m_peekPx;
         canvas->m_mapPinned = m_mapPinned;
+        canvas->m_mapOn = m_showMap;
+        canvas->m_scratchpad = m_scratchpad;
         canvas->m_glide = m_glide;
         canvas->m_landMs = m_landMs;
         canvas->m_nav.sync(); // the peek gutter changes the camera target
@@ -544,7 +758,19 @@ void TrellisEffect::setMapPinned(bool on)
     trellis::config::saveValue(QStringLiteral("mapPinned"), on);
 }
 void TrellisEffect::toggleMapPinned() { setMapPinned(!m_mapPinned); }
-void TrellisEffect::toggleMap() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleMap(); }
+void TrellisEffect::toggleMap()
+{
+    markSessionInteraction();
+    auto *canvas = current();
+    if (!canvas) return;
+    canvas->toggleMap();
+    m_showMap = canvas->m_mapOn; // the toggle is remembered, and the other outputs follow it
+    for (const auto &other : m_canvases) {
+        if (other.get() == canvas || other->m_mapOn == m_showMap) continue;
+        other->toggleMap();
+    }
+    trellis::config::saveValue(QStringLiteral("map"), m_showMap);
+}
 void TrellisEffect::saveView() { markSessionInteraction(); if (auto *canvas = current()) canvas->beginFramingName(); }
 void TrellisEffect::closeActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->closeActive(); }
 void TrellisEffect::back() { markSessionInteraction(); if (auto *canvas = current()) canvas->back(); }

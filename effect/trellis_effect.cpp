@@ -136,7 +136,7 @@ void TrellisCanvas::cyclePanel(int step)
     // Visit windows in the order they were opened, skipping the ones parked in the dock.
     std::vector<size_t> shown;
     for (size_t i = 0; i < m_windows.size(); ++i)
-        if (!m_windows[i].window->isMinimized())
+        if (!m_windows[i].window->isMinimized() && !scratchWindow(m_windows[i].window))
             shown.push_back(i);
     if (shown.empty())
         return;
@@ -149,6 +149,62 @@ void TrellisCanvas::cyclePanel(int step)
     effects->activateWindow(m_windows[pick].window);
     applyRest();
 }
+// The active window's docked panel, or empty (nothing active here, or it floats).
+static std::string dockedPanelOf(const TrellisCanvas &canvas, const trellis::LayoutDocument &doc, int index, const std::vector<std::string> &panels)
+{
+    Q_UNUSED(canvas)
+    if (index < 0 || size_t(index) >= panels.size()) return {};
+    const auto where = trellis::locatePanel(doc, panels[size_t(index)]);
+    return where.where == trellis::PanelLocation::Where::Docked ? panels[size_t(index)] : std::string();
+}
+
+void TrellisCanvas::focusDirection(trellis::Edge dir)
+{
+    std::vector<std::string> panels;
+    for (const auto &t : m_windows) panels.push_back(t.panel);
+    const std::string from = dockedPanelOf(*this, m_doc, activeIndex(), panels);
+    if (from.empty() || m_session) return;
+    const std::string to = trellis::neighbourInDirection(m_rects, from, dir);
+    if (to.empty()) return;
+    const auto at = std::find_if(m_windows.begin(), m_windows.end(), [&](const Tracked &t) { return t.panel == to && !t.window->isMinimized(); });
+    if (at == m_windows.end()) return;
+    const auto &leaves = m_nav.framedLeaves();
+    if (!m_nav.overviewing() && std::find(leaves.begin(), leaves.end(), to) == leaves.end())
+        m_nav.focus(to);
+    effects->activateWindow(at->window);
+    applyRest();
+}
+
+void TrellisCanvas::moveDirection(trellis::Edge dir)
+{
+    if (m_resize) finishResize(false);
+    std::vector<std::string> panels;
+    for (const auto &t : m_windows) panels.push_back(t.panel);
+    const std::string panel = dockedPanelOf(*this, m_doc, activeIndex(), panels);
+    if (panel.empty() || m_session) return;
+    bool moved = false;
+    auto next = trellis::moveInDirection(m_doc, panel, dir, layoutMetrics(), &moved);
+    if (!moved) return;
+    m_doc = std::move(next);
+    relayout(true);
+    m_nav.ensureVisible(panel);
+    applyRest();
+}
+
+bool TrellisCanvas::resizeStep(trellis::Edge dir, double fraction)
+{
+    if (m_resize) finishResize(false);
+    std::vector<std::string> panels;
+    for (const auto &t : m_windows) panels.push_back(t.panel);
+    const std::string panel = dockedPanelOf(*this, m_doc, activeIndex(), panels);
+    if (panel.empty() || m_session) return false;
+    const auto root = trellis::resizeInDirection(m_doc.root, layoutMetrics(), panel, dir, fraction);
+    if (!root) return false;
+    m_doc.root = root;
+    relayout(false);
+    return true;
+}
+
 void TrellisCanvas::nextPanel() { cyclePanel(1); }
 void TrellisCanvas::previousPanel() { cyclePanel(-1); }
 void TrellisCanvas::toggleMaximizeActive() { toggleMaximize(activeIndex()); }
@@ -185,6 +241,15 @@ void TrellisEffect::registerShortcuts()
         {"TrellisMode", "Trellis: Toggle Floating-First Mode", Qt::META | Qt::ALT | Qt::Key_F, &TrellisEffect::toggleFloatFirst},
         {"TrellisBar", "Trellis: Toggle Bar", Qt::META | Qt::ALT | Qt::Key_B, &TrellisEffect::toggleBar},
         {"TrellisMap", "Trellis: Toggle Map", Qt::META | Qt::ALT | Qt::Key_M, &TrellisEffect::toggleMap},
+        {"TrellisFocusLeft", "Trellis: Focus Left", Qt::META | Qt::CTRL | Qt::Key_Left, &TrellisEffect::focusLeft},
+        {"TrellisFocusRight", "Trellis: Focus Right", Qt::META | Qt::CTRL | Qt::Key_Right, &TrellisEffect::focusRight},
+        {"TrellisFocusUp", "Trellis: Focus Up", Qt::META | Qt::CTRL | Qt::Key_Up, &TrellisEffect::focusUp},
+        {"TrellisFocusDown", "Trellis: Focus Down", Qt::META | Qt::CTRL | Qt::Key_Down, &TrellisEffect::focusDown},
+        {"TrellisMoveLeft", "Trellis: Move Panel Left", Qt::META | Qt::CTRL | Qt::SHIFT | Qt::Key_Left, &TrellisEffect::moveLeft},
+        {"TrellisMoveRight", "Trellis: Move Panel Right", Qt::META | Qt::CTRL | Qt::SHIFT | Qt::Key_Right, &TrellisEffect::moveRight},
+        {"TrellisMoveUp", "Trellis: Move Panel Up", Qt::META | Qt::CTRL | Qt::SHIFT | Qt::Key_Up, &TrellisEffect::moveUp},
+        {"TrellisMoveDown", "Trellis: Move Panel Down", Qt::META | Qt::CTRL | Qt::SHIFT | Qt::Key_Down, &TrellisEffect::moveDown},
+        {"TrellisResizeMode", "Trellis: Resize Mode", Qt::META | Qt::CTRL | Qt::Key_R, &TrellisEffect::toggleResizeMode},
         {"TrellisSaveView", "Trellis: Save View", Qt::META | Qt::ALT | Qt::Key_S, &TrellisEffect::saveView},
     };
     for (const Binding &b : bindings) {
@@ -193,6 +258,34 @@ void TrellisEffect::registerShortcuts()
         a->setText(QString::fromLatin1(b.text));
         KGlobalAccel::self()->setGlobalShortcut(a, b.keys);
         connect(a, &QAction::triggered, this, b.slot);
+    }
+}
+
+// Registered on demand so a disabled scratchpad does not hold Meta+G (KWin's Grid View wants it too).
+void TrellisEffect::syncScratchShortcuts()
+{
+    if (!m_scratchpad) {
+        qDeleteAll(m_scratchActions);
+        m_scratchActions.clear();
+        return;
+    }
+    if (!m_scratchActions.isEmpty()) return;
+    struct Binding {
+        const char *id, *text;
+        QKeySequence keys;
+        void (TrellisEffect::*slot)();
+    };
+    const Binding bindings[] = {
+        {"TrellisScratchpad", "Trellis: Toggle Scratchpad", Qt::META | Qt::Key_G, &TrellisEffect::toggleScratchPad},
+        {"TrellisScratchMark", "Trellis: Mark Window as Scratchpad", Qt::META | Qt::SHIFT | Qt::Key_G, &TrellisEffect::toggleScratchMarkSlot},
+    };
+    for (const Binding &b : bindings) {
+        auto *a = new QAction(this);
+        a->setObjectName(QString::fromLatin1(b.id));
+        a->setText(QString::fromLatin1(b.text));
+        KGlobalAccel::self()->setGlobalShortcut(a, b.keys);
+        connect(a, &QAction::triggered, this, b.slot);
+        m_scratchActions << a;
     }
 }
 
@@ -238,7 +331,10 @@ void TrellisCanvas::watch(EffectWindow *w)
 
 bool TrellisCanvas::manageable(EffectWindow *w)
 {
-    return w && !(w->window() && w->window()->inherits("KWin::LayerShellV1Window")) && w->isNormalWindow() && !w->isDeleted() && !w->isSpecialWindow() && !w->isPopupWindow();
+    // A window that opens already fullscreen (Spectacle's region overlay, a game, a slideshow) is meant to cover the
+    // screen, not to take a tile; windows that go fullscreen later are already tracked and unaffected.
+    return w && !w->isFullScreen() && !(w->window() && w->window()->inherits("KWin::LayerShellV1Window")) && w->isNormalWindow() && !w->isDeleted() && !w->isSpecialWindow() && !w->isPopupWindow()
+        && !w->isOnScreenDisplay() && !w->isNotification();
 }
 
 TrellisCanvas::Tracked *TrellisCanvas::trackedFor(EffectWindow *w)
@@ -309,9 +405,19 @@ const TRect *TrellisCanvas::worldRect(const std::string &panel) const
 std::optional<TRect> TrellisCanvas::floatScreen(const std::string &panel) const
 {
     for (const auto &f : m_doc.floating)
-        if (f.panel->id == panel)
-            return TRect{m_area.x() + f.rect.x * m_area.width(), m_area.y() + f.rect.y * m_area.height(),
-                         f.rect.w * m_area.width(), f.rect.h * m_area.height()};
+        if (f.panel->id == panel) {
+            TRect r{m_area.x() + f.rect.x * m_area.width(), m_area.y() + f.rect.y * m_area.height(),
+                    f.rect.w * m_area.width(), f.rect.h * m_area.height()};
+            if (const auto d = m_drawers.find(panel); d != m_drawers.end() && !d->second.open) {
+                switch (d->second.edge) {
+                case trellis::Edge::Left: r.x = m_area.x() + m_drawerStripPx - r.w; break;
+                case trellis::Edge::Right: r.x = m_area.right() - m_drawerStripPx; break;
+                case trellis::Edge::Top: r.y = m_area.y() + m_drawerStripPx - r.h; break;
+                case trellis::Edge::Bottom: r.y = m_area.bottom() - m_drawerStripPx; break;
+                }
+            }
+            return r;
+        }
     return std::nullopt;
 }
 
@@ -371,6 +477,14 @@ void TrellisCanvas::relayout(bool animate)
         if (m_uiScreen.isEmpty())
             m_uiScreen = m_screen;
         m_area = QRectF(g.x(), g.y(), std::max(1.0, double(g.width())), std::max(1.0, double(g.height()) - barHeight()));
+        // Floats may reach past the usable area to the screen's edge, under a panel.
+        const QRectF full(m_output->geometry());
+        m_doc.floatMargin = {std::max(0.0, m_area.x() - full.x()) / m_area.width(), std::max(0.0, m_area.y() - full.y()) / m_area.height(),
+                             std::max(0.0, full.right() - m_area.right()) / m_area.width(), std::max(0.0, full.bottom() - m_area.bottom()) / m_area.height()};
+    }
+    for (auto it = m_drawers.begin(); it != m_drawers.end();) {
+        const auto loc = trellis::locatePanel(m_doc, it->first);
+        it = loc.where == trellis::PanelLocation::Where::Floating ? std::next(it) : m_drawers.erase(it);
     }
     std::map<std::string, TRect> before;
     for (const auto &kv : m_rects)
@@ -446,6 +560,8 @@ bool TrellisCanvas::placedByUs(EffectWindow *w) const
 // Append at the end seam so every column keeps an equal 1/n share.
 void TrellisCanvas::dockAtEnd(const NodePtr &panel)
 {
+    if (fillVacancyFor(panel, std::nullopt))
+        return;
     if (m_doc.root && m_doc.root->kind == Node::Kind::Split && m_doc.root->axis == Axis::X) {
         const auto spec = seamTarget(m_doc.root, int(m_doc.root->children.size()));
         m_doc.root = applyDockTarget(m_doc.root, spec, panel, uid("split"));
@@ -461,6 +577,8 @@ void TrellisCanvas::dockAtEnd(const NodePtr &panel)
 void TrellisCanvas::dockAtPointer(const NodePtr &panel)
 {
     const QPointF cursor = effects->cursorPos();
+    if (fillVacancyFor(panel, m_placeAtPointer && !overUi(cursor) ? std::optional<QPointF>(cursor) : std::nullopt))
+        return;
     if (!m_placeAtPointer || !m_doc.root || !m_area.contains(cursor) || overUi(cursor)) {
         dockAtEnd(panel);
         return;
@@ -586,7 +704,7 @@ void TrellisCanvas::updateDock()
 {
     m_dockOrder.clear();
     for (const auto &t : m_windows)
-        if (t.window->isMinimized())
+        if (t.window->isMinimized() && !scratchWindow(t.window)) // the scratchpad has its own shortcut and minimap entry
             m_dockOrder.push_back(t.window);
     updateBar();
 }
@@ -646,7 +764,7 @@ void TrellisCanvas::toggleMap()
 void TrellisCanvas::updateBar()
 {
     // Naming a view needs the text field, so the bar floats over the windows for that long without reserving space.
-    if (!m_barOn && !m_naming) {
+    if (!m_barOn && !m_naming && m_hint.isEmpty()) {
         if (m_bar) {
             effects->addRepaint(Region(m_bar->geometry()));
             m_bar.reset();
@@ -677,17 +795,19 @@ void TrellisCanvas::updateBar()
     for (EffectWindow *w : m_dockOrder)
         labels << w->caption();
     const int hidden = int(m_dockOrder.size());
-    const int open = int(m_windows.size()) - hidden;
+    const int scratch = int(std::count_if(m_windows.begin(), m_windows.end(), [this](const Tracked &w) { return scratchWindow(w.window); }));
+    const int open = int(m_windows.size()) - hidden - scratch;
     const QString count = QStringLiteral("%1 %2").arg(open).arg(open == 1 ? QStringLiteral("window") : QStringLiteral("windows"))
         + (hidden ? QStringLiteral(" · %1 in Dock").arg(hidden) : QString());
     QQuickItem *item = m_bar->rootItem();
     item->setProperty("naming", m_naming);
+    item->setProperty("hint", m_hint);
     item->setProperty("nameError", m_nameError);
-    const QString signature = QStringLiteral("%1|%2|%3|%4|%5|%6|%7|%8|%9")
+    const QString signature = QStringLiteral("%1|%2|%3|%4|%5|%6|%7|%8|%9|%10")
                                   .arg(geo.x()).arg(geo.y()).arg(geo.width())
                                   .arg(framings.size() ? QString::number(qHash(QVariant(framings).toString())) : QString(), labels.join(QLatin1Char(',')), count)
                                   .arg(m_nav.canGoBack() * 8 + m_nav.canGoForward() * 4 + m_mapOn * 2 + m_nav.overviewing())
-                                  .arg(m_hoverKey + m_pressKey);
+                                  .arg(m_hoverKey + m_pressKey, m_hint);
     if (signature == m_barSignature && m_bar->geometry() == Rect(geo))
         return;
     m_barSignature = signature;
@@ -748,11 +868,14 @@ void TrellisCanvas::updateMap(bool force)
         m[QStringLiteral("h")] = r.h;
         m[QStringLiteral("focused")] = framed == id;
         m[QStringLiteral("floating")] = false;
+        m[QStringLiteral("vacant")] = isVacant(entry.node);
         m[QStringLiteral("tint")] = QString::fromLatin1(TINTS[i++ % 8]);
         tiles << m;
-        sig << QStringLiteral("%1:%2,%3,%4,%5,%6").arg(QString::fromStdString(id)).arg(r.x, 0, 'f', 3).arg(r.y, 0, 'f', 3).arg(r.w, 0, 'f', 3).arg(r.h, 0, 'f', 3).arg(framed == id);
+        sig << QStringLiteral("%1:%2,%3,%4,%5,%6").arg(QString::fromStdString(id)).arg(r.x, 0, 'f', 3).arg(r.y, 0, 'f', 3).arg(r.w, 0, 'f', 3).arg(r.h, 0, 'f', 3).arg(framed == id) + (isVacant(entry.node) ? QStringLiteral("v") : QString());
     }
     for (const auto &f : m_doc.floating) {
+        if (std::any_of(m_windows.begin(), m_windows.end(), [&](const Tracked &w) { return w.panel == f.panel->id && scratchWindow(w.window); }))
+            continue; // the scratchpad is summoned from the footer, not parked as a tile
         QVariantMap m;
         m[QStringLiteral("id")] = QString::fromStdString(f.panel->id);
         m[QStringLiteral("x")] = f.rect.x;
@@ -765,6 +888,9 @@ void TrellisCanvas::updateMap(bool force)
         tiles << m;
         sig << QStringLiteral("f%1:%2,%3").arg(QString::fromStdString(f.panel->id)).arg(f.rect.x, 0, 'f', 3).arg(f.rect.y, 0, 'f', 3);
     }
+    const QVariantMap scratch = m_scratchState ? m_scratchState() : QVariantMap();
+    sig << QStringLiteral("s%1,%2,%3,%4,%5").arg(scratch.value(QStringLiteral("enabled")).toBool()).arg(scratch.value(QStringLiteral("count")).toInt()).arg(scratch.value(QStringLiteral("shown")).toBool())
+               .arg(scratch.value(QStringLiteral("active")).toBool()).arg(scratch.value(QStringLiteral("canMark")).toBool());
     const QString signature = sig.join(QLatin1Char(';')) + QStringLiteral("|%1|%2").arg(aspect, 0, 'f', 3).arg(m_hoverKey + (m_floatFirst ? QStringLiteral("F") : QStringLiteral("T")) + (m_mapPinned ? QStringLiteral("P") : QStringLiteral("U")))
         + (m_mapDragging ? QStringLiteral("|%1,%2,%3,%4|%5").arg(m_mapBand.x()).arg(m_mapBand.y()).arg(m_mapBand.width()).arg(m_mapBand.height()).arg(m_mapPicks.size()) : QString());
     if (force || signature != m_mapSignature) {
@@ -775,6 +901,11 @@ void TrellisCanvas::updateMap(bool force)
         item->setProperty("stateText", m_nav.overviewing() ? QStringLiteral("Overview") : QStringLiteral("Framed"));
         item->setProperty("floatFirst", m_floatFirst);
         item->setProperty("pinned", m_mapPinned);
+        item->setProperty("scratchEnabled", scratch.value(QStringLiteral("enabled")));
+        item->setProperty("scratchCount", scratch.value(QStringLiteral("count")));
+        item->setProperty("scratchShown", scratch.value(QStringLiteral("shown")));
+        item->setProperty("scratchActive", scratch.value(QStringLiteral("active")));
+        item->setProperty("scratchCanMark", scratch.value(QStringLiteral("canMark")));
         item->setProperty("band", m_mapBand);
         item->setProperty("bandOn", m_mapDragging);
         QStringList picks;
@@ -866,6 +997,9 @@ void TrellisCanvas::barAction(const QString &key)
     } else if (key == QLatin1String("map:mode")) {
         if (m_toggleMode)
             m_toggleMode();
+    } else if (key == QLatin1String("map:scratch") || key == QLatin1String("map:scratch-mark")) {
+        if (m_scratchAction)
+            m_scratchAction(key == QLatin1String("map:scratch") ? QStringLiteral("toggle") : QStringLiteral("mark"));
     } else if (key == QLatin1String("map:overview")) {
         m_nav.overview();
     } else if (key.startsWith(QLatin1String("map:frame:"))) {
@@ -1027,6 +1161,12 @@ void TrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
 {
     const auto ms = m_clock.tick(data.view).count();
     m_nowMs += double(ms);
+    m_layerTarget = layerShown() ? 1 : 0;
+    if (m_layerDim != m_layerTarget) {
+        const double step = double(ms) / 180.0; // the dim eases in and out in about a fifth of a second
+        m_layerDim = m_layerDim < m_layerTarget ? std::min(m_layerTarget, m_layerDim + step) : std::max(m_layerTarget, m_layerDim - step);
+        m_animating = true;
+    }
     if (m_animating) {
         const double dt = std::min(Motion::maxStep, double(ms) / 1000.0);
         if (m_session) {
@@ -1091,7 +1231,7 @@ void TrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
         updateTiles(dt);
         updateMap();
         const bool tilesMoving = std::any_of(m_tiles.begin(), m_tiles.end(), [](const auto &t) { return std::abs(t.second.velocity) > 0.001 || std::abs(t.second.target - t.second.amount) > 0.0001; });
-        m_animating = tilesMoving || areaProgress < 1 || springing || (m_map && !m_map->rootItem()->property("settled").toBool()) || tweening || !m_flights.empty() || !m_popups.empty() || !m_closing.empty() || m_session || m_slot || m_marquee || (!m_glide && layoutAwaitingLanding()) || !m_landings.empty();
+        m_animating = tilesMoving || areaProgress < 1 || springing || (m_map && !m_map->rootItem()->property("settled").toBool()) || tweening || !m_flights.empty() || !m_popups.empty() || !m_closing.empty() || m_session || m_slot || m_marquee || m_layerDim != m_layerTarget || (!m_glide && layoutAwaitingLanding()) || !m_landings.empty();
     }
 }
 
@@ -1126,6 +1266,10 @@ void TrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp
             if (const auto tile = m_tiles.find(tracked->panel); tile != m_tiles.end())
                 opacity *= 1 - std::clamp(tile->second.amount, 0.0, 1.0);
         data.multiplyOpacity(opacity);
+        if (m_layerDim > 0 && !scratchWindow(w)) { // under the scratch layer: still there, but not asking for attention
+            data.setBrightness(data.brightness() * (1 - 0.42 * m_layerDim));
+            data.setSaturation(data.saturation() * (1 - 0.3 * m_layerDim));
+        }
         if (const auto *tracked = trackedFor(w); tracked && peeking(tracked->panel)) {
             data.setBrightness(0.55); // out of focus: the edge is there to be found, not to be read
             data.setSaturation(0.6);
@@ -1397,6 +1541,7 @@ bool TrellisCanvas::handleButton(const PointerButtonEvent &e)
 
 bool TrellisCanvas::handleMotion(const PointerMotionEvent &e)
 {
+    updateDrawerHover(e);
     if (handleIconMotion(e)) return true;
     if (m_naming && barKey(e.position) == QLatin1String("name-edit") && m_bar) {
         auto event = e;
@@ -1662,6 +1807,7 @@ void TrellisCanvas::startDrag(EffectWindow *w, QPointF pointer)
     const Tracked *t = trackedFor(w);
     if (!t || m_session)
         return;
+    m_drawers.erase(t->panel); // grabbed: it is a plain float from here on
     refreshRects();
     const QPointF rel = pointer - m_area.topLeft();
     m_session = std::make_unique<trellis::DragSession>(*this, t->panel, std::string(), trellis::Point{rel.x(), rel.y()});
@@ -1738,6 +1884,26 @@ void TrellisCanvas::endDrag(bool commit)
         m_transfer(moving, m_windowPointer);
 }
 
+// A new or docking window takes an empty slot (under the cursor when given, else the first) before it splits a tile.
+bool TrellisCanvas::fillVacancyFor(const trellis::NodePtr &panel, const std::optional<QPointF> &cursor)
+{
+    const auto empty = vacancies(m_doc.root);
+    if (empty.empty())
+        return false;
+    std::string pick = empty.front();
+    if (cursor && m_area.contains(*cursor)) {
+        const QPointF rel = *cursor - m_area.topLeft();
+        const trellis::Point point = fromScreen({rel.x(), rel.y()});
+        for (const auto &id : empty)
+            if (const TRect *r = worldRect(id); r && point.x >= r->x && point.x <= r->x + r->w && point.y >= r->y && point.y <= r->y + r->h) {
+                pick = id;
+                break;
+            }
+    }
+    m_doc = fillVacancy(m_doc, pick, panel);
+    return true;
+}
+
 // The drop slot: a translucent placeholder where the dragged window will land.
 void TrellisCanvas::updateSlot(double dt)
 {
@@ -1785,6 +1951,47 @@ void TrellisCanvas::updateSlot(double dt)
     effects->addRepaint(Region(m_slot->geometry()));
 }
 
+void TrellisCanvas::stashPanel(const std::string &panel, trellis::Edge edge, const TRect &from)
+{
+    const auto loc = trellis::locatePanel(m_doc, panel);
+    if (loc.where != trellis::PanelLocation::Where::Docked || leafIds(m_doc.root).size() < 2) return;
+    // Revealed, it keeps the tile's own size and hugs the edge it slides out of; the neighbours reflow into the tile's place.
+    TRect open = from;
+    switch (edge) {
+    case trellis::Edge::Left: open.x = m_area.x(); break;
+    case trellis::Edge::Right: open.x = m_area.right() - open.w; break;
+    case trellis::Edge::Top: open.y = m_area.y(); break;
+    case trellis::Edge::Bottom: open.y = m_area.bottom() - open.h; break;
+    }
+    const trellis::Rect rect{(open.x - m_area.x()) / m_area.width(), (open.y - m_area.y()) / m_area.height(),
+                             open.w / m_area.width(), open.h / m_area.height()};
+    m_doc = trellis::floatPanel(m_doc, loc.panel, rect, trellis::FloatingLayer::Overlay);
+    m_drawers[panel] = {edge, false};
+}
+
+void TrellisCanvas::updateDrawerHover(const PointerMotionEvent &event)
+{
+    if (m_drawers.empty() || m_session || m_resize || event.buttons != Qt::NoButton) return;
+    for (auto &[panel, d] : m_drawers) {
+        const auto r = floatScreen(panel);
+        if (!r) continue;
+        QRectF zone(r->x, r->y, r->w, r->h);
+        if (d.open) zone.adjust(-8, -8, 8, 8);
+        const bool want = zone.contains(event.position);
+        if (want == d.open) continue;
+        for (const auto &t : m_windows) {
+            if (t.panel != panel) continue;
+            double opacity = 1;
+            const TRect from = visualRect(t.window, &opacity).value_or(*r);
+            d.open = want;
+            relayout(true);
+            startFlight(t.window, FlightKind::Glide, from, {}, opacity);
+            break;
+        }
+        return; // relayout may have invalidated the map iteration
+    }
+}
+
 void TrellisCanvas::toggleFloat(int i)
 {
     if (m_resize) finishResize(false);
@@ -1800,14 +2007,18 @@ void TrellisCanvas::toggleFloat(int i)
         dockAtEnd(loc.panel);
     } else if (loc.where == trellis::PanelLocation::Where::Docked) {
         if (!rulesFor(t.window).floating) return;
-        // Keep at least one tiled panel so the canvas never empties.
-        if (leafIds(m_doc.root).size() < 2)
+        // Float-first leaves the slot empty for the next window; tiling reflows the neighbours into it
+        // and keeps at least one tiled panel so the canvas never empties.
+        const auto vacated = m_floatFirst ? trellis::vacatePanel(m_doc, loc.panel->id) : std::nullopt;
+        if (!vacated && leafIds(m_doc.root).size() < 2)
             return;
         // Pop out slightly smaller than the tile, centred on it.
         const TRect a = from;
         const double w = a.w * 0.8, h = a.h * 0.8;
         const trellis::Rect rect{(a.x + (a.w - w) / 2 - m_area.x()) / m_area.width(), (a.y + (a.h - h) / 2 - m_area.y()) / m_area.height(),
                                  w / m_area.width(), h / m_area.height()};
+        if (vacated)
+            m_doc = *vacated;
         m_doc = trellis::floatPanel(m_doc, loc.panel, rect, trellis::FloatingLayer::Overlay);
     } else {
         return;
@@ -1867,9 +2078,11 @@ QString TrellisCanvas::dump()
             lines.back() += QStringLiteral(" client %1,%2 %3x%4").arg(body.x()).arg(body.y()).arg(body.width()).arg(body.height());
         }
         lines.back() += QStringLiteral(" app '%1'").arg(appId(t.window));
-        if (const auto drawn = visualRect(t.window))
+        double drawnOpacity = 1;
+        if (const auto drawn = visualRect(t.window, &drawnOpacity))
             lines.back() += QStringLiteral(" drawn %1x%2").arg(drawn->w, 0, 'f', 1).arg(drawn->h, 0, 'f', 1)
-                + QStringLiteral(" drawnpos %1,%2").arg(drawn->x, 0, 'f', 1).arg(drawn->y, 0, 'f', 1);
+                + QStringLiteral(" drawnpos %1,%2").arg(drawn->x, 0, 'f', 1).arg(drawn->y, 0, 'f', 1)
+                + QStringLiteral(" opacity %1").arg(drawnOpacity, 0, 'f', 2);
         const auto rule = rulesFor(t.window);
         if (rule.scaling == trellis::ViewScaling::Inert) lines.back() += QStringLiteral(" INERT");
         if (rule.scaling == trellis::ViewScaling::None) lines.back() += QStringLiteral(" NO_SCALE");
@@ -1887,6 +2100,21 @@ QString TrellisCanvas::dump()
                 .arg(f.from.x).arg(f.from.y).arg(f.from.w).arg(f.from.h).arg(f.fromOpacity);
         }
     }
+    if (m_scratchState) {
+        const auto s = m_scratchState();
+        lines << QStringLiteral("SCRATCH count %1 shown %2 active %3 enabled %4").arg(s.value("count").toInt()).arg(s.value("shown").toBool()).arg(s.value("active").toBool()).arg(s.value("enabled").toBool());
+        lines << QStringLiteral("LAYER dim %1").arg(m_layerDim, 0, 'f', 2);
+    }
+    for (const auto &t : m_windows)
+        if (scratchWindow(t.window)) lines << QStringLiteral("SCRATCHWIN %1 %2").arg(QString::fromStdString(t.panel), t.window->isMinimized() ? QStringLiteral("hidden") : QStringLiteral("shown"));
+    {
+        QStringList stack;
+        for (EffectWindow *w : effects->stackingOrder())
+            if (const auto *t = trackedFor(w)) stack << QString::fromStdString(t->panel);
+        lines << QStringLiteral("STACK %1").arg(stack.join(QLatin1Char(' '))); // bottom to top
+    }
+    if (const int active = activeIndex(); active >= 0)
+        lines << QStringLiteral("ACTIVE %1").arg(QString::fromStdString(m_windows[size_t(active)].panel));
     if (m_resize) lines << QStringLiteral("RESIZE %1 floating %2 boundaries %3 nativeSteps %4").arg(m_resize->window ? m_resize->window->caption() : QString()).arg(m_resize->floating).arg(m_resize->boundaries.size()).arg(m_resize->nativeSteps);
     if (m_session && m_session->active()) {
         const auto &tg = m_session->target();
@@ -1901,10 +2129,20 @@ QString TrellisCanvas::dump()
             lines << QStringLiteral("SLOT %1,%2 %3x%4 opacity %5").arg(r.x, 0, 'f', 1).arg(r.y, 0, 'f', 1).arg(r.w, 0, 'f', 1).arg(r.h, 0, 'f', 1).arg(m_slotOpacity, 0, 'f', 2);
         }
     }
+    for (const auto &[panel, d] : m_drawers)
+        if (const auto r = floatScreen(panel))
+            lines << QStringLiteral("DRAWER %1 edge %2 %3 at %4,%5 %6x%7").arg(QString::fromStdString(panel)).arg(int(d.edge)).arg(d.open ? "open" : "closed")
+                         .arg(r->x, 0, 'f', 1).arg(r->y, 0, 'f', 1).arg(r->w, 0, 'f', 1).arg(r->h, 0, 'f', 1);
+    for (const auto &id : vacancies(m_doc.root))
+        if (const TRect *vw = worldRect(id)) {
+            const TRect r = panelAt(m_tween.apply(id, *vw), m_camera.value);
+            lines << QStringLiteral("VACANT %1 %2,%3 %4x%5").arg(QString::fromStdString(id)).arg(r.x, 0, 'f', 1).arg(r.y, 0, 'f', 1).arg(r.w, 0, 'f', 1).arg(r.h, 0, 'f', 1);
+        }
     {
         QStringList order;
         for (const auto &id : leafIds(m_doc.root))
-            order << QString::fromStdString(id);
+            if (!isVacant(findNode(m_doc.root, id)))
+                order << QString::fromStdString(id);
         for (const auto &[cw, c] : m_closing) {
             const double p = std::min(1.0, (m_nowMs - c.start) / CLOSE_MS);
             lines << QStringLiteral("CLOSING %1 progress %2 opacity %3").arg(cw->caption()).arg(p, 0, 'f', 2).arg(c.opacity * APPEAR_EASE(1 - p), 0, 'f', 2)

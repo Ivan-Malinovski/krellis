@@ -17,8 +17,10 @@ Settings load(const QString &file)
     s.floatFirst = c.value(QStringLiteral("floatFirst"), s.floatFirst).toBool();
     s.placeAtPointer = c.value(QStringLiteral("placeAtPointer"), s.placeAtPointer).toBool();
     s.peek = std::max(0.0, c.value(QStringLiteral("peek"), s.peek).toDouble());
+    s.map = c.value(QStringLiteral("map"), s.map).toBool();
     s.mapPinned = c.value(QStringLiteral("mapPinned"), s.mapPinned).toBool();
     s.glide = c.value(QStringLiteral("glide"), s.glide).toBool();
+    s.scratchpad = c.value(QStringLiteral("scratchpad"), s.scratchpad).toBool();
     s.landMs = std::max(0.0, c.value(QStringLiteral("landMs"), s.landMs).toDouble());
     return s;
 }
@@ -29,8 +31,10 @@ bool save(const Settings &s, const QString &file)
     c.setValue(QStringLiteral("floatFirst"), s.floatFirst);
     c.setValue(QStringLiteral("placeAtPointer"), s.placeAtPointer);
     c.setValue(QStringLiteral("peek"), s.peek);
+    c.setValue(QStringLiteral("map"), s.map);
     c.setValue(QStringLiteral("mapPinned"), s.mapPinned);
     c.setValue(QStringLiteral("glide"), s.glide);
+    c.setValue(QStringLiteral("scratchpad"), s.scratchpad);
     c.setValue(QStringLiteral("landMs"), s.landMs);
     c.sync();
     return c.status() == QSettings::NoError;
@@ -64,6 +68,7 @@ QList<AppRule> loadRules(const QString &file)
         r.allowFloating = c.value(QStringLiteral("allowFloating"), r.allowFloating).toBool();
         r.singleton = c.value(QStringLiteral("singleton"), r.singleton).toBool();
         r.closable = c.value(QStringLiteral("closable"), r.closable).toBool();
+        r.scratchpad = c.value(QStringLiteral("scratchpad"), r.scratchpad).toBool();
         c.endGroup();
         rules.append(r);
     }
@@ -90,6 +95,7 @@ bool saveRules(const QList<AppRule> &rules, const QString &file)
         c.setValue(QStringLiteral("allowFloating"), r.allowFloating);
         c.setValue(QStringLiteral("singleton"), r.singleton);
         c.setValue(QStringLiteral("closable"), r.closable);
+        c.setValue(QStringLiteral("scratchpad"), r.scratchpad);
         c.endGroup();
     }
     c.endGroup();

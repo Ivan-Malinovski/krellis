@@ -52,14 +52,55 @@ void TrellisCanvas::loadRules()
         rule.floating = config.value("allowFloating", true).toBool();
         rule.singleton = config.value("singleton", false).toBool();
         rule.closable = config.value("closable", true).toBool();
+        rule.scratchpad = config.value("scratchpad", false).toBool();
         m_rules[app] = rule;
         config.endGroup();
     }
 }
+bool TrellisCanvas::scratchWindow(EffectWindow *w) const
+{
+    if (!w || !m_scratchpad) return false;
+    if (m_markedScratch && m_markedScratch(w)) return true;
+    const auto found = m_rules.find(appId(w));
+    return found != m_rules.end() && found->second.scratchpad;
+}
 ViewRules TrellisCanvas::rulesFor(EffectWindow *w) const
 {
     const auto found = m_rules.find(appId(w));
-    return found == m_rules.end() ? ViewRules{} : found->second;
+    ViewRules rule = found == m_rules.end() ? ViewRules{} : found->second;
+    if (scratchWindow(w)) {
+        // Floating only: it never joins the tiled layout, and a drag can't dock it.
+        rule.scratchpad = true;
+        rule.side = rule.stage = false;
+        rule.floating = true;
+        rule.placement = ViewPlacement::Floating;
+        rule.placementSet = true;
+    }
+    return rule;
+}
+bool TrellisCanvas::layerShown() const
+{
+    return std::any_of(m_windows.begin(), m_windows.end(), [this](const Tracked &t) {
+        return !t.window->isMinimized() && !t.window->isHidden() && scratchWindow(t.window);
+    });
+}
+bool TrellisCanvas::floatForScratch(EffectWindow *w, int slot)
+{
+    if (m_resize) finishResize(false);
+    const Tracked *t = trackedFor(w);
+    if (!t) return false;
+    const auto loc = locatePanel(m_doc, t->panel);
+    if (loc.where == PanelLocation::Where::Floating || loc.where == PanelLocation::Where::Hidden) return true;
+    if (loc.where != PanelLocation::Where::Docked || leafIds(m_doc.root).size() < 2) return false;
+    double opacity = 1;
+    const TRect from = visualRect(w, &opacity).value_or(screenRect(t->panel));
+    const auto saved = m_rememberedFloats.find(t->panel);
+    const TRect rect = saved == m_rememberedFloats.end() ? TRect{0.2 + 0.03 * (slot % 5), 0.175 + 0.04 * (slot % 5), 0.6, 0.65} : saved->second;
+    m_doc = floatPanel(m_doc, loc.panel, rect, FloatingLayer::Overlay);
+    relayout(true);
+    applyRest();
+    startFlight(w, FlightKind::Glide, from, {}, opacity);
+    return true;
 }
 Point TrellisCanvas::minSize(const std::vector<std::string> &views) const
 {
@@ -104,7 +145,9 @@ void TrellisCanvas::toggleDock(int index)
         m_rememberedFloats[t.panel] = location.floatState.rect;
         const auto stage = findStage(m_doc.root);
         m_doc = removePanel(m_doc, t.panel);
-        if (stage && findNode(m_doc.root, stage->id)) {
+        if (!vacancies(m_doc.root).empty()) {
+            dockAtEnd(location.panel);
+        } else if (stage && findNode(m_doc.root, stage->id)) {
             TRect shown{0, 0, m_area.width(), m_area.height()};
             if (const auto *rect = worldRect(stage->id)) shown = panelAt(*rect, m_camera.value);
             m_doc = insertPanel(m_doc, location.panel, DockTarget::beside(stage->id, shown.w >= shown.h ? trellis::Edge::Right : trellis::Edge::Bottom));
@@ -115,6 +158,9 @@ void TrellisCanvas::toggleDock(int index)
         if (!rule.floating) return;
         const auto saved = m_rememberedFloats.find(t.panel);
         const TRect rect = saved == m_rememberedFloats.end() ? TRect{0.2, 0.15, 0.6, 0.65} : saved->second;
+        // Float-first leaves the slot empty for the next window; tiling reflows the neighbours into it.
+        if (const auto vacated = m_floatFirst ? vacatePanel(m_doc, t.panel) : std::nullopt)
+            m_doc = *vacated;
         m_doc = floatPanel(m_doc, location.panel, rect, FloatingLayer::Overlay);
         relayout(true);
         if (const auto stage = findStage(m_doc.root)) m_nav.include({stage->id});

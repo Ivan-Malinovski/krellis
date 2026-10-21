@@ -12,6 +12,7 @@
 #include "view_rules.h"
 #include "session_store.h"
 #include "trellis_config.h"
+#include "keynav.h"
 #include <QTimer>
 
 #include <QObject>
@@ -66,6 +67,7 @@ public:
     const trellis::LayoutDocument &doc() const override { return m_doc; }
     trellis::NavMode mode() const override { return trellis::NavMode::Free; }
     trellis::Point viewport() const override;
+    trellis::FloatMargin floatMargin() const override { return m_doc.floatMargin; }
     double peekPadding() const override { return m_peekPx; }
     trellis::LayoutMetrics layoutMetrics() const override;
     void schedule() override;
@@ -122,6 +124,11 @@ public Q_SLOTS:
     void toggleFloat(int index);
     void toggleDock(int index);
     void toggleDockActive();
+    // Keyboard navigation (directions are screen sides): act on the active window.
+    void focusDirection(trellis::Edge dir);
+    void moveDirection(trellis::Edge dir);
+    bool resizeStep(trellis::Edge dir, double fraction);
+    void setHint(const QString &hint) { if (hint != m_hint) { m_hint = hint; updateBar(); } }
     QString barHit(double x, double y) { return barKey({x, y}); }
     // Drive a window drag without KWin's interactive move: press on window `index` at (x, y).
     bool simDragStart(int index, double x, double y);
@@ -146,6 +153,10 @@ private:
     std::function<void()> m_changed;
     bool m_mapPinned = false;                // the minimap stays out instead of sliding off the edge
     std::function<void()> m_togglePin;
+    // Scratchpad: the effect owns the marks (they follow a window across outputs). Both may be unset.
+    std::function<bool(EffectWindow *)> m_markedScratch;
+    std::function<void(const QString &)> m_scratchAction; // "toggle" | "mark", from the minimap
+    std::function<QVariantMap()> m_scratchState;           // {count, shown, active, canMark} across all outputs
     std::function<void()> m_toggleMode; // the minimap pill: flips floating-first for every canvas
     QPointF m_windowPointer;
     bool m_applyingRest = false;
@@ -162,6 +173,7 @@ private:
         QPointF anchor;
         bool floating = false;
         std::vector<ResizeBoundary> boundaries;
+        std::optional<trellis::Edge> stash; // an edge tile squeezed below the collapse width: the edge it slides out of
     };
     std::optional<NativeResize> m_resize;
     void startResize(EffectWindow *window);
@@ -180,6 +192,14 @@ private:
     std::map<QString, trellis::ViewRules> m_rules;
     QString m_rulesFile;
     std::map<std::string, TRect> m_rememberedFloats;
+    // Drawers: an edge tile resized to a sliver. It becomes an overlay float (its revealed rect) that rests mostly
+    // past the screen edge, leaving `m_drawerStripPx` visible, and slides out while the pointer is over it.
+    struct Drawer { trellis::Edge edge; bool open = false; };
+    std::map<std::string, Drawer> m_drawers;
+    double m_drawerStripPx = 12;     // sliver left in view while closed
+    double m_drawerCollapsePx = 40;  // an edge tile squeezed thinner than this collapses
+    void stashPanel(const std::string &panel, trellis::Edge edge, const TRect &from);
+    void updateDrawerHover(const PointerMotionEvent &event);
     struct Tracked {
         EffectWindow *window;
         std::string panel, view;
@@ -194,6 +214,14 @@ private:
     void adoptDrag(EffectWindow *w, QPointF pointer, const QRectF &startGeometry);
     int activeIndex() const;
     static bool manageable(EffectWindow *w);
+    // A scratch window is a floating overlay that the scratchpad shortcut shows and hides: marked at run time or by a rule.
+    bool scratchWindow(EffectWindow *w) const;
+    // Turn the docked window into a centred overlay float. False when it can't (nothing left to tile, or not docked).
+    bool m_scratchpad = false; // [General] scratchpad, mirrored from the effect; off, no window counts as scratch
+    bool floatForScratch(EffectWindow *w, int slot = 0); // slot offsets the default rect so marked windows cascade
+    // The scratch layer is up while any scratch window is shown on this output; the rest of the canvas dims under it.
+    bool layerShown() const;
+    double m_layerDim = 0, m_layerTarget = 0;
     Tracked *trackedFor(EffectWindow *w);
     void relayout(bool animate);
     TRect panelAt(const TRect &world, const TRect &camera) const;
@@ -206,6 +234,7 @@ private:
     void moveDrag(QPointF pointer);
     void endDrag(bool commit);
     void updateSlot(double dt);
+    bool fillVacancyFor(const trellis::NodePtr &panel, const std::optional<QPointF> &cursor);
     TRect screenRect(const std::string &panel) const;
     TRect sizingCamera() const;
     TRect restRect(const std::string &panel, const TRect *world = nullptr) const;
@@ -258,6 +287,7 @@ private:
     void finishMapSelect(bool commit);
     bool m_barOn = false; // the bar is optional; Plasma's panel already covers most of it
     bool m_naming = false, m_nameError = false;
+    QString m_hint; // modal key hint shown on the bar (resize mode)
     double barHeight() const; // space reserved for the bar, 0 while it is hidden
     void setBarOn(bool on);
     void toggleMap();
@@ -372,6 +402,27 @@ public Q_SLOTS:
     void toggleFloatActive();
     void toggleHideActive();
     void closeActive();
+    // Keyboard navigation: direction is left, right, up or down.
+    void focusDirection(const QString &direction);
+    void moveDirection(const QString &direction);
+    bool resizeStep(const QString &direction, double fraction);
+    void toggleResizeMode();
+    // Scratchpad: floating overlays summoned over the current view and dismissed again. An empty name means any.
+    void toggleScratch(const QString &name);
+    void toggleScratchPad() { toggleScratch(QString()); }
+    void toggleScratchMarkSlot() { toggleScratchMarkActive(); }
+    bool toggleScratchMarkActive(); // false when the window can't become one (the only tile) or comes from a rule
+    int scratchCount() const;
+    // One slot per direction for the global shortcuts (QAction wants a no-argument slot).
+    void focusLeft() { focusDirection(QStringLiteral("left")); }
+    void focusRight() { focusDirection(QStringLiteral("right")); }
+    void focusUp() { focusDirection(QStringLiteral("up")); }
+    void focusDown() { focusDirection(QStringLiteral("down")); }
+    void moveLeft() { moveDirection(QStringLiteral("left")); }
+    void moveRight() { moveDirection(QStringLiteral("right")); }
+    void moveUp() { moveDirection(QStringLiteral("up")); }
+    void moveDown() { moveDirection(QStringLiteral("down")); }
+    bool resizeModeActive() const { return m_resizeMode; }
     void turnOff();
     QString version() const;
     void toggleBar();
@@ -463,9 +514,27 @@ private:
     QPointer<EffectWindow> m_clientGrab;
     std::set<quint32> m_clientButtons, m_dismissedButtons;
     std::set<int> m_inertKeys;
+    std::vector<QPointer<EffectWindow>> m_scratchMarks; // run-time marks; rule-flagged windows are found through the canvases
+    std::vector<EffectWindow *> scratchWindows() const;
+    QVariantMap scratchState() const;
+    void refreshScratchUi();
+    QPointer<EffectWindow> m_scratchLast; // the scratch window that had focus last, raised on top when the layer comes up
+    bool m_scratchBusy = false;           // showing or hiding the layer: activations in between must not dismiss it
+    bool scratchLayerShown() const;
+    void showScratch(const std::vector<EffectWindow *> &windows);
+    void hideScratch(const std::vector<EffectWindow *> &windows);
+    void scratchActivated(EffectWindow *w);
+    void scratchClick(QPointF point);
+    bool m_resizeMode = false; // arrow keys resize the active tile; see handleResizeKey
+    QTimer *m_resizeModeTimer = nullptr;
+    void setResizeMode(bool on);
+    bool handleResizeKey(const KeyboardKeyEvent &e);
     bool m_grabDecoration = false;
     QPointF m_decorPosition;
     void registerShortcuts();
+    void syncScratchShortcuts(); // Meta+G and Meta+Shift+G exist only while the scratchpad is enabled
+    QList<QAction *> m_scratchActions;
+    bool m_scratchpad = false;
     void transfer(EffectWindow *window, TrellisCanvas *target);
     TrellisCanvas *canvasAt(QPointF point) const;
     TrellisCanvas *owner(EffectWindow *window) const;
@@ -478,6 +547,7 @@ private:
     double m_peekPx = 40;         // likewise ([General] peek, pixels)
     bool m_floatFirst = false; // loaded from trellisrc; mirrored into every canvas
     bool m_mapPinned = false;  // likewise
+    bool m_showMap = true;     // [General] map, default on; the minimap shortcut flips and saves it
     double m_landMs = 200; // loaded from trellisrc ([General] landMs); mirrored into every canvas
     bool m_glide = false; // loaded from trellisrc ([General] glide, default off); mirrored into every canvas
 };

@@ -8,6 +8,7 @@ add_library(trellis_core STATIC
     navigator.cpp
     drag.cpp
     session.cpp
+    keynav.cpp
 )
 target_include_directories(trellis_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_options(trellis_core PRIVATE -Wall -Wextra)

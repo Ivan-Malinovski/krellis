@@ -18,7 +18,7 @@ work=${NEST_WORK:-/tmp/trellis-nest}; rm -rf "$work"; mkdir -p "$work/config" "$
   IFS=, read -ra ids <<<"$effects"; for e in "${ids[@]}"; do echo "${e}Enabled=true"; done
   echo "blurEnabled=false"; echo "[Compositing]"; echo "Backend=OpenGL"
 } > "$work/config/kwinrc"
-if [ -n "${NEST_TRELLISRC:-}" ]; then cp "$NEST_TRELLISRC" "$work/config/trellisrc"; else printf "[General]\nglide=true\n" >"$work/config/trellisrc"; fi
+if [ -n "${NEST_TRELLISRC:-}" ]; then cp "$NEST_TRELLISRC" "$work/config/trellisrc"; else printf "[General]\nglide=true\nmap=false\n" >"$work/config/trellisrc"; fi
 if [ -n "${NEST_SESSION_FILE:-}" ]; then cp "$NEST_SESSION_FILE" "$work/state/kwin-trellis/session.json"; fi
 export NEST_OUTPUTS=${NEST_OUTPUTS:-1}
 export NEST_BACKEND_FLAG=

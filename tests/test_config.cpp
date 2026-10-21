@@ -14,9 +14,11 @@ private Q_SLOTS:
         QTemporaryDir dir;
         const QString file = dir.filePath("trellisrc");
         Settings s;
-        s.floatFirst = true; s.placeAtPointer = false; s.peek = 12; s.mapPinned = true; s.glide = true; s.landMs = 90;
+        s.floatFirst = true; s.placeAtPointer = false; s.peek = 12; s.map = false; s.mapPinned = true; s.glide = true; s.landMs = 90; s.scratchpad = true;
         QVERIFY(save(s, file));
         QCOMPARE(load(file), s);
+        QVERIFY(!Settings{}.scratchpad);
+        QVERIFY(Settings{}.map);
     }
     void defaultsWhenMissing()
     {
@@ -50,7 +52,7 @@ private Q_SLOTS:
         QTemporaryDir dir;
         const QString file = dir.filePath("trellisrc");
         AppRule a; a.app = "org.kde.dolphin"; a.placement = "floating"; a.scaling = "inert"; a.minWidth = 300; a.minHeight = 200;
-        a.allowStage = false; a.singleton = true; a.closable = false;
+        a.allowStage = false; a.singleton = true; a.closable = false; a.scratchpad = true;
         AppRule b; b.app = "mpv";
         QVERIFY(saveRules({a, b}, file));
         QCOMPARE(loadRules(file), (QList<AppRule>{b, a})); // groups come back sorted

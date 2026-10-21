@@ -11,7 +11,7 @@ using namespace trellis::config;
 QHash<int, QByteArray> RulesModel::roleNames() const
 {
     return {{App, "app"}, {Placement, "placement"}, {Scaling, "scaling"}, {MinWidth, "minWidth"}, {MinHeight, "minHeight"},
-            {AllowSide, "allowSide"}, {AllowStage, "allowStage"}, {AllowFloating, "allowFloating"}, {Singleton, "singleton"}, {Closable, "closable"}};
+            {AllowSide, "allowSide"}, {AllowStage, "allowStage"}, {AllowFloating, "allowFloating"}, {Singleton, "singleton"}, {Closable, "closable"}, {Scratchpad, "scratchpad"}};
 }
 
 QVariant RulesModel::data(const QModelIndex &index, int role) const
@@ -29,6 +29,7 @@ QVariant RulesModel::data(const QModelIndex &index, int role) const
     case AllowFloating: return r.allowFloating;
     case Singleton: return r.singleton;
     case Closable: return r.closable;
+    case Scratchpad: return r.scratchpad;
     }
     return {};
 }
@@ -48,6 +49,7 @@ bool RulesModel::setData(const QModelIndex &index, const QVariant &value, int ro
     case AllowFloating: r.allowFloating = value.toBool(); break;
     case Singleton: r.singleton = value.toBool(); break;
     case Closable: r.closable = value.toBool(); break;
+    case Scratchpad: r.scratchpad = value.toBool(); break;
     default: return false;
     }
     Q_EMIT dataChanged(index, index, {role});

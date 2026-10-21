@@ -73,9 +73,31 @@ KCM.SimpleKCM {
             }
             QQC2.CheckBox {
                 Kirigami.FormData.label: i18n("Minimap:")
+                text: i18n("Show the minimap")
+                checked: kcm.map
+                onToggled: kcm.map = checked
+            }
+            QQC2.CheckBox {
                 text: i18n("Keep pinned open")
+                enabled: kcm.map
                 checked: kcm.mapPinned
                 onToggled: kcm.mapPinned = checked
+            }
+
+            QQC2.CheckBox {
+                Kirigami.FormData.label: i18n("Scratchpad:")
+                text: i18n("Enable (Meta+G shows and hides the scratch windows)")
+                checked: kcm.scratchpad
+                onToggled: kcm.scratchpad = checked
+            }
+            QQC2.Label {
+                Layout.fillWidth: true
+                Layout.preferredWidth: Kirigami.Units.gridUnit * 18
+                Layout.maximumWidth: Kirigami.Units.gridUnit * 24
+                wrapMode: Text.WordWrap
+                opacity: 0.7
+                font: Kirigami.Theme.smallFont
+                text: i18n("Marked windows float over the canvas and come and go together. Meta+Shift+G marks the active window; Meta+G is also KWin's Grid View, so free it in Shortcuts first. Off, the shortcuts are released and the minimap has no scratchpad row.")
             }
 
             Kirigami.Separator { Kirigami.FormData.isSection: true; Kirigami.FormData.label: i18n("Motion") }
@@ -169,6 +191,7 @@ KCM.SimpleKCM {
                 required property bool allowFloating
                 required property bool singleton
                 required property bool closable
+                required property bool scratchpad
 
                 header: RowLayout {
                     Kirigami.Heading {
@@ -244,6 +267,11 @@ KCM.SimpleKCM {
                         text: i18n("Can be closed from the title bar")
                         checked: closable
                         onToggled: kcm.rules.set(index, "closable", checked)
+                    }
+                    QQC2.CheckBox {
+                        text: i18n("Scratchpad window (needs the scratchpad enabled above)")
+                        checked: scratchpad
+                        onToggled: kcm.rules.set(index, "scratchpad", checked)
                     }
                 }
             }

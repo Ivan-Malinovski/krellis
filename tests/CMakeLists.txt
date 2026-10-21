@@ -10,6 +10,7 @@ trellis_test(test_resize)
 trellis_test(test_motion)
 trellis_test(test_navigator)
 trellis_test(test_drag)
+trellis_test(test_keynav)
 
 trellis_test(test_input_geometry)
 

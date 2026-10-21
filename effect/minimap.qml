@@ -4,7 +4,7 @@ import QtQuick
 // `tiles` when the layout changes and the camera every frame; clicks are routed through hit().
 Item {
     id: root
-    property var tiles: []           // [{id, x, y, w, h, focused, floating, tint}] in 0..1 units
+    property var tiles: []           // [{id, x, y, w, h, focused, floating, vacant, tint}] in 0..1 units
     property real camX: 0
     property real camY: 0
     property real camW: 1
@@ -14,6 +14,11 @@ Item {
     property string stateText: "Overview"
     property bool floatFirst: false  // the active mode, named in the header
     property string hoverKey: ""
+    property int scratchCount: 0     // scratch windows on any output
+    property bool scratchEnabled: false
+    property bool scratchShown: false
+    property bool scratchActive: false   // the active window is a scratch window
+    property bool scratchCanMark: false
     property bool pinned: false      // stays out instead of sliding off the screen edge
     // Auto-hide: out while the pointer is over it, for a moment after it appears or is left, or while a
     // square is dragged on it. Otherwise only a slim tab shows at the screen edge.
@@ -30,7 +35,8 @@ Item {
     property var picks: []                    // tile ids the square touches
     readonly property rect stageRect: Qt.rect(card.x + stage.x, card.y + stage.y, stage.width, stage.height)
     readonly property bool helpOpen: open && hoverKey === "map:help"
-    readonly property var help: [
+    readonly property var help: scratchEnabled ? helpAll : helpAll.filter(r => r[0] !== "Meta+G" && r[0] !== "Meta+Shift+G")
+    readonly property var helpAll: [
         ["Alt / Meta + scroll", "Zoom a column and row"],
         ["Scroll on a title bar", "Zoom, no key needed"],
         ["Drag a square on the map", "Zoom to the tiles it touches"],
@@ -42,6 +48,11 @@ Item {
         ["Meta+Alt + Down", "Step out"],
         ["Meta+Alt + Left / Right", "Back / forward"],
         ["Meta + [ / ]", "Previous / next panel"],
+        ["Meta+Ctrl + arrows", "Focus the tile in that direction"],
+        ["Meta+Ctrl+Shift + arrows", "Move the panel that way"],
+        ["Meta+Ctrl+R", "Resize with the arrow keys"],
+        ["Meta+G", "Show / hide the scratchpad"],
+        ["Meta+Shift+G", "Make / unmake a scratch window"],
         ["Meta+Shift+Return", "Maximize panel"],
         ["Meta+Shift+F", "Float / tile panel"],
         ["Meta+Shift+D", "Dock beside the stage"],
@@ -53,7 +64,7 @@ Item {
         ["Meta+Alt+Escape", "Turn Trellis off"]
     ]
     readonly property real helpH: 30 + help.length * 15 + 8
-    readonly property real cardH: mapH + 24 + 26
+    readonly property real cardH: mapH + 24 + 26 + (scratchEnabled ? 24 : 0)
     readonly property real mapW: 232
     readonly property real mapH: Math.round(mapW * aspect)
     readonly property bool settled: shown ? (card.opacity > 0.99 && Math.abs(slide - (open ? 1 : 0)) < 0.002 && !peek.running && !linger.running)
@@ -202,6 +213,41 @@ Item {
             }
         }
 
+        // The scratchpad: summon or dismiss it, and mark the active window as one.
+        Row {
+            visible: root.scratchEnabled
+            x: 12; y: 30 + root.mapH + 8
+            spacing: 6
+            Rectangle {
+                property string hitKey: "map:scratch"
+                width: scratchText.width + 18; height: 18; radius: 9
+                opacity: root.scratchCount > 0 ? 1 : 0.5
+                color: root.scratchShown ? (root.hoverKey === "map:scratch" ? "#668496ec" : "#408496ec") : (root.hoverKey === "map:scratch" ? "#40ffffff" : "#26ffffff")
+                border.width: 1
+                border.color: root.scratchShown ? "#808496ec" : "#33ffffff"
+                Text {
+                    id: scratchText
+                    anchors.centerIn: parent
+                    text: root.scratchCount === 0 ? "Scratchpad" : "Scratchpad  ·  " + (root.scratchShown ? "hide" : "show" + (root.scratchCount > 1 ? " (" + root.scratchCount + ")" : ""))
+                    color: "#e6e9f5"; font.pixelSize: 10
+                }
+            }
+            Rectangle {
+                property string hitKey: "map:scratch-mark"
+                width: markText.width + 18; height: 18; radius: 9
+                opacity: root.scratchCanMark ? 1 : 0.5
+                color: root.hoverKey === "map:scratch-mark" ? "#40ffffff" : "#26ffffff"
+                border.width: 1
+                border.color: "#33ffffff"
+                Text {
+                    id: markText
+                    anchors.centerIn: parent
+                    text: root.scratchActive ? "Unmark" : "Mark active"
+                    color: "#e6e9f5"; font.pixelSize: 10
+                }
+            }
+        }
+
         Item {
             id: stage
             x: 12; y: 30
@@ -221,17 +267,17 @@ Item {
                     width: Math.max(1, modelData.w * stage.width - (modelData.floating ? 1.5 : 3))
                     height: Math.max(1, modelData.h * stage.height - (modelData.floating ? 1.5 : 3))
                     radius: 3
-                    color: modelData.tint
+                    color: modelData.vacant ? "transparent" : modelData.tint
                     readonly property bool picked: root.bandOn && root.picks.indexOf(modelData.id) >= 0
-                    opacity: picked ? 1 : (root.bandOn ? 0.4 : (root.hoverKey === hitKey ? 1 : (modelData.focused ? 0.95 : 0.75)))
-                    border.width: picked ? 1.5 : (modelData.focused ? 1.5 : 0)
-                    border.color: "#ffffff"
+                    opacity: modelData.vacant ? 0.7 : picked ? 1 : (root.bandOn ? 0.4 : (root.hoverKey === hitKey ? 1 : (modelData.focused ? 0.95 : 0.75)))
+                    border.width: modelData.vacant ? 1 : picked ? 1.5 : (modelData.focused ? 1.5 : 0)
+                    border.color: modelData.vacant ? "#8b94b3" : "#ffffff"
                     Behavior on x { NumberAnimation { duration: 460; easing.type: Easing.OutQuint } }
                     Behavior on y { NumberAnimation { duration: 460; easing.type: Easing.OutQuint } }
                     Behavior on width { NumberAnimation { duration: 460; easing.type: Easing.OutQuint } }
                     Behavior on height { NumberAnimation { duration: 460; easing.type: Easing.OutQuint } }
                     Behavior on opacity { NumberAnimation { duration: 120 } }
-                    Rectangle { width: parent.width; height: Math.min(parent.height, 3.5); radius: 1.5; color: "#38ffffff" }
+                    Rectangle { visible: !modelData.vacant; width: parent.width; height: Math.min(parent.height, 3.5); radius: 1.5; color: "#38ffffff" }
                 }
             }
 

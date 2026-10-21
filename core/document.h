@@ -28,6 +28,15 @@ NodePtr withViews(const NodePtr &panel, std::vector<std::string> views, std::str
 
 LayoutDocument updatePanel(LayoutDocument doc, NodePtr panel);
 LayoutDocument removePanel(LayoutDocument doc, const std::string &panelId, bool keepProportions = false);
+/// A vacancy is a docked panel with no views: the slot a window left when it was pulled out into float. It keeps
+/// its size so the neighbours stay put, and takes the next window dropped or opened there.
+bool isVacant(const NodePtr &node);
+/// Docked vacancies, in layout order.
+std::vector<std::string> vacancies(const NodePtr &root);
+/// Replace a docked panel with a vacancy; nullopt when it has no split parent to keep a slot in.
+std::optional<LayoutDocument> vacatePanel(const LayoutDocument &doc, const std::string &panelId);
+/// Put `panel` in the vacancy's slot.
+LayoutDocument fillVacancy(LayoutDocument doc, const std::string &vacancyId, NodePtr panel);
 LayoutDocument detachView(LayoutDocument doc, const std::string &viewId);
 LayoutDocument closeView(LayoutDocument doc, const std::string &viewId);
 LayoutDocument selectView(LayoutDocument doc, const std::string &viewId);
@@ -63,7 +72,7 @@ LayoutDocument insertPanel(LayoutDocument doc, NodePtr panel, const DockTarget &
 LayoutDocument floatPanel(LayoutDocument doc, NodePtr panel, Rect rect, FloatingLayer layer);
 Rect clampFloat(Rect rect);
 /// Overlay floats are confined to the usable area (never over a panel or off screen); stage floats keep the loose rule.
-Rect clampFloat(Rect rect, FloatingLayer layer);
+Rect clampFloat(Rect rect, FloatingLayer layer, const FloatMargin &margin = {});
 LayoutDocument raiseFloat(LayoutDocument doc, const std::string &panelId);
 
 std::optional<RestoreTarget> restoreTargetFor(const LayoutDocument &doc, const std::string &panelId);

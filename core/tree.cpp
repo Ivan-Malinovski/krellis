@@ -18,6 +18,15 @@ NodePtr makePanel(std::string id, std::vector<std::string> views, std::string se
     return n;
 }
 
+NodePtr makeVacancy(std::string id)
+{
+    auto n = std::make_shared<Node>();
+    n->kind = Node::Kind::Panel;
+    n->id = std::move(id);
+    n->vacant = true;
+    return n;
+}
+
 NodePtr makeSplit(std::string id, Axis axis, std::vector<NodePtr> children, std::vector<double> weights)
 {
     auto n = std::make_shared<Node>();
@@ -244,7 +253,7 @@ bool contains(const NodePtr &root, const std::string &ancestor, const std::strin
 NodePtr normalize(const NodePtr &node)
 {
     if (node->kind == Node::Kind::Panel)
-        return node->views.empty() ? nullptr : node;
+        return node->views.empty() && !node->vacant ? nullptr : node;
     if (node->kind == Node::Kind::Stage) {
         NodePtr child = node->child ? normalize(node->child) : nullptr;
         if (child == node->child)

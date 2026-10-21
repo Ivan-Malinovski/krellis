@@ -10,6 +10,7 @@ struct ViewRules {
     Point minimum{160, 120};
     bool side = true, stage = true, floating = true;
     bool singleton = false, closable = true;
+    bool scratchpad = false; // a floating overlay summoned and dismissed with the scratchpad shortcut
     bool allows(ViewPlacement where) const {
         switch (where) {
         case ViewPlacement::Side: return side;

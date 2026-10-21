@@ -1,4 +1,5 @@
 #include "document.h"
+#include "spatial.h"
 
 #include <algorithm>
 #include <atomic>
@@ -122,6 +123,37 @@ LayoutDocument removePanel(LayoutDocument doc, const std::string &panelId, bool 
     return doc;
 }
 
+bool isVacant(const NodePtr &node)
+{
+    return node && node->kind == Node::Kind::Panel && node->vacant;
+}
+
+std::vector<std::string> vacancies(const NodePtr &root)
+{
+    std::vector<std::string> out;
+    for (const auto &id : leafIds(root))
+        if (isVacant(findNode(root, id)))
+            out.push_back(id);
+    return out;
+}
+
+std::optional<LayoutDocument> vacatePanel(const LayoutDocument &doc, const std::string &panelId)
+{
+    const NodePtr parent = parentSplit(doc.root, panelId);
+    const NodePtr panel = findNode(doc.root, panelId);
+    if (!parent || !panel || panel->kind != Node::Kind::Panel)
+        return std::nullopt;
+    LayoutDocument out = doc;
+    out.root = replaceNode(doc.root, panelId, makeVacancy(uid("vacancy")));
+    return out;
+}
+
+LayoutDocument fillVacancy(LayoutDocument doc, const std::string &vacancyId, NodePtr panel)
+{
+    doc.root = replaceNode(doc.root, vacancyId, panel);
+    return doc;
+}
+
 LayoutDocument detachView(LayoutDocument doc, const std::string &viewId)
 {
     NodePtr panel = panelOfView(doc, viewId);
@@ -230,15 +262,16 @@ Rect clampFloat(Rect rect)
             std::min(1 - std::min(h, 0.05), std::max(0.0, rect.y)), w, h};
 }
 
-Rect clampFloat(Rect rect, FloatingLayer layer)
+Rect clampFloat(Rect rect, FloatingLayer layer, const FloatMargin &margin)
 {
     if (layer != FloatingLayer::Overlay)
         return clampFloat(rect);
-    const double w = std::min(1.0, std::max(0.02, rect.x < 0 ? rect.w + rect.x : rect.w));
-    const double h = std::min(1.0, std::max(0.02, rect.y < 0 ? rect.h + rect.y : rect.h));
-    const double x = std::min(1 - w, std::max(0.0, rect.x));
-    const double y = std::min(1 - h, std::max(0.0, rect.y));
-    return {x, y, std::min(w, 1 - x), std::min(h, 1 - y)};
+    const double minX = -margin.left, maxX = 1 + margin.right, minY = -margin.top, maxY = 1 + margin.bottom;
+    const double w = std::min(maxX - minX, std::max(0.02, rect.x < minX ? rect.w + (rect.x - minX) : rect.w));
+    const double h = std::min(maxY - minY, std::max(0.02, rect.y < minY ? rect.h + (rect.y - minY) : rect.h));
+    const double x = std::min(maxX - w, std::max(minX, rect.x));
+    const double y = std::min(maxY - h, std::max(minY, rect.y));
+    return {x, y, std::min(w, maxX - x), std::min(h, maxY - y)};
 }
 
 static int topZ(const LayoutDocument &doc)
@@ -253,7 +286,7 @@ LayoutDocument floatPanel(LayoutDocument doc, NodePtr panel, Rect rect, Floating
 {
     doc = removePanel(std::move(doc), panel->id);
     const int z = topZ(doc) + 1;
-    doc.floating.push_back({panel, clampFloat(rect, layer), z, layer});
+    doc.floating.push_back({panel, clampFloat(rect, layer, doc.floatMargin), z, layer});
     return doc;
 }
 
@@ -425,7 +458,7 @@ LayoutDocument sanitize(LayoutDocument input, const std::function<bool(const std
     for (auto &f : doc.floating)
         if (NodePtr panel = fixPanel(f.panel)) {
             f.panel = panel;
-            f.rect = clampFloat(f.rect, f.layer);
+            f.rect = clampFloat(f.rect, f.layer, doc.floatMargin);
             floating.push_back(f);
         }
     doc.floating = std::move(floating);

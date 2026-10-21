@@ -68,7 +68,7 @@ void TrellisCanvas::resizeStepped(EffectWindow *w, const RectF &geometry)
 void TrellisCanvas::resizeAt(EffectWindow *w, QPointF pointer)
 {
     if (!m_resize || m_resize->window != w) return;
-    const auto &state = *m_resize;
+    auto &state = *m_resize;
     const auto *tracked = trackedFor(w);
     if (!tracked) return;
     const QPointF delta = pointer - state.anchor;
@@ -88,7 +88,7 @@ void TrellisCanvas::resizeAt(EffectWindow *w, QPointF pointer)
         const TRect normalized{(left - m_area.x()) / m_area.width(), (top - m_area.y()) / m_area.height(),
                                std::max(1.0, right - left) / m_area.width(), std::max(1.0, bottom - top) / m_area.height()};
         for (auto &floating : m_doc.floating)
-            if (floating.panel->id == tracked->panel) floating.rect = clampFloat(normalized, trellis::FloatingLayer::Overlay);
+            if (floating.panel->id == tracked->panel) floating.rect = clampFloat(normalized, trellis::FloatingLayer::Overlay, m_doc.floatMargin);
     } else {
         m_doc.root = state.before.root;
         for (const auto &boundary : state.boundaries) {
@@ -97,6 +97,20 @@ void TrellisCanvas::resizeAt(EffectWindow *w, QPointF pointer)
             const double worldDelta = distance * (x ? state.camera.w / m_area.width() : state.camera.h / m_area.height());
             const auto drag = dragBoundary(m_doc.root, layoutMetrics(), boundary.split, boundary.index);
             if (drag.valid) m_doc.root = drag.drag.to(boundary.start + worldDelta);
+        }
+        // An edge tile squeezed to a sliver from its inner side collapses into a drawer on release.
+        state.stash.reset();
+        if (int(leftEdge) + int(rightEdge) + int(topEdge) + int(bottomEdge) == 1) {
+            const auto *self = m_rects.find(tracked->panel);
+            const auto *root = m_doc.root ? m_rects.find(m_doc.root->id) : nullptr;
+            if (self && root) {
+                const auto &a = self->rect, &b = root->rect;
+                const double eps = 0.5;
+                if (leftEdge && std::abs(a.x + a.w - (b.x + b.w)) < eps && state.painted.w - delta.x() < m_drawerCollapsePx) state.stash = trellis::Edge::Right;
+                else if (rightEdge && std::abs(a.x - b.x) < eps && state.painted.w + delta.x() < m_drawerCollapsePx) state.stash = trellis::Edge::Left;
+                else if (topEdge && std::abs(a.y + a.h - (b.y + b.h)) < eps && state.painted.h - delta.y() < m_drawerCollapsePx) state.stash = trellis::Edge::Bottom;
+                else if (bottomEdge && std::abs(a.y - b.y) < eps && state.painted.h + delta.y() < m_drawerCollapsePx) state.stash = trellis::Edge::Top;
+            }
         }
     }
     relayout(false);
@@ -113,7 +127,11 @@ void TrellisCanvas::finishResize(bool commit)
         && state.window->window()->isInteractiveResize())
         state.window->window()->cancelInteractiveMoveResize();
     if (!commit) m_doc = std::move(state.before);
-    else if (state.floating && state.window) {
+    else if (state.stash && state.window && trackedFor(state.window)) {
+        const std::string panel = trackedFor(state.window)->panel;
+        m_doc = state.before;
+        stashPanel(panel, *state.stash, state.painted);
+    } else if (state.floating && state.window) {
         if (const auto *tracked = trackedFor(state.window))
             for (const auto &floating : m_doc.floating)
                 if (floating.panel->id == tracked->panel) m_rememberedFloats[tracked->panel] = floating.rect;
