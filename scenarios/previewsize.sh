@@ -1,4 +1,5 @@
 # While previewing a drop, the other windows really take their previewed size (not a stretched paint).
+# Needs a glide=false rc with landMs=0 (or glide=true): the short landing glide scales a window for ~200 ms by design.
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET; unset DISPLAY
 call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }

@@ -1048,7 +1048,7 @@ void TrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp
 // The content is already laid out at the new size, so nothing is re-flowed mid-animation.
 void TrellisCanvas::frameChanged(EffectWindow *w, const RectF &old)
 {
-    if (m_glide || m_landMs <= 0 || m_session || m_resize || m_flights.count(w) || !trackedFor(w)) return;
+    if (m_glide || m_landMs <= 0 || (m_session && w == m_dragWindow) || m_resize || m_flights.count(w) || !trackedFor(w)) return;
     if (w->isUserMove() || w->isUserResize() || w->isMinimized() || w->isHidden()) return;
     const QRectF now = w->frameGeometry();
     if (old.width() <= 0 || old.height() <= 0 || now.width() <= 0 || now.height() <= 0) return;
