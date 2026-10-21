@@ -1,0 +1,9 @@
+<RCC>
+  <qresource prefix="/@TRELLIS_ID@">
+    <file alias="bar.qml">@CMAKE_CURRENT_SOURCE_DIR@/bar.qml</file>
+    <file alias="tiles.qml">@CMAKE_CURRENT_SOURCE_DIR@/tiles.qml</file>
+    <file alias="minimap.qml">@CMAKE_CURRENT_SOURCE_DIR@/minimap.qml</file>
+    <file alias="slot.qml">@CMAKE_CURRENT_SOURCE_DIR@/slot.qml</file>
+    <file alias="marquee.qml">@CMAKE_CURRENT_SOURCE_DIR@/marquee.qml</file>
+  </qresource>
+</RCC>

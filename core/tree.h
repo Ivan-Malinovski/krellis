@@ -1,0 +1,47 @@
+// Layout tree operations (port of Trellis model/tree).
+#pragma once
+
+#include "types.h"
+
+#include <functional>
+
+namespace trellis {
+
+inline const Rect UNIT{0, 0, 1, 1};
+
+struct Entry {
+    NodePtr node;
+    Rect rect;
+    std::string parent; // empty = none
+    double scale = 1;
+    bool isVirtual = false; // camera-only sibling range (spatial.h)
+};
+using Entries = OrderedMap<Entry>;
+
+/// Pixel minimums for laying out. `min` is the smallest a node may be along an axis, in pixels
+/// of its parent group's own layout space.
+struct LayoutMetrics {
+    double width = 0, height = 0;
+    std::function<double(const Node &, Axis)> min;
+};
+
+Entries layoutRects(const NodePtr &root, const LayoutMetrics *metrics = nullptr);
+std::vector<double> distribute(double total, const std::vector<double> &weights, const std::vector<double> &mins);
+double sum(const std::vector<double> &values);
+
+NodePtr findNode(const NodePtr &node, const std::string &id);
+std::vector<NodePtr> panelsOf(const NodePtr &node);
+NodePtr findStage(const NodePtr &node);
+bool contains(const NodePtr &root, const std::string &ancestor, const std::string &id);
+
+NodePtr normalize(const NodePtr &node);
+/// Removes a node. The freed share goes to the following sibling, or with keepProportions to all siblings
+/// in proportion, so nothing else changes size relative to its neighbours.
+NodePtr removeNode(const NodePtr &root, const std::string &id, bool keepProportions = false);
+NodePtr insertBeside(const NodePtr &root, const std::string &targetId, const NodePtr &incoming, Edge edge,
+                     const std::string &splitId, double share = 0.5);
+NodePtr replaceNode(const NodePtr &root, const std::string &id, const NodePtr &replacement);
+NodePtr resizeBoundary(const NodePtr &split, int index, double position,
+                       const std::function<double(int)> &min = nullptr);
+
+} // namespace trellis

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# shot <name>: screenshot the nested kwin to $NEST_OUT/<name>.png (run inside a nested.sh scenario)
+spectacle -b -f -n -o "${NEST_OUT:?}/$1.png" >/dev/null 2>&1
+test -s "$NEST_OUT/$1.png" && echo "shot: $NEST_OUT/$1.png"

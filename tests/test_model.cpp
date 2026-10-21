@@ -1,0 +1,206 @@
+// Port of Trellis packages/core/test/model.test.ts
+#include "builder.h"
+#include "document.h"
+#include "spatial.h"
+
+#include <QtTest>
+
+using namespace trellis;
+namespace L = trellis::layout;
+
+static NodePtr P(const char *id, std::vector<std::string> views) { return makePanel(id, std::move(views)); }
+
+static LayoutDocument ide()
+{
+    auto docs = L::panel({L::view("editor", "a"), L::view("editor", "b")}, "docs");
+    auto root = L::row({L::panel({L::view("files", "files"), L::view("search", "search")}, "left"),
+                        L::stage(&docs, "stage"), L::panel({L::view("outline", "outline")}, "outline")},
+                       {1, 3, 1});
+    return createDocument(&root);
+}
+
+static std::vector<std::string> ids(const std::vector<NodePtr> &ns)
+{
+    std::vector<std::string> out;
+    for (auto &n : ns)
+        out.push_back(n->id);
+    return out;
+}
+using V = std::vector<std::string>;
+
+class TestModel : public QObject
+{
+    Q_OBJECT
+private slots:
+    void builderCompiles()
+    {
+        auto doc = ide();
+        auto v = viewIds(doc);
+        std::sort(v.begin(), v.end());
+        QCOMPARE(v, (V{"a", "b", "files", "outline", "search"}));
+        QCOMPARE(doc.views["a"].type, std::string("editor"));
+        QCOMPARE(findStage(doc.root)->id, std::string("stage"));
+        QCOMPARE(doc.root->weights[1], 0.6);
+    }
+    void builderRejectsDuplicates()
+    {
+        auto bad = L::row({L::view("x", "a"), L::view("x", "a")});
+        QVERIFY_EXCEPTION_THROWN(createDocument(&bad), std::runtime_error);
+        auto two = L::row({L::stage(), L::stage()});
+        QVERIFY_EXCEPTION_THROWN(createDocument(&two), std::runtime_error);
+    }
+    void builderDeterministicIds()
+    {
+        auto spec = L::row({L::view("x"), L::view("x", "x-2"), L::view("x"), L::view("y")});
+        auto a = viewIds(createDocument(&spec));
+        QCOMPARE(a, (V{"x-1", "x-2", "x-3", "y-1"}));
+        QCOMPARE(viewIds(createDocument(&spec)), a);
+    }
+    void treeLayout()
+    {
+        auto rects = layoutRects(ide().root);
+        QCOMPARE(rects.at("left").rect.x, 0.0);
+        QVERIFY(qAbs(rects.at("left").rect.w - 0.2) < 1e-12);
+        QVERIFY(qAbs(rects.at("docs").rect.x - 0.2) < 1e-12);
+        QVERIFY(rects.at("stage").rect == rects.at("docs").rect);
+    }
+    void normalizeFlattens()
+    {
+        auto inner = makeSplit("inner", Axis::X, {P("b", {"2"}), P("c", {"3"})}, {0.5, 0.5});
+        auto outer = makeSplit("outer", Axis::X, {P("a", {"1"}), inner}, {0.5, 0.5});
+        auto n = normalize(outer);
+        QCOMPARE(ids(n->children), (V{"a", "b", "c"}));
+        QCOMPARE(n->weights, (std::vector<double>{0.5, 0.25, 0.25}));
+    }
+    void removeKeepsStage()
+    {
+        auto doc = ide();
+        auto without = removeNode(doc.root, "left");
+        QCOMPARE(ids(without->children), (V{"stage", "outline"}));
+        QVERIFY(qAbs(without->weights[0] - 0.8) < 1e-12);
+        QVERIFY(removeNode(doc.root, "stage") == doc.root);
+        auto emptied = removeNode(doc.root, "docs");
+        QVERIFY(!findStage(emptied)->child);
+    }
+    void insertBesideShare()
+    {
+        auto root = insertBeside(P("a", {"1"}), "a", P("b", {"2"}), Edge::Left, "s", 0.25);
+        QCOMPARE(ids(root->children), (V{"b", "a"}));
+        QCOMPARE(root->weights, (std::vector<double>{0.25, 0.75}));
+        auto below = insertBeside(root, "a", P("c", {"3"}), Edge::Bottom, "t");
+        QVERIFY(findNode(below, "t")->axis == Axis::Y);
+    }
+    void closeViewKeepsStage()
+    {
+        auto doc = closeView(ide(), "a");
+        QCOMPARE(locatePanel(doc, "docs").panel->selected, std::string("b"));
+        doc = closeView(doc, "b");
+        QVERIFY(!locatePanel(doc, "docs"));
+        QVERIFY(findStage(doc.root) && !findStage(doc.root)->child);
+        QVERIFY(!doc.views.count("a"));
+    }
+    void detachAndAddTab()
+    {
+        auto doc = detachView(ide(), "b");
+        QVERIFY(doc.views.count("b"));
+        doc = addTab(doc, "left", "b", 1);
+        auto p = locatePanel(doc, "left").panel;
+        QCOMPARE(p->views, (V{"files", "b", "search"}));
+        QCOMPARE(p->selected, std::string("b"));
+    }
+    void selectAndReorder()
+    {
+        auto doc = selectView(ide(), "b");
+        QCOMPARE(panelOfView(doc, "b")->selected, std::string("b"));
+        doc = reorderTabs(doc, "docs", {"b", "a"});
+        QCOMPARE(panelOfView(doc, "a")->views, (V{"b", "a"}));
+    }
+    void dockIntoStage()
+    {
+        auto doc = closeView(closeView(ide(), "a"), "b");
+        doc.views["n"] = ViewRecord{"editor", {}, {}};
+        doc = insertPanel(doc, P("p1", {"n"}), DockTarget::intoPanel("stage"));
+        QCOMPARE(findStage(doc.root)->child->id, std::string("p1"));
+        doc.views["m"] = ViewRecord{"editor", {}, {}};
+        doc = insertPanel(doc, P("p2", {"m"}), DockTarget::intoPanel("stage"));
+        QCOMPARE(locatePanel(doc, "p1").panel->views, (V{"n", "m"}));
+    }
+    void hideRestoreFloat()
+    {
+        auto doc = ide();
+        doc = hidePanel(doc, "outline");
+        QVERIFY(doc.hidden[0].restore.kind == RestoreTarget::Kind::Docked);
+        QCOMPARE(doc.hidden[0].restore.beside, std::string("stage"));
+        QVERIFY(doc.hidden[0].restore.edge == Edge::Right);
+        doc = restorePanel(doc, "outline", FloatingLayer::Overlay);
+        QCOMPARE(ids(doc.root->children), (V{"left", "stage", "outline"}));
+        QVERIFY(qAbs(doc.root->weights[2] - 0.2) < 1e-9);
+        auto floating = floatPanel(doc, locatePanel(doc, "outline").panel, {0.1, 0.1, 0.3, 0.3}, FloatingLayer::Overlay);
+        QCOMPARE(floating.floating.size(), size_t(1));
+        auto hidden = hidePanel(floating, "outline");
+        QVERIFY(hidden.hidden[0].restore.kind == RestoreTarget::Kind::Floating);
+        QCOMPARE(restorePanel(hidden, "outline", FloatingLayer::Overlay).floating.size(), size_t(1));
+    }
+    void sanitizeBroken()
+    {
+        LayoutDocument d;
+        d.root = makeSplit("s", Axis::X,
+                           {P("p", {"a", "ghost"}), P("q", {"a"}), makeStage("st1"), makeStage("st2")},
+                           {std::nan(""), 2, 1, 1});
+        d.floating.push_back({P("f", {"c"}), {5, -1, 3, 0}, 1, FloatingLayer::Overlay});
+        d.views = {{"a", {"x", {}, {}}}, {"c", {"x", {}, {}}}, {"orphan", {"x", {}, {}}}};
+        auto doc = sanitize(d);
+        auto v = viewIds(doc);
+        std::sort(v.begin(), v.end());
+        QCOMPARE(v, (V{"a", "c"}));
+        QVERIFY(!doc.views.count("orphan"));
+        QCOMPARE(ids(panelsOf(doc.root)), (V{"p"}));
+        QVERIFY(doc.floating[0].rect.w <= 1);
+    }
+    void dropGeometry()
+    {
+        Rect r{0, 0, 100, 100};
+        QVERIFY(dropEdge({10, 50}, r) == Edge::Left);
+        QVERIFY(!dropEdge({50, 50}, r));
+        QVERIFY(dropEdge({50, 95}, r) == Edge::Bottom);
+        auto d = dropRects(r, Edge::Right);
+        QVERIFY(d.slot == (Rect{50, 0, 50, 100}));
+        QVERIFY(d.collapsed == (Rect{100, 0, 0, 100}));
+    }
+    void focusLayoutRangesAndFit()
+    {
+        auto root = makeSplit("r", Axis::X, {P("a", {"1"}), P("b", {"2"}), P("c", {"3"})});
+        auto e = focusLayout(root);
+        // a+b, b+c ranges exist; a+b+c is the root itself.
+        QVERIFY(e.has(rangeId("r", {"a", "b"})));
+        QVERIFY(e.has(rangeId("r", {"b", "c"})));
+        QCOMPARE(e.size(), size_t(6));
+        QCOMPARE(bestFit(Rect{0, 0, 1.0 / 3, 1}, e), std::string("a"));
+        QCOMPARE(bestFit(Rect{0, 0, 2.0 / 3, 1}, e), rangeId("r", {"a", "b"}));
+        QCOMPARE(frameLeaves(root, {"b", "c"}), rangeId("r", {"b", "c"}));
+    }
+    void maximizeRestoresExactPrior()
+    {
+        auto root = makeSplit("r", Axis::X, {P("a", {"1"}), P("b", {"2"}), P("c", {"3"})});
+        auto e = focusLayout(root);
+        auto up = maximizeTransition(e, "r", rangeId("r", {"a", "b"}), "a", std::nullopt);
+        QCOMPARE(up.destination, std::string("a"));
+        QVERIFY(up.session);
+        auto back = maximizeTransition(e, "r", "a", "a", up.session);
+        QCOMPARE(back.destination, rangeId("r", {"a", "b"}));
+    }
+    void historyReplacesForward()
+    {
+        auto h = recordVisit({{"", {}}}, 0, {"a", {"a"}});
+        h = recordVisit(h.visits, h.index, {"b", {"b"}});
+        h = recordVisit(h.visits, 1, {"c", {"c"}});
+        // Visiting "c" after going back to "a" drops "b" from forward history.
+        QCOMPARE(h.visits.size(), size_t(3));
+        QCOMPARE(h.index, 2);
+        auto same = recordVisit(h.visits, h.index, {"c", {"c"}});
+        QCOMPARE(same.visits.size(), size_t(3));
+    }
+};
+
+QTEST_APPLESS_MAIN(TestModel)
+#include "test_model.moc"

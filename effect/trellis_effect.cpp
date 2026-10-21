@@ -1,0 +1,1878 @@
+#include "trellis_effect.h"
+#include "input_geometry.h"
+
+#include <QFile>
+#include <KGlobalAccel>
+#include <QAction>
+#include <QKeySequence>
+#include <QKeyEvent>
+
+#include "effect/effecthandler.h"
+#include "effect/timeline.h"
+#include "effect/offscreenquickview.h"
+#include <QQuickItem>
+#include "window.h"
+#include "core/output.h"
+
+#include <QDBusConnection>
+#include <algorithm>
+#include <QLoggingCategory>
+#include <QStringList>
+#include <QTimer>
+#include <QScopedValueRollback>
+#include <cmath>
+
+Q_LOGGING_CATEGORY(trellisLog, "trellis")
+
+namespace KWin {
+
+using namespace trellis;
+
+namespace {
+// --trellis-ease and the appear animation from the Trellis stylesheet.
+const std::function<double(double)> APPEAR_EASE = trellis::cubicBezier(0.22, 1, 0.36, 1);
+constexpr double APPEAR_MS = 220;
+constexpr double CLOSE_MS = 180;
+constexpr double BAR_H = 48;
+constexpr double SteppingPatienceMs = 120; // longest a gliding client may sit on a size request before being asked again
+constexpr double LandingPatienceMs = 300; // longest a stale buffer is drawn at its own size while its client lays out
+}
+
+static constexpr double GAP = 6; // px between tiles
+
+TrellisCanvas::TrellisCanvas(LogicalOutput *output)
+    : m_output(output)
+    , m_nav(*this, m_camera)
+{
+    loadRules();
+    connect(effects, &EffectsHandler::windowClosed, this, &TrellisCanvas::windowClosed);
+    connect(effects, &EffectsHandler::windowActivated, this, &TrellisCanvas::windowActivated);
+    connect(effects, &EffectsHandler::windowAdded, this, [this](EffectWindow *w) { watch(w); });
+    for (EffectWindow *w : effects->stackingOrder())
+        watch(w);
+    // Struts can change without output geometry changing (panel visibility,
+    // thickness or edge). Query KWin after it has recomputed its client areas.
+    auto *areaTimer = new QTimer(this);
+    areaTimer->setInterval(100);
+    connect(areaTimer, &QTimer::timeout, this, [this] {
+        const auto outputs = effects->screens();
+        if (!outputs.contains(m_output))
+            return;
+        const auto r = effects->clientArea(MaximizeArea, m_output);
+        const QRectF usable(r.x(), r.y(), r.width(), r.height());
+        if (usable == m_screen)
+            return;
+        if (m_resize) finishResize(false);
+        std::map<EffectWindow *, std::pair<TRect, double>> before;
+        for (const auto &t : m_windows)
+            if (!t.window->isMinimized()) {
+                TRect rect = screenRect(t.panel);
+                double opacity = 1;
+                flightRect(t.window, t, rect, opacity);
+                before[t.window] = {rect, opacity};
+            }
+        relayout(true);
+        for (const auto &[window, paint] : before)
+            startFlight(window, FlightKind::Glide, paint.first, {}, paint.second);
+    });
+    areaTimer->start();
+    relayout(false);
+}
+
+TrellisCanvas::~TrellisCanvas() = default;
+
+void TrellisCanvas::prepareUnload()
+{
+    m_unloading = true;
+    m_changed = {};
+    m_transfer = {};
+    for (auto *timer : findChildren<QTimer *>()) timer->stop();
+    disconnect(effects, nullptr, this, nullptr);
+    for (auto *window : effects->stackingOrder()) {
+        disconnect(window, nullptr, this, nullptr);
+        if (window->window()) disconnect(window->window(), nullptr, this, nullptr);
+    }
+    if (m_session) {
+        const auto cancelled = m_session->end(false, m_nowMs);
+        if (cancelled.wasDrag) m_doc = cancelled.next;
+        m_session.reset();
+    }
+    if (m_resize) {
+        m_doc = m_resize->before;
+        if (m_resize->window && m_resize->window->window())
+            m_resize->window->window()->cancelInteractiveMoveResize();
+    }
+    m_resize.reset();
+    m_dragWindow = nullptr;
+    m_dragFromKWin = false;
+    m_drag = Drag::None;
+    m_naming = false;
+    m_iconPressed.clear();
+    m_nav.endGesture();
+    m_tween.stop();
+    m_flights.clear();
+    m_landings.clear();
+    m_popups.clear();
+    m_closing.clear();
+    m_slot.reset();
+    m_marquee.reset();
+    m_animating = false;
+}
+
+int TrellisCanvas::activeIndex() const
+{
+    EffectWindow *active = effects->activeWindow();
+    for (size_t i = 0; i < m_windows.size(); ++i)
+        if (m_windows[i].window == active)
+            return int(i);
+    return -1;
+}
+
+void TrellisCanvas::cyclePanel(int step)
+{
+    // Visit windows in the order they were opened, skipping the ones parked in the dock.
+    std::vector<size_t> shown;
+    for (size_t i = 0; i < m_windows.size(); ++i)
+        if (!m_windows[i].window->isMinimized())
+            shown.push_back(i);
+    if (shown.empty())
+        return;
+    const int cur = activeIndex();
+    const auto at = std::find(shown.begin(), shown.end(), size_t(cur < 0 ? 0 : cur));
+    long pos = at == shown.end() ? 0 : long(at - shown.begin());
+    pos = ((pos + step) % long(shown.size()) + long(shown.size())) % long(shown.size());
+    const size_t pick = shown[size_t(pos)];
+    m_nav.focus(m_windows[pick].panel);
+    effects->activateWindow(m_windows[pick].window);
+    applyRest();
+}
+void TrellisCanvas::nextPanel() { cyclePanel(1); }
+void TrellisCanvas::previousPanel() { cyclePanel(-1); }
+void TrellisCanvas::toggleMaximizeActive() { toggleMaximize(activeIndex()); }
+void TrellisCanvas::toggleFloatActive() { toggleFloat(activeIndex()); }
+void TrellisCanvas::toggleHideActive() { toggleHide(activeIndex()); }
+void TrellisCanvas::closeActive()
+{
+    const int i = activeIndex();
+    if (i >= 0 && rulesFor(m_windows[size_t(i)].window).closable)
+        m_windows[size_t(i)].window->closeWindow();
+}
+
+void TrellisEffect::registerShortcuts()
+{
+    // Meta-based so they do not collide with Plasma's Ctrl+Alt desktop switching.
+    struct Binding {
+        const char *id, *text;
+        QKeySequence keys;
+        void (TrellisEffect::*slot)();
+    };
+    const Binding bindings[] = {
+        {"TrellisOverview", "Trellis: Toggle Overview", Qt::META | Qt::ALT | Qt::Key_Up, &TrellisEffect::toggleOverview},
+        {"TrellisBack", "Trellis: Back", Qt::META | Qt::ALT | Qt::Key_Left, &TrellisEffect::back},
+        {"TrellisForward", "Trellis: Forward", Qt::META | Qt::ALT | Qt::Key_Right, &TrellisEffect::forward},
+        {"TrellisStepOut", "Trellis: Step Out", Qt::META | Qt::ALT | Qt::Key_Down, &TrellisEffect::stepOut},
+        {"TrellisNextPanel", "Trellis: Next Panel", Qt::META | Qt::Key_BracketRight, &TrellisEffect::nextPanel},
+        {"TrellisPreviousPanel", "Trellis: Previous Panel", Qt::META | Qt::Key_BracketLeft, &TrellisEffect::previousPanel},
+        {"TrellisMaximize", "Trellis: Maximize Panel", Qt::META | Qt::SHIFT | Qt::Key_Return, &TrellisEffect::toggleMaximizeActive},
+        {"TrellisFloat", "Trellis: Float Panel", Qt::META | Qt::SHIFT | Qt::Key_F, &TrellisEffect::toggleFloatActive},
+        {"TrellisHide", "Trellis: Hide Panel to Dock", Qt::META | Qt::SHIFT | Qt::Key_H, &TrellisEffect::toggleHideActive},
+        {"TrellisDock", "Trellis: Toggle Dock", Qt::META | Qt::SHIFT | Qt::Key_D, &TrellisEffect::toggleDockActive},
+        {"TrellisClose", "Trellis: Close Panel", Qt::META | Qt::SHIFT | Qt::Key_W, &TrellisEffect::closeActive},
+        {"TrellisOff", "Trellis: Turn Off", Qt::META | Qt::ALT | Qt::Key_Escape, &TrellisEffect::turnOff},
+        {"TrellisMode", "Trellis: Toggle Floating-First Mode", Qt::META | Qt::ALT | Qt::Key_F, &TrellisEffect::toggleFloatFirst},
+        {"TrellisBar", "Trellis: Toggle Bar", Qt::META | Qt::ALT | Qt::Key_B, &TrellisEffect::toggleBar},
+        {"TrellisMap", "Trellis: Toggle Map", Qt::META | Qt::ALT | Qt::Key_M, &TrellisEffect::toggleMap},
+        {"TrellisSaveView", "Trellis: Save View", Qt::META | Qt::ALT | Qt::Key_S, &TrellisEffect::saveView},
+    };
+    for (const Binding &b : bindings) {
+        auto *a = new QAction(this);
+        a->setObjectName(QString::fromLatin1(b.id));
+        a->setText(QString::fromLatin1(b.text));
+        KGlobalAccel::self()->setGlobalShortcut(a, b.keys);
+        connect(a, &QAction::triggered, this, b.slot);
+    }
+}
+
+void TrellisCanvas::watch(EffectWindow *w)
+{
+    if (w->window()) {
+        connect(w->window(), &Window::interactiveMoveResizeStepped, this, [this, w](const RectF &geometry) {
+            resizeStepped(w, geometry);
+        });
+        connect(w->window(), &Window::iconChanged, this, [this, w] {
+            if (const auto *t = trackedFor(w)) { m_tiles[t->panel].icon = QString(); schedule(); }
+        });
+        connect(w->window(), &Window::captionChanged, this, [this, w] {
+            if (trackedFor(w)) { m_barSignature.clear(); updateBar(); schedule(); }
+        });
+    }
+    // A title-bar double click (or the maximize button) maximizes natively; Trellis answers with its own
+    // panel maximize and gives the window its tile back.
+    connect(w, &EffectWindow::windowMaximizedStateChanged, this, [this, w](EffectWindow *, bool horizontal, bool vertical) {
+        if (!horizontal && !vertical) return;
+        QPointer<EffectWindow> guard(w);
+        QTimer::singleShot(0, this, [this, guard] {
+            if (!guard || !guard->window() || m_unloading) return;
+            const auto *t = trackedFor(guard);
+            if (!t || floatScreen(t->panel)) return;
+            const int index = int(t - m_windows.data());
+            guard->window()->setMaximize(false, false);
+            toggleMaximize(index);
+        });
+    });
+    connect(w, &EffectWindow::minimizedChanged, this, &TrellisCanvas::minimizedChanged);
+    connect(w, &EffectWindow::windowStartUserMovedResized, this, &TrellisCanvas::userMoveStarted);
+    connect(w, &EffectWindow::windowStepUserMovedResized, this, [this](EffectWindow *win) {
+        if (!m_dragFromKWin || win != m_dragWindow)
+            return;
+        const QPointF pointer = win->window() ? win->window()->interactiveMoveResizeAnchor() : effects->cursorPos();
+        if (m_handoff && m_output && !QRectF(QRect(m_output->geometry())).contains(pointer) && m_handoff(win, pointer))
+            return;
+        moveDrag(pointer);
+    });
+    connect(w, &EffectWindow::windowFinishUserMovedResized, this, &TrellisCanvas::userMoveFinished);
+}
+
+bool TrellisCanvas::manageable(EffectWindow *w)
+{
+    return w && !(w->window() && w->window()->inherits("KWin::LayerShellV1Window")) && w->isNormalWindow() && !w->isDeleted() && !w->isSpecialWindow() && !w->isPopupWindow();
+}
+
+TrellisCanvas::Tracked *TrellisCanvas::trackedFor(EffectWindow *w)
+{
+    for (auto &t : m_windows)
+        if (t.window == w)
+            return &t;
+    return nullptr;
+}
+
+Point TrellisCanvas::viewport() const
+{
+    return {m_area.width(), m_area.height()};
+}
+
+LayoutMetrics TrellisCanvas::layoutMetrics() const
+{
+    LayoutMetrics m;
+    m.width = m_area.width();
+    m.height = m_area.height();
+    // Pixel minimums: a panel needs a usable client; splits sum along their axis, max across.
+    m.min = [this](const Node &n, Axis axis) -> double {
+        const auto minOf = [this](const auto &self, const Node &node, Axis a) -> double {
+            if (node.kind == Node::Kind::Stage)
+                return node.child ? self(self, *node.child, a) : 0.0;
+            if (node.kind != Node::Kind::Split) {
+                const auto minimum = minSize(node.views);
+                return a == Axis::X ? minimum.x : minimum.y;
+            }
+            double total = 0;
+            for (const auto &c : node.children) {
+                const double v = self(self, *c, a);
+                total = (a == node.axis) ? total + v : std::max(total, v);
+            }
+            return total;
+        };
+        return minOf(minOf, n, axis);
+    };
+    return m;
+}
+
+void TrellisCanvas::schedule()
+{
+    if (m_unloading) return;
+    m_animating = true;
+    effects->addRepaintFull();
+}
+
+TRect TrellisCanvas::panelAt(const TRect &world, const TRect &cam) const
+{
+    const double W = m_area.width(), H = m_area.height();
+    return {m_area.x() + (world.x - cam.x) / cam.w * W + GAP, m_area.y() + (world.y - cam.y) / cam.h * H + GAP,
+            world.w / cam.w * W - 2 * GAP, world.h / cam.h * H - 2 * GAP};
+}
+
+const TRect *TrellisCanvas::worldRect(const std::string &panel) const
+{
+    if (m_session && m_session->active()) {
+        const auto &targets = m_session->layoutTargets();
+        const auto it = targets.find(panel);
+        return it == targets.end() ? nullptr : &it->second;
+    }
+    const Entry *e = m_rects.find(panel);
+    return e ? &e->rect : nullptr;
+}
+
+// Overlay floats live in viewport-normalised coordinates, independent of the camera.
+std::optional<TRect> TrellisCanvas::floatScreen(const std::string &panel) const
+{
+    for (const auto &f : m_doc.floating)
+        if (f.panel->id == panel)
+            return TRect{m_area.x() + f.rect.x * m_area.width(), m_area.y() + f.rect.y * m_area.height(),
+                         f.rect.w * m_area.width(), f.rect.h * m_area.height()};
+    return std::nullopt;
+}
+
+TRect TrellisCanvas::screenRect(const std::string &panel) const
+{
+    if (const auto f = floatScreen(panel))
+        return *f;
+    const TRect *w = worldRect(panel);
+    if (!w)
+        return {};
+    return panelAt(m_tween.apply(panel, *w), m_camera.value);
+}
+
+// The camera that client sizes follow: the animated one while it glides, so a window is asked for the
+// size it is being shown at rather than jumping to its final size.
+TRect TrellisCanvas::sizingCamera() const
+{
+    return !m_session && !m_resize && m_camera.moving() ? m_camera.value : m_camera.target;
+}
+
+TRect TrellisCanvas::restRect(const std::string &panel, const TRect *world) const
+{
+    TRect r;
+    if (const auto floating = floatScreen(panel)) r = *floating;
+    else if (world) r = panelAt(*world, sizingCamera());
+    else {
+        const Entry *entry = m_rects.find(panel);
+        if (!entry) return {};
+        r = panelAt(entry->rect, sizingCamera());
+    }
+    // Clients get a sane real size even when the canvas is zoomed far out or in; the paint
+    // transform covers the difference.
+    for (const auto &t : m_windows) if (t.panel == panel) {
+        const auto rule = rulesFor(t.window);
+        if (rule.scaling != trellis::ViewScaling::None) {
+            r.w = std::max(rule.minimum.x, std::min(r.w, m_area.width() * 2));
+            r.h = std::max(rule.minimum.y, std::min(r.h, m_area.height() * 2));
+        }
+        break;
+    }
+    return r;
+}
+
+void TrellisCanvas::relayout(bool animate)
+{
+    if (m_unloading) return;
+    {
+        if (!effects->screens().contains(m_output))
+            return;
+        const auto g = effects->clientArea(MaximizeArea, m_output);
+        const QRectF next(g.x(), g.y(), g.width(), g.height());
+        if (next != m_screen && !m_uiScreen.isEmpty()) {
+            m_uiFrom = m_uiScreen;
+            m_areaChangedMs = m_nowMs;
+        }
+        m_screen = next;
+        if (m_uiScreen.isEmpty())
+            m_uiScreen = m_screen;
+        m_area = QRectF(g.x(), g.y(), std::max(1.0, double(g.width())), std::max(1.0, double(g.height()) - barHeight()));
+    }
+    std::map<std::string, TRect> before;
+    for (const auto &kv : m_rects)
+        before[kv.first] = m_tween.apply(kv.first, kv.second.rect);
+    const auto metrics = layoutMetrics();
+    m_rects = m_doc.root ? layoutRects(m_doc.root, &metrics) : Entries();
+    if (animate && m_glide && !before.empty())
+        m_tween.begin(before, m_nowMs);
+    m_nav.sync();
+    refreshRects();
+    applyRest();
+    updateBar();
+    updateTiles(0);
+    changed();
+    schedule();
+}
+
+void TrellisCanvas::applyRest(bool stepping)
+{
+    if (m_unloading) return;
+    QScopedValueRollback<bool> applying(m_applyingRest, true);
+    const bool previewing = m_session && m_session->active();
+    for (auto &t : m_windows) {
+        Window *window = t.window->window();
+        if (!window || t.window->isMinimized() || t.window->isUserMove() || t.window->isUserResize()
+            || trellis::locatePanel(m_doc, t.panel).where == trellis::PanelLocation::Where::Hidden)
+            continue;
+        // While a drag previews a drop, the other windows really take their previewed size, so the
+        // client redraws crisply instead of being stretched; the lifted one keeps its own.
+        const TRect *previewed = previewing ? worldRect(t.panel) : nullptr;
+        if (previewing && (t.window == m_dragWindow || !previewed || floatScreen(t.panel)))
+            continue;
+        if (m_nativeMutation) m_nativeMutation(t.window, false);
+        window->setKeepAbove(floatScreen(t.panel).has_value());
+        // Clients are asked for the size they are being drawn at, so a layout glide (maximize, dock,
+        // drop, rule change) never lays their contents out at the final size ahead of the animation.
+        TRect stepped;
+        if (!previewed)
+            if (const TRect *world = worldRect(t.panel)) {
+                stepped = m_tween.apply(t.panel, *world);
+                previewed = &stepped;
+            }
+        TRect r = previewed ? restRect(t.panel, previewed) : restRect(t.panel);
+        const RectF target(r.x, r.y, r.w, r.h);
+        // While gliding, a client is given its next size only once it has landed the previous one (or has
+        // sat on it for a while), so a heavy client lays out at its own pace instead of at every frame.
+        if (stepping && t.requested && m_nowMs - t.requestedMs < SteppingPatienceMs
+            && (std::abs(window->frameGeometry().width() - t.requested->width()) > 1
+                || std::abs(window->frameGeometry().height() - t.requested->height()) > 1))
+            continue;
+        if (!t.requested || !(*t.requested == target)) t.requestedMs = m_nowMs;
+        t.requested = target;
+        if (!m_glide) schedule(); // repaint when the patience window ends, even if the client never commits
+        if (window->moveResizeGeometry() != target)
+            window->moveResize(target);
+    }
+}
+
+bool TrellisCanvas::placedByUs(EffectWindow *w) const
+{
+    for (const auto &t : m_windows) {
+        if (t.window != w) continue;
+        if (!t.requested || !w->window()) return false;
+        const auto near = [&](const RectF &a) {
+            return std::abs(a.x() - t.requested->x()) <= 1 && std::abs(a.y() - t.requested->y()) <= 1
+                && std::abs(a.width() - t.requested->width()) <= 1 && std::abs(a.height() - t.requested->height()) <= 1;
+        };
+        return near(w->window()->frameGeometry()) || near(w->window()->moveResizeGeometry());
+    }
+    return false;
+}
+
+// Append at the end seam so every column keeps an equal 1/n share.
+void TrellisCanvas::dockAtEnd(const NodePtr &panel)
+{
+    if (m_doc.root && m_doc.root->kind == Node::Kind::Split && m_doc.root->axis == Axis::X) {
+        const auto spec = seamTarget(m_doc.root, int(m_doc.root->children.size()));
+        m_doc.root = applyDockTarget(m_doc.root, spec, panel, uid("split"));
+    } else if (m_doc.root) {
+        m_doc = insertPanel(m_doc, panel, DockTarget::beside(leafIds(m_doc.root).back(), trellis::Edge::Right));
+    } else {
+        m_doc.root = panel;
+    }
+}
+
+void TrellisCanvas::windowAdded(EffectWindow *w)
+{
+    if (!manageable(w) || trackedFor(w))
+        return;
+    if (m_resize) finishResize(false);
+    const auto rule = rulesFor(w);
+    if (rule.singleton) {
+        for (const auto &other : m_windows)
+            if (appId(other.window) == appId(w)) {
+                if (m_nativeMutation) m_nativeMutation(w, true);
+                w->minimize(); // Preserve the native client; never close a duplicate.
+                effects->activateWindow(other.window);
+                return;
+            }
+    }
+    auto placement = rule.placementSet ? rule.placement
+        : m_floatFirst ? trellis::ViewPlacement::Floating : trellis::ViewPlacement::Side;
+    if (!rule.allows(placement)) {
+        if (rule.side) placement = trellis::ViewPlacement::Side;
+        else if (rule.stage) placement = trellis::ViewPlacement::Stage;
+        else if (rule.floating) placement = trellis::ViewPlacement::Floating;
+        else return;
+    }
+    const int n = ++m_counter;
+    Tracked t{w, "p" + std::to_string(n), "w" + std::to_string(n)};
+    NodePtr panel = makePanel(t.panel, {t.view}, t.view);
+    if (placement == trellis::ViewPlacement::Floating) {
+        // Successive floats cascade so a new window doesn't hide the one before it.
+        const int k = int(m_doc.floating.size()) % 6;
+        m_doc = trellis::floatPanel(m_doc, panel, {0.2 + 0.025 * k, 0.15 + 0.035 * k, 0.6, 0.65}, trellis::FloatingLayer::Overlay);
+    } else if (placement == trellis::ViewPlacement::Stage) {
+        if (const auto stage = trellis::findStage(m_doc.root)) {
+            auto updated = std::make_shared<trellis::Node>(*stage);
+            updated->child = stage->child ? trellis::makeSplit(uid("stage-row"), trellis::Axis::X, {stage->child, panel}) : panel;
+            m_doc.root = trellis::replaceNode(m_doc.root, stage->id, updated);
+        } else {
+            auto stageNode = trellis::makeStage(uid("stage"), panel);
+            m_doc.root = m_doc.root ? trellis::makeSplit(uid("root"), trellis::Axis::X, {stageNode, m_doc.root}) : stageNode;
+        }
+    } else {
+        dockAtEnd(panel);
+    }
+    m_windows.push_back(t);
+    // A native minimized window must enter the hidden model before the first
+    // layout can issue a configure. Hidden clients may not acknowledge resizes.
+    if (w->isMinimized()) m_doc = hidePanel(m_doc, t.panel);
+    relayout(true);
+    if (!w->isMinimized()) {
+        m_nav.ensureVisible(t.panel);
+        if (m_glide && m_nowMs > 0) startFlight(w, FlightKind::Appear, {}, {});
+    }
+    qCDebug(trellisLog) << "added" << w->caption() << QString::fromStdString(t.panel);
+}
+
+void TrellisCanvas::windowClosed(EffectWindow *w)
+{
+    if (m_resize) finishResize(false);
+    if (w->isPopupWindow()) {
+        double opacity = 1;
+        if (const auto from = m_glide ? visualRect(w, &opacity) : std::nullopt)
+            m_closing.emplace(w, Closing{EffectWindowDeletedRef(w), *from, m_nowMs, opacity, EffectWindowVisibleRef(w, EffectWindow::PAINT_DISABLED_BY_MINIMIZE)});
+        m_popups.erase(w);
+        schedule();
+        return;
+    }
+    for (size_t i = 0; i < m_windows.size(); ++i) {
+        if (m_windows[i].window != w)
+            continue;
+        // Capture the paint state before dropping a flight (including a hide
+        // visible-ref). Native minimized state alone cannot tell us what is drawn.
+        double opacity = 1;
+        const auto from = visualRect(w, &opacity);
+        if (m_glide && from && from->w > 0 && from->h > 0 && opacity > 0 && m_nowMs > 0
+            && ((!w->isMinimized() && !w->isHidden()) || m_flights.count(w)))
+            m_closing.emplace(w, Closing{EffectWindowDeletedRef(w), *from, m_nowMs, opacity, EffectWindowVisibleRef(w, EffectWindow::PAINT_DISABLED_BY_MINIMIZE)});
+        m_flights.erase(w);
+        m_landings.erase(w);
+        if (w == m_dragWindow) {
+            m_session.reset();
+            m_dragWindow = nullptr;
+        }
+        m_doc = closeView(m_doc, m_windows[i].view);
+        m_windows.erase(m_windows.begin() + long(i));
+        relayout(true);
+        updateDock();
+        return;
+    }
+}
+
+void TrellisCanvas::windowActivated(EffectWindow *w)
+{
+    Tracked *t = trackedFor(w);
+    if (!t)
+        return;
+    if (floatScreen(t->panel))
+        m_doc = raiseFloat(m_doc, t->panel);
+    else
+        m_nav.ensureVisible(t->panel);
+}
+
+void TrellisCanvas::updateDock()
+{
+    m_dockOrder.clear();
+    for (const auto &t : m_windows)
+        if (t.window->isMinimized())
+            m_dockOrder.push_back(t.window);
+    updateBar();
+}
+
+static bool sceneContains(const std::unique_ptr<OffscreenQuickScene> &scene, QPointF p)
+{
+    return scene && QRectF(QRect(scene->geometry())).contains(p);
+}
+
+static QString sceneKey(const std::unique_ptr<OffscreenQuickScene> &scene, QPointF p)
+{
+    if (!sceneContains(scene, p))
+        return {};
+    const QPointF local = p - QPointF(scene->geometry().x(), scene->geometry().y());
+    QVariant out;
+    QMetaObject::invokeMethod(scene->rootItem(), "hit", Q_RETURN_ARG(QVariant, out), Q_ARG(QVariant, local.x()), Q_ARG(QVariant, local.y()),
+                              Q_ARG(QVariant, QVariant()));
+    return out.toString();
+}
+
+bool TrellisCanvas::overUi(QPointF p) const { return sceneContains(m_bar, p) || (m_mapOn && sceneContains(m_map, p)); }
+
+QString TrellisCanvas::barKey(QPointF pointer) const
+{
+    if (m_mapOn && sceneContains(m_map, pointer))
+        return sceneKey(m_map, pointer);
+    return sceneKey(m_bar, pointer);
+}
+
+double TrellisCanvas::barHeight() const { return m_barOn ? BAR_H : 0; }
+
+void TrellisCanvas::setBarOn(bool on)
+{
+    if (m_barOn == on) return;
+    m_barOn = on;
+    m_barSignature.clear();
+    updateBar();
+    relayout(true);
+    schedule();
+}
+
+void TrellisCanvas::toggleMap()
+{
+    m_mapOn = !m_mapOn;
+    m_barSignature.clear();
+    updateBar();
+    schedule();
+}
+
+void TrellisCanvas::updateBar()
+{
+    // Naming a view needs the text field, so the bar floats over the windows for that long without reserving space.
+    if (!m_barOn && !m_naming) {
+        if (m_bar) {
+            effects->addRepaint(Region(m_bar->geometry()));
+            m_bar.reset();
+        }
+        m_barSignature.clear();
+        updateMap();
+        return;
+    }
+    if (!m_bar) {
+        m_bar = std::make_unique<OffscreenQuickScene>();
+        m_bar->setSource(QUrl(QStringLiteral("qrc:/" TRELLIS_ID "/bar.qml")));
+        if (!m_bar->rootItem()) {
+            qCWarning(trellisLog) << "bar.qml failed to load";
+            m_bar.reset();
+            return;
+        }
+    }
+    const QRect geo(int(m_uiScreen.x()), int(m_uiScreen.bottom() - BAR_H), int(m_uiScreen.width()), int(BAR_H));
+    QVariantList framings;
+    for (const auto &f : m_nav.framings()) {
+        QVariantMap m;
+        m[QStringLiteral("id")] = QString::fromStdString(f.id);
+        m[QStringLiteral("name")] = QString::fromStdString(f.name);
+        m[QStringLiteral("current")] = !f.frame.empty() && f.frame.front() == m_nav.framed();
+        framings << m;
+    }
+    QStringList labels;
+    for (EffectWindow *w : m_dockOrder)
+        labels << w->caption();
+    const int hidden = int(m_dockOrder.size());
+    const int open = int(m_windows.size()) - hidden;
+    const QString count = QStringLiteral("%1 %2").arg(open).arg(open == 1 ? QStringLiteral("window") : QStringLiteral("windows"))
+        + (hidden ? QStringLiteral(" · %1 in Dock").arg(hidden) : QString());
+    QQuickItem *item = m_bar->rootItem();
+    item->setProperty("naming", m_naming);
+    item->setProperty("nameError", m_nameError);
+    const QString signature = QStringLiteral("%1|%2|%3|%4|%5|%6|%7|%8|%9")
+                                  .arg(geo.x()).arg(geo.y()).arg(geo.width())
+                                  .arg(framings.size() ? QString::number(qHash(QVariant(framings).toString())) : QString(), labels.join(QLatin1Char(',')), count)
+                                  .arg(m_nav.canGoBack() * 8 + m_nav.canGoForward() * 4 + m_mapOn * 2 + m_nav.framed().empty())
+                                  .arg(m_hoverKey + m_pressKey);
+    if (signature == m_barSignature && m_bar->geometry() == Rect(geo))
+        return;
+    m_barSignature = signature;
+    const Rect old = m_bar->geometry();
+    m_bar->setGeometry(Rect(geo));
+    item->setProperty("framings", framings);
+    item->setProperty("labels", labels);
+    item->setProperty("overviewCurrent", m_nav.framed().empty());
+    item->setProperty("canBack", m_nav.canGoBack());
+    item->setProperty("canForward", m_nav.canGoForward());
+    item->setProperty("mapOn", m_mapOn);
+    item->setProperty("countText", count);
+    item->setProperty("hoverKey", m_hoverKey);
+    item->setProperty("pressKey", m_pressKey);
+    effects->addRepaint(Region(old) + Region(Rect(geo)));
+    updateMap();
+}
+
+static const char *const TINTS[] = {"#3f8fd6", "#d8ab35", "#2f8fe6", "#d65b56", "#b9a7d8", "#2bb45f", "#c97bd1", "#e08a4a"};
+
+// The minimap lives above the bar, bottom right. Tiles refresh when the layout changes; the camera
+// frame is fed every frame so zoom and pan gestures are tracked live.
+void TrellisCanvas::updateMap(bool force)
+{
+    if (!m_mapOn && !m_map)
+        return;
+    if (!m_map) {
+        m_map = std::make_unique<OffscreenQuickScene>();
+        m_map->setSource(QUrl(QStringLiteral("qrc:/" TRELLIS_ID "/minimap.qml")));
+        if (!m_map->rootItem()) {
+            qCWarning(trellisLog) << "minimap.qml failed to load";
+            m_map.reset();
+            return;
+        }
+        force = true;
+    }
+    QQuickItem *item = m_map->rootItem();
+    if (!m_mapOn && item->property("settled").toBool()) {
+        const Rect g = m_map->geometry();
+        m_map.reset();
+        effects->addRepaint(Region(g));
+        return;
+    }
+    const double aspect = m_area.height() / std::max(1.0, m_area.width());
+    QVariantList tiles;
+    QStringList sig;
+    const std::string framed = m_nav.framed();
+    int i = 0;
+    for (const auto &[id, entry] : m_nav.entries()) {
+        if (entry.node->kind != Node::Kind::Panel)
+            continue;
+        QVariantMap m;
+        const TRect r = m_tween.apply(id, entry.rect);
+        m[QStringLiteral("id")] = QString::fromStdString(id);
+        m[QStringLiteral("x")] = r.x;
+        m[QStringLiteral("y")] = r.y;
+        m[QStringLiteral("w")] = r.w;
+        m[QStringLiteral("h")] = r.h;
+        m[QStringLiteral("focused")] = framed == id;
+        m[QStringLiteral("floating")] = false;
+        m[QStringLiteral("tint")] = QString::fromLatin1(TINTS[i++ % 8]);
+        tiles << m;
+        sig << QStringLiteral("%1:%2,%3,%4,%5,%6").arg(QString::fromStdString(id)).arg(r.x, 0, 'f', 3).arg(r.y, 0, 'f', 3).arg(r.w, 0, 'f', 3).arg(r.h, 0, 'f', 3).arg(framed == id);
+    }
+    for (const auto &f : m_doc.floating) {
+        QVariantMap m;
+        m[QStringLiteral("id")] = QString::fromStdString(f.panel->id);
+        m[QStringLiteral("x")] = f.rect.x;
+        m[QStringLiteral("y")] = f.rect.y;
+        m[QStringLiteral("w")] = f.rect.w;
+        m[QStringLiteral("h")] = f.rect.h;
+        m[QStringLiteral("focused")] = false;
+        m[QStringLiteral("floating")] = true;
+        m[QStringLiteral("tint")] = QString::fromLatin1(TINTS[i++ % 8]);
+        tiles << m;
+        sig << QStringLiteral("f%1:%2,%3").arg(QString::fromStdString(f.panel->id)).arg(f.rect.x, 0, 'f', 3).arg(f.rect.y, 0, 'f', 3);
+    }
+    const QString signature = sig.join(QLatin1Char(';')) + QStringLiteral("|%1|%2").arg(aspect, 0, 'f', 3).arg(m_hoverKey);
+    if (force || signature != m_mapSignature) {
+        m_mapSignature = signature;
+        item->setProperty("aspect", aspect);
+        item->setProperty("tiles", tiles);
+        item->setProperty("hoverKey", m_hoverKey);
+        item->setProperty("stateText", framed.empty() ? QStringLiteral("Overview") : QStringLiteral("Framed"));
+    }
+    const TRect c = m_camera.value;
+    item->setProperty("camX", c.x);
+    item->setProperty("camY", c.y);
+    item->setProperty("camW", c.w);
+    item->setProperty("camH", c.h);
+    item->setProperty("shown", m_mapOn);
+    const QSizeF size(item->implicitWidth(), item->implicitHeight());
+    const QRect geo(int(m_uiScreen.right() - size.width() - 12), int(m_uiScreen.bottom() - barHeight() - size.height() - 8), int(size.width()), int(size.height()));
+    const Rect old = m_map->geometry();
+    if (old != Rect(geo))
+        m_map->setGeometry(Rect(geo));
+    effects->addRepaint(Region(old) + Region(Rect(geo)));
+}
+
+void TrellisCanvas::barAction(const QString &key)
+{
+    if (key == QLatin1String("overview")) {
+        m_nav.overview();
+    } else if (key == QLatin1String("back")) {
+        m_nav.back();
+    } else if (key == QLatin1String("forward")) {
+        m_nav.forward();
+    } else if (key == QLatin1String("save")) {
+        if (m_naming) submitFramingName();
+        else beginFramingName();
+    } else if (key == QLatin1String("name-cancel")) {
+        m_naming = false;
+        m_nameError = false;
+    } else if (key == QLatin1String("map")) {
+        m_mapOn = !m_mapOn;
+    } else if (key == QLatin1String("map:overview")) {
+        m_nav.overview();
+    } else if (key.startsWith(QLatin1String("map:frame:"))) {
+        m_nav.focus(key.mid(10).toStdString());
+    } else if (key.startsWith(QLatin1String("map:focus:"))) {
+        if (const auto *t = [&]() -> const Tracked * {
+                for (const auto &w : m_windows)
+                    if (w.panel == key.mid(10).toStdString())
+                        return &w;
+                return nullptr;
+            }())
+            effects->activateWindow(t->window);
+    } else if (key.startsWith(QLatin1String("framing:"))) {
+        m_nav.goFraming(key.mid(8).toStdString());
+    } else if (key.startsWith(QLatin1String("rm:"))) {
+        m_nav.removeFraming(key.mid(3).toStdString());
+    } else if (key.startsWith(QLatin1String("dock:"))) {
+        const int i = key.mid(5).toInt();
+        if (i >= 0 && i < int(m_dockOrder.size()))
+            m_dockOrder[size_t(i)]->unminimize();
+    }
+    applyRest();
+    updateBar();
+    schedule();
+}
+
+TRect TrellisCanvas::chipRect(EffectWindow *w) const
+{
+    const auto it = std::find(m_dockOrder.begin(), m_dockOrder.end(), w);
+    if (!m_bar || it == m_dockOrder.end())
+        return {m_area.center().x() - 60, m_screen.bottom() - 40, 120, 30};
+    QVariant out;
+    QMetaObject::invokeMethod(m_bar->rootItem(), "chipRect", Q_RETURN_ARG(QVariant, out),
+                              Q_ARG(QVariant, int(it - m_dockOrder.begin())));
+    const QRectF r = out.toRectF();
+    const Rect g = m_bar->geometry();
+    if (r.isEmpty())
+        return {double(g.x()), double(g.y()), double(g.width()), double(g.height())};
+    return {g.x() + r.x(), g.y() + r.y(), r.width(), r.height()};
+}
+
+void TrellisCanvas::startFlight(EffectWindow *w, FlightKind kind, TRect from, TRect to, double opacity)
+{
+    Flight f{kind, from, to, m_nowMs, 0, false, std::nullopt};
+    f.fromOpacity = opacity;
+    f.duration = kind == FlightKind::Appear ? APPEAR_MS : kind == FlightKind::Hide ? trellis::DOCK_HIDE_MS : kind == FlightKind::Glide ? trellis::Motion::layoutMs : trellis::DOCK_RESTORE_MS;
+    if (!m_glide)
+        f.duration = 1; // keeps the flight bookkeeping (hide refs, native restore) but lands on the next frame
+    if (kind == FlightKind::Hide)
+        f.ref.emplace(w, EffectWindow::PAINT_DISABLED_BY_MINIMIZE);
+    m_flights.erase(w);
+    m_flights.emplace(w, std::move(f));
+    schedule();
+}
+
+// The animated screen rect and opacity for a window in flight. False when it is not flying.
+bool TrellisCanvas::flightRect(EffectWindow *w, const Tracked &t, TRect &rect, double &opacity) const
+{
+    const auto it = m_flights.find(w);
+    if (it == m_flights.end())
+        return false;
+    const Flight &f = it->second;
+    const double p = std::min(1.0, std::max(0.0, (m_nowMs - f.start) / f.duration));
+    switch (f.kind) {
+    case FlightKind::Appear: {
+        const double e = APPEAR_EASE(p);
+        const TRect r = screenRect(t.panel);
+        const double s = 0.97 + 0.03 * e;
+        rect = {r.x + r.w * (1 - s) / 2, r.y + r.h * (1 - s) / 2, r.w * s, r.h * s};
+        opacity = e;
+        return true;
+    }
+    case FlightKind::Hide: {
+        const double e = trellis::DOCK_EASE(p);
+        rect = trellis::lerpRect(f.from, f.to, e);
+        // An acknowledgement hold is native visibility only. The visual hide
+        // still ends at 300 ms, with no translucent card left over the dock.
+        opacity = p >= 1 && f.nativeRestore ? 0 : f.fromOpacity + (0.1 - f.fromOpacity) * e;
+        return true;
+    }
+    case FlightKind::Glide: {
+        rect = trellis::lerpRect(f.from, screenRect(t.panel), trellis::easeOutQuint(p));
+        opacity = f.fromOpacity + (1 - f.fromOpacity) * trellis::easeOutQuint(p);
+        return true;
+    }
+    case FlightKind::Restore: {
+        const double e = trellis::DOCK_EASE(p);
+        rect = trellis::lerpRect(f.from, screenRect(t.panel), e);
+        opacity = f.fromOpacity + (1 - f.fromOpacity) * e;
+        return true;
+    }
+    }
+    return false;
+}
+
+void TrellisCanvas::minimizedChanged(EffectWindow *w)
+{
+    if (m_resize) finishResize(false);
+    Tracked *t = trackedFor(w);
+    if (!t)
+        return;
+    const bool hidden = trellis::locatePanel(m_doc, t->panel).where == trellis::PanelLocation::Where::Hidden;
+    if (w->isMinimized() && !hidden) {
+        double opacity = 1;
+        const TRect from = visualRect(w, &opacity).value_or(screenRect(t->panel));
+        m_doc = hidePanel(m_doc, t->panel);
+        relayout(true);
+        updateDock();
+        startFlight(w, FlightKind::Hide, from, chipRect(w), opacity);
+        // Restore the baseline while the hide flight's visible ref keeps the
+        // client unsuspended and able to grow its buffer. Once fully hidden,
+        // a configure-only commit can clip a larger target to the old buffer.
+        if (m_hiddenNativeRect && w->window()) {
+            if (const auto baseline = m_hiddenNativeRect(w)) {
+                // Only restore its size here. Native output ownership follows
+                // the frame's centre, so keep that centre on this canvas even
+                // when the original window was larger than the current output.
+                const RectF target(m_area.center().x() - baseline->width() / 2,
+                                   m_area.center().y() - baseline->height() / 2,
+                                   baseline->width(), baseline->height());
+                auto &flight = m_flights.at(w);
+                flight.nativeRestore = target;
+                QScopedValueRollback<bool> applying(m_applyingRest, true);
+                w->window()->moveResize(target);
+            }
+        }
+    } else if (!w->isMinimized() && hidden) {
+        double opacity = 0.1;
+        TRect from = chipRect(w);
+        // A completed hidden window has no painted rect; an interrupted hide does.
+        if (m_flights.count(w))
+            from = visualRect(w, &opacity).value_or(from);
+        m_doc = restorePanel(m_doc, t->panel, trellis::FloatingLayer::Overlay);
+        relayout(true);
+        m_nav.ensureVisible(t->panel);
+        applyRest();
+        updateDock();
+        startFlight(w, FlightKind::Restore, from, {}, opacity);
+    }
+}
+
+void TrellisCanvas::toggleHide(int i)
+{
+    if (i < 0 || i >= int(m_windows.size()))
+        return;
+    EffectWindow *w = m_windows[size_t(i)].window;
+    if (w->isMinimized())
+        w->unminimize();
+    else
+        w->minimize();
+}
+
+void TrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
+{
+    const auto ms = m_clock.tick(data.view).count();
+    m_nowMs += double(ms);
+    if (m_animating) {
+        const double dt = std::min(Motion::maxStep, double(ms) / 1000.0);
+        if (m_session) {
+            m_session->tick(m_nowMs);
+            if (m_session->active()) {
+                m_lifted = m_session->liftedRect(m_nowMs);
+                applyRest();
+            }
+        }
+        if (m_resize) m_camera.jump(m_resize->camera);
+        const bool springing = m_camera.step(dt);
+        const bool tweening = m_tween.step(m_nowMs);
+        if (!m_session && !m_resize) {
+            // Clients follow the glide in real steps (camera moves included), so their contents are
+            // never laid out at the final size and squashed into the shrinking or growing rect.
+            if (tweening || springing) applyRest(true);
+            else if (m_steppingResize) applyRest();
+            m_steppingResize = tweening || springing;
+        }
+        for (auto it = m_flights.begin(); it != m_flights.end();) {
+            const auto &flight = it->second;
+            const double elapsed = m_nowMs - flight.start;
+            bool waitingForBuffer = false;
+            if (elapsed >= flight.duration && flight.nativeRestore && it->first->window()) {
+                const auto actual = it->first->window()->frameGeometry();
+                const auto requested = it->first->window()->moveResizeGeometry();
+                const auto wanted = *flight.nativeRestore;
+                auto matches = [&wanted](const RectF &rect) {
+                    return std::abs(rect.x() - wanted.x()) <= 1 && std::abs(rect.y() - wanted.y()) <= 1
+                        && std::abs(rect.width() - wanted.width()) <= 1 && std::abs(rect.height() - wanted.height()) <= 1;
+                };
+                waitingForBuffer = !matches(actual) || !matches(requested);
+                if (waitingForBuffer && elapsed >= flight.duration + 1500) {
+                    qCWarning(trellisLog) << "hide native restore timed out" << appId(it->first)
+                                         << "target" << wanted << "frame" << actual << "requested" << requested;
+                    waitingForBuffer = false;
+                }
+            }
+            if (elapsed >= flight.duration && !waitingForBuffer)
+                it = m_flights.erase(it);
+            else
+                ++it;
+        }
+        for (auto it = m_closing.begin(); it != m_closing.end();) {
+            if (m_nowMs - it->second.start >= CLOSE_MS)
+                it = m_closing.erase(it);
+            else
+                ++it;
+        }
+        std::erase_if(m_landings, [this](const auto &l) { return m_nowMs - l.second.start >= m_landMs; });
+        std::erase_if(m_popups, [this](const auto &p) { return m_nowMs - p.second >= APPEAR_MS; });
+        refreshRects();
+        updateSlot(dt);
+        updateMarquee(dt);
+        const double areaProgress = std::clamp((m_nowMs - m_areaChangedMs) / trellis::Motion::layoutMs, 0.0, 1.0);
+        if (!m_uiFrom.isEmpty()) {
+            const double t = trellis::easeOutQuint(areaProgress);
+            m_uiScreen = QRectF(m_uiFrom.topLeft() + (m_screen.topLeft() - m_uiFrom.topLeft()) * t,
+                                m_uiFrom.size() + (m_screen.size() - m_uiFrom.size()) * t);
+            updateBar();
+        }
+        updateTiles(dt);
+        updateMap();
+        const bool tilesMoving = std::any_of(m_tiles.begin(), m_tiles.end(), [](const auto &t) { return std::abs(t.second.velocity) > 0.001 || std::abs(t.second.target - t.second.amount) > 0.0001; });
+        m_animating = tilesMoving || areaProgress < 1 || springing || (m_map && !m_map->rootItem()->property("settled").toBool()) || tweening || !m_flights.empty() || !m_popups.empty() || !m_closing.empty() || m_session || m_slot || m_marquee || (!m_glide && layoutAwaitingLanding()) || !m_landings.empty();
+    }
+}
+
+void TrellisCanvas::postPaintScreen()
+{
+    if (m_animating)
+        effects->addRepaintFull();
+}
+
+void TrellisCanvas::prePaintWindow(RenderView *view, EffectWindow *w, WindowPrePaintData &data)
+{
+    if (visualRect(w)) {
+        data.setTransformed();
+        if (m_flights.count(w) || w->isPopupWindow())
+            data.setTranslucent();
+        if (const auto *t = trackedFor(w))
+            if (const auto tile = m_tiles.find(t->panel); tile != m_tiles.end() && tile->second.amount > 0)
+                data.setTranslucent();
+    } else if (m_closing.count(w)) {
+        data.setTransformed();
+        data.setTranslucent();
+    }
+}
+
+void TrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data)
+{
+    double opacity = 1;
+    if (const auto drawn = visualRect(w, &opacity)) {
+        const TRect want = *drawn;
+        if (auto *tracked = trackedFor(w)) tracked->lastDrawn = want;
+        if (const auto *tracked = trackedFor(w))
+            if (const auto tile = m_tiles.find(tracked->panel); tile != m_tiles.end())
+                opacity *= 1 - std::clamp(tile->second.amount, 0.0, 1.0);
+        data.multiplyOpacity(opacity);
+        const RectF frame = w->frameGeometry();
+        if (want.w > 0 && want.h > 0 && frame.width() > 0 && frame.height() > 0) {
+            data += QPointF(want.x - frame.x(), want.y - frame.y());
+            data *= QVector2D(float(want.w / frame.width()), float(want.h / frame.height()));
+        }
+    }
+    else if (const auto c = m_closing.find(w); c != m_closing.end()) {
+        // Fade out while easing down to 97% about the centre: the appear curve, played backwards.
+        const double p = std::min(1.0, std::max(0.0, (m_nowMs - c->second.start) / CLOSE_MS));
+        const double e = APPEAR_EASE(1 - p);
+        const TRect r = c->second.rect;
+        const double s = 0.97 + 0.03 * e;
+        const RectF frame = w->frameGeometry();
+        if (frame.width() > 0 && frame.height() > 0) {
+            data += QPointF(r.x + r.w * (1 - s) / 2 - frame.x(), r.y + r.h * (1 - s) / 2 - frame.y());
+            data *= QVector2D(float(r.w * s / frame.width()), float(r.h * s / frame.height()));
+        }
+        data.multiplyOpacity(c->second.opacity * e);
+    }
+    effects->paintWindow(rt, vp, w, mask, region, data);
+}
+
+// With glide off, a window whose real geometry just changed plays a short move-and-scale from where it was.
+// The content is already laid out at the new size, so nothing is re-flowed mid-animation.
+void TrellisCanvas::frameChanged(EffectWindow *w, const RectF &old)
+{
+    if (m_glide || m_landMs <= 0 || m_session || m_resize || m_flights.count(w) || !trackedFor(w)) return;
+    if (w->isUserMove() || w->isUserResize() || w->isMinimized() || w->isHidden()) return;
+    const QRectF now = w->frameGeometry();
+    if (old.width() <= 0 || old.height() <= 0 || now.width() <= 0 || now.height() <= 0) return;
+    if (std::abs(old.x() - now.x()) < 1 && std::abs(old.y() - now.y()) < 1
+        && std::abs(old.width() - now.width()) < 1 && std::abs(old.height() - now.height()) < 1) return;
+    // Start from what was last drawn (this also retargets a running glide), so a window that was already
+    // shown at its final rect, such as a neighbour stretched during a border drag, does not jump back.
+    const Tracked *t = trackedFor(w);
+    TRect from = t && t->lastDrawn ? *t->lastDrawn : TRect{old.x(), old.y(), old.width(), old.height()};
+    m_landings[w] = {from, m_nowMs};
+    schedule();
+}
+
+// A client asked for a size it has not yet landed, within the patience window. Clients held at another
+// size by rules never land, and are scaled by design instead.
+bool TrellisCanvas::awaitingLanding(const Tracked &t) const
+{
+    const EffectWindow *w = t.window;
+    if (!t.requested || w->isMinimized() || w->isHidden() || m_flights.count(t.window)) return false;
+    if (m_nowMs - t.requestedMs >= LandingPatienceMs) return false;
+    const QRectF frame = w->frameGeometry();
+    if (frame.width() <= 0 || frame.height() <= 0 || t.requested->width() <= 0) return false;
+    if (const Entry *entry = m_rects.find(t.panel)) {
+        const TRect natural = panelAt(entry->rect, sizingCamera()), real = restRect(t.panel);
+        if (std::abs(natural.w - real.w) > 0.5 || std::abs(natural.h - real.h) > 0.5) return false;
+    }
+    return std::abs(frame.width() - t.requested->width()) > 1 || std::abs(frame.height() - t.requested->height()) > 1;
+}
+
+bool TrellisCanvas::layoutAwaitingLanding() const
+{
+    return std::any_of(m_windows.begin(), m_windows.end(), [this](const Tracked &t) { return awaitingLanding(t); });
+}
+
+std::optional<TRect> TrellisCanvas::visualRect(EffectWindow *w, double *opacity) const
+{
+    if (m_closing.count(w)) return std::nullopt;
+    for (const auto &t : m_windows) {
+        if (t.window != w) continue;
+        TRect rect = screenRect(t.panel);
+        double alpha = 1;
+        if (m_session && m_session->active() && w == m_dragWindow)
+            rect = {m_lifted.x + m_area.x(), m_lifted.y + m_area.y(), m_lifted.w, m_lifted.h};
+        else
+            flightRect(w, t, rect, alpha);
+        if (opacity) *opacity = alpha;
+        // Never stretch contents: a window in transit keeps its own aspect and is drawn at the
+        // largest uniform scale that fits, anchored top-left, until its client catches up.
+        // Zoomed views, live divider drags and floats deliberately fit windows to their rect.
+        const QRectF frame = w->frameGeometry();
+        const bool flights = m_flights.count(w) || (m_session && m_session->active() && w == m_dragWindow);
+        const auto &cam = m_camera.value;
+        const bool unzoomed = std::abs(cam.w - 1) < 0.01 && std::abs(cam.h - 1) < 0.01;
+        const Entry *entry = m_rects.find(t.panel);
+        // A client held at a size other than its tile (minimum or maximum rules) is meant to be scaled.
+        const bool clamped = entry && [&] {
+            const TRect natural = panelAt(entry->rect, sizingCamera()), real = restRect(t.panel);
+            return std::abs(natural.w - real.w) > 0.5 || std::abs(natural.h - real.h) > 0.5;
+        }();
+        // Without a glide the new layout is final from the first frame, while clients still hold their old
+        // buffers. Rather than stretch those into the new rects (a blink when they land) or leave gaps, hold
+        // every window at its real geometry until all the resized clients have landed, then show the new
+        // layout at once. Not during a live border drag: a slow client (Brave) held at its stale
+        // size would trail the dragged edge, so neighbours follow it, slightly stretched, as before.
+        bool lagging = false;
+        if (!m_glide && !flights && frame.width() > 0 && frame.height() > 0 && !m_resize && layoutAwaitingLanding()) {
+            rect = {frame.x(), frame.y(), frame.width(), frame.height()};
+            lagging = true;
+        }
+        if (!lagging && unzoomed && !clamped && !m_resize && !floatScreen(t.panel) && frame.width() > 0 && frame.height() > 0 && rect.w > 0 && rect.h > 0) {
+            const double sx = rect.w / frame.width(), sy = rect.h / frame.height();
+            if (std::abs(sx - sy) > 0.01 * std::max(sx, sy)) {
+                const double u = std::min(sx, sy);
+                rect.w = frame.width() * u;
+                rect.h = frame.height() * u;
+            }
+        }
+        if (const auto it = m_landings.find(w); it != m_landings.end())
+            rect = trellis::lerpRect(it->second.from, rect, trellis::easeOutQuint((m_nowMs - it->second.start) / m_landMs));
+        return rect;
+    }
+    if (w->isPopupWindow()) {
+        EffectWindow *parent = w->transientFor();
+        if (parent && parent != w) {
+            if (const auto shown = visualRect(parent, opacity)) {
+                const auto p = parent->frameGeometry();
+                const auto r = w->frameGeometry();
+                auto rect = trellis::mapChildRect({r.x(), r.y(), r.width(), r.height()},
+                    {p.x(), p.y(), p.width(), p.height()}, *shown);
+                if (rect) {
+                    if (const auto it = m_popups.find(w); it != m_popups.end()) {
+                        const double e = APPEAR_EASE(std::clamp((m_nowMs - it->second) / APPEAR_MS, 0.0, 1.0));
+                        const double scale = 0.97 + 0.03 * e;
+                        rect->x += rect->w * (1 - scale) / 2;
+                        rect->y += rect->h * (1 - scale) / 2;
+                        rect->w *= scale;
+                        rect->h *= scale;
+                        if (opacity) *opacity *= e;
+                    }
+                }
+                return rect;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+// ------------------------------------------------------------------ input
+TrellisInput::TrellisInput(TrellisEffect *effect)
+    : InputEventFilter(InputFilterOrder::Effects)
+    , m_effect(effect)
+{
+}
+bool TrellisInput::pointerMotion(PointerMotionEvent *e) { return m_effect->handleMotion(*e); }
+bool TrellisInput::pointerButton(PointerButtonEvent *e) { return m_effect->handleButton(*e); }
+bool TrellisInput::pointerAxis(PointerAxisEvent *e) { return m_effect->handleAxis(*e); }
+bool TrellisInput::keyboardKey(KeyboardKeyEvent *e) { return m_effect->handleKey(*e); }
+bool TrellisInput::pinchGestureBegin(PointerPinchGestureBeginEvent *e)
+{
+    return e->fingerCount >= 2;
+}
+bool TrellisInput::pinchGestureUpdate(PointerPinchGestureUpdateEvent *e)
+{
+    m_effect->pinch(e->scale, effects->cursorPos(), e->delta);
+    return true;
+}
+bool TrellisInput::pinchGestureEnd(PointerPinchGestureEndEvent *)
+{
+    m_effect->endPinch();
+    return true;
+}
+bool TrellisInput::pinchGestureCancelled(PointerPinchGestureCancelEvent *)
+{
+    m_effect->endPinch();
+    return true;
+}
+
+static constexpr auto GESTURE_MODS = Qt::ControlModifier | Qt::AltModifier;
+
+bool TrellisCanvas::handleKey(const KeyboardKeyEvent &e)
+{
+    if (m_naming && m_bar && m_bar->rootItem()) {
+        if (e.key == Qt::Key_Escape) {
+            if (e.state == KeyboardKeyState::Pressed) { m_naming = false; m_nameError = false; updateBar(); }
+        } else if (e.key == Qt::Key_Return || e.key == Qt::Key_Enter) {
+            if (e.state == KeyboardKeyState::Pressed) submitFramingName();
+        } else {
+            QKeyEvent key(e.state == KeyboardKeyState::Released ? QEvent::KeyRelease : QEvent::KeyPress,
+                e.key, e.modifiers, e.nativeScanCode, e.nativeVirtualKey, 0, e.text,
+                e.state == KeyboardKeyState::Repeated);
+            m_bar->forwardKeyEvent(&key);
+        }
+        return true;
+    }
+    if (e.key == Qt::Key_V)
+        m_keyV = e.state != KeyboardKeyState::Released;
+    // Esc abandons a rectangle selection and returns to the current framing.
+    if (e.key == Qt::Key_Escape && m_drag == Drag::Rect) {
+        if (e.state == KeyboardKeyState::Pressed) {
+            m_drag = Drag::None;
+            finishRectSelect(false);
+        }
+        return true;
+    }
+    return false;
+}
+
+bool TrellisCanvas::handleButton(const PointerButtonEvent &e)
+{
+    if (handleIconButton(e)) return true;
+    if (m_naming && barKey(e.position) == QLatin1String("name-edit") && m_bar) {
+        auto event = e;
+        m_bar->forwardPointerButtonEvent(&event);
+        return true;
+    }
+    if (e.button != Qt::LeftButton)
+        return false;
+    if (e.state == PointerButtonState::Released) {
+        if (m_pressBar) {
+            const QString pressed = m_pressKey;
+            m_pressBar = false;
+            m_pressKey.clear();
+            if (!pressed.isEmpty() && barKey(e.position) == pressed)
+                barAction(pressed);
+            else
+                updateBar();
+            return true;
+        }
+        if (m_drag == Drag::None)
+            return false;
+        const bool rect = m_drag == Drag::Rect;
+        m_drag = Drag::None;
+        if (rect) {
+            finishRectSelect(true);
+            return true;
+        }
+        m_nav.finishGesture();
+        applyRest();
+        return true;
+    }
+    // The bar swallows presses over it; the action fires on release over the same item.
+    if (const QString key = barKey(e.position); overUi(e.position)) {
+        m_pressKey = key;
+        m_pressBar = true;
+        updateBar();
+        return true;
+    }
+    if ((e.modifiers & GESTURE_MODS) == GESTURE_MODS) {
+        m_dragLast = m_dragAnchor = e.position;
+        if (e.modifiers & Qt::ShiftModifier) {
+            m_drag = Drag::Rect;
+            m_nav.endGesture();
+            m_rectView = m_camera.value;
+            moveRectSelect(e.position);
+        } else {
+            m_drag = m_keyV ? Drag::Scale : Drag::Pan;
+        }
+        return true;
+    }
+    return false;
+}
+
+bool TrellisCanvas::handleMotion(const PointerMotionEvent &e)
+{
+    if (handleIconMotion(e)) return true;
+    if (m_naming && barKey(e.position) == QLatin1String("name-edit") && m_bar) {
+        auto event = e;
+        m_bar->forwardPointerMotionEvent(&event);
+        return true;
+    }
+    if (m_drag == Drag::None) {
+        const QString key = barKey(e.position);
+        if (key != m_hoverKey) {
+            m_hoverKey = key;
+            updateBar();
+        }
+        return false;
+    }
+    const QPointF d = e.position - m_dragLast;
+    m_dragLast = e.position;
+    if (m_drag == Drag::Rect) {
+        moveRectSelect(e.position);
+        return true;
+    }
+    if (m_drag == Drag::Pan) {
+        m_nav.zoom(1.0, {0.5, 0.5}, {-d.x(), -d.y()});
+    } else {
+        const QPointF a = m_dragAnchor - m_area.topLeft();
+        // Dragging up or right zooms in.
+        m_nav.zoom(std::exp(-(d.x() - d.y()) * 0.004), {a.x() / m_area.width(), a.y() / m_area.height()});
+    }
+    return true;
+}
+
+bool TrellisCanvas::handleAxis(const PointerAxisEvent &e)
+{
+    if (e.orientation != Qt::Vertical)
+        return false;
+    // Ctrl+Alt+scroll, or Ctrl+scroll with a notched wheel, steps the hierarchy.
+    const bool chord = (e.modifiers & GESTURE_MODS) == GESTURE_MODS;
+    const bool ctrlWheel = (e.modifiers & Qt::ControlModifier) && e.source == PointerAxisSource::Wheel;
+    if (!chord && !ctrlWheel)
+        return false;
+    const QPointF a = e.position - m_area.topLeft();
+    const TRect c = m_camera.value;
+    const trellis::Point world{c.x + c.w * a.x() / m_area.width(), c.y + c.h * a.y() / m_area.height()};
+    if (m_nav.wheelStep(e.delta, world, m_nowMs))
+        applyRest();
+    return true;
+}
+
+// ------------------------------------------------------------------ rectangle select
+QString TrellisCanvas::candidateLabel(const std::string &id) const
+{
+    const trellis::Entry *entry = m_nav.entries().find(id);
+    if (!entry)
+        return {};
+    const auto leaves = trellis::leafIds(entry->node);
+    if (leaves.size() == 1) {
+        for (const auto &t : m_windows)
+            if (t.panel == leaves.front())
+                return t.window->caption();
+    }
+    return QStringLiteral("%1 windows").arg(leaves.size());
+}
+
+void TrellisCanvas::moveRectSelect(QPointF pointer)
+{
+    const trellis::Rect viewport{m_area.x(), m_area.y(), m_area.width(), m_area.height()};
+    const TRect world = trellis::rectangleCamera({m_dragAnchor.x(), m_dragAnchor.y()}, {pointer.x(), pointer.y()}, viewport, m_rectView);
+    const TRect s = toScreen(world); // against the live camera, which does not move during the gesture
+    m_rectBand = QRectF(s.x, s.y, s.w, s.h);
+    m_rectCandidate = (s.w >= 8 && s.h >= 8) ? trellis::bestFit(world, m_nav.entries()) : std::string();
+    if (!m_rectCandidate.empty()) {
+        if (const trellis::Entry *entry = m_nav.entries().find(m_rectCandidate)) {
+            m_candTarget = panelScreen(entry->rect);
+            m_candLabel = QStringLiteral("Release to focus %1 · Esc to cancel").arg(candidateLabel(m_rectCandidate));
+        } else {
+            m_rectCandidate.clear();
+        }
+    }
+    updateMarquee(0);
+    schedule();
+}
+
+void TrellisCanvas::finishRectSelect(bool commit)
+{
+    const std::string pick = commit && !m_rectCandidate.empty() ? m_rectCandidate : m_nav.framed();
+    m_rectCandidate.clear();
+    m_rectBand = QRectF();
+    m_nav.focus(pick);
+    applyRest();
+    schedule();
+}
+
+void TrellisCanvas::updateMarquee(double dt)
+{
+    const bool live = m_drag == Drag::Rect;
+    const bool hasCand = live && !m_rectCandidate.empty();
+    const double k = dt > 0 ? 1 - std::exp(-dt / 0.07) : 0;
+    m_bandOpacity += ((live && !m_rectBand.isEmpty() ? 1.0 : 0.0) - m_bandOpacity) * (dt > 0 ? k : 1);
+    m_candOpacity += ((hasCand ? 1.0 : 0.0) - m_candOpacity) * (dt > 0 ? k : 0.5);
+    if (hasCand) {
+        // The candidate glides to its target rather than jumping between tiles.
+        const double kc = dt > 0 ? 1 - std::exp(-dt / 0.05) : 0;
+        if (m_candShown.w <= 0 || m_candOpacity < 0.05)
+            m_candShown = m_candTarget;
+        else
+            m_candShown = trellis::lerpRect(m_candShown, m_candTarget, kc);
+    }
+    if (!m_marquee) {
+        if (!live)
+            return;
+        m_marquee = std::make_unique<OffscreenQuickScene>();
+        m_marquee->setSource(QUrl(QStringLiteral("qrc:/" TRELLIS_ID "/marquee.qml")));
+        if (!m_marquee->rootItem()) {
+            qCWarning(trellisLog) << "marquee.qml failed to load";
+            m_marquee.reset();
+            return;
+        }
+        m_marquee->setGeometry(Rect(m_area.toAlignedRect()));
+    }
+    if (!live && m_bandOpacity < 0.01 && m_candOpacity < 0.01) {
+        const Rect g = m_marquee->geometry();
+        m_marquee.reset();
+        m_bandOpacity = m_candOpacity = 0;
+        effects->addRepaint(Region(g));
+        return;
+    }
+    QQuickItem *item = m_marquee->rootItem();
+    item->setProperty("mX", m_rectBand.x());
+    item->setProperty("mY", m_rectBand.y());
+    item->setProperty("mW", m_rectBand.width());
+    item->setProperty("mH", m_rectBand.height());
+    item->setProperty("mOpacity", m_bandOpacity);
+    item->setProperty("cX", m_candShown.x);
+    item->setProperty("cY", m_candShown.y);
+    item->setProperty("cW", m_candShown.w);
+    item->setProperty("cH", m_candShown.h);
+    item->setProperty("cOpacity", m_candOpacity);
+    if (hasCand)
+        item->setProperty("cLabel", m_candLabel);
+    effects->addRepaint(Region(m_marquee->geometry()));
+}
+
+void TrellisCanvas::pinch(double scale, QPointF at, QPointF delta)
+{
+    const double factor = m_pinchScale > 0 ? scale / m_pinchScale : 1.0;
+    m_pinchScale = scale;
+    const QPointF a = at - m_area.topLeft();
+    // A pinch out (scale > 1) zooms in: the camera shrinks.
+    m_nav.zoom(1.0 / std::max(0.01, factor), {a.x() / m_area.width(), a.y() / m_area.height()}, {-delta.x(), -delta.y()});
+}
+
+void TrellisCanvas::endPinch()
+{
+    m_pinchScale = 1;
+    m_nav.finishGesture();
+    applyRest();
+}
+
+
+// ------------------------------------------------------------------ drag and drop
+double TrellisCanvas::inset() const { return GAP; }
+
+trellis::Rect TrellisCanvas::toScreen(const trellis::Rect &w) const
+{
+    const TRect &c = m_camera.value;
+    return {(w.x - c.x) / c.w * m_area.width(), (w.y - c.y) / c.h * m_area.height(), w.w / c.w * m_area.width(),
+            w.h / c.h * m_area.height()};
+}
+
+trellis::Point TrellisCanvas::fromScreen(trellis::Point p) const
+{
+    const TRect &c = m_camera.value;
+    return {c.x + p.x / m_area.width() * c.w, c.y + p.y / m_area.height() * c.h};
+}
+
+trellis::Rect TrellisCanvas::panelScreen(const trellis::Rect &world) const
+{
+    const TRect r = panelAt(world, m_camera.value);
+    return {r.x - m_area.x(), r.y - m_area.y(), r.w, r.h};
+}
+
+std::optional<trellis::Rect> TrellisCanvas::fromScreenRect(const std::optional<trellis::Rect> &s) const
+{
+    if (!s)
+        return std::nullopt;
+    const TRect &c = m_camera.value;
+    return TRect{c.x + (s->x - GAP) / m_area.width() * c.w, c.y + (s->y - GAP) / m_area.height() * c.h,
+                 (s->w + 2 * GAP) / m_area.width() * c.w, (s->h + 2 * GAP) / m_area.height() * c.h};
+}
+
+const trellis::RectMap &TrellisCanvas::lastRects() const { return m_lastRects; }
+
+// Callers hold iterators into lastRects(), so it only changes at frame boundaries.
+void TrellisCanvas::refreshRects()
+{
+    m_lastRects.clear();
+    const auto add = [&](const std::string &id) {
+        if (const TRect *w = worldRect(id))
+            m_lastRects[id] = panelScreen(m_tween.apply(id, *w));
+    };
+    if (m_session && m_session->active()) {
+        for (const auto &kv : m_session->layoutTargets())
+            add(kv.first);
+    } else {
+        for (const auto &id : leafIds(m_doc.root))
+            add(id);
+    }
+    for (const auto &f : m_doc.floating)
+        if (const auto r = floatScreen(f.panel->id))
+            m_lastRects[f.panel->id] = {r->x - m_area.x(), r->y - m_area.y(), r->w, r->h};
+}
+
+void TrellisCanvas::beginTween(const trellis::RectMap &previous, double nowMs)
+{
+    std::map<std::string, TRect> from;
+    for (const auto &kv : previous)
+        if (const auto w = fromScreenRect(kv.second))
+            from[kv.first] = *w;
+    if (m_glide) m_tween.begin(from, nowMs);
+}
+
+void TrellisCanvas::userMoveStarted(EffectWindow *w)
+{
+    if (w->isUserResize()) { startResize(w); return; }
+    if (!w->isUserMove() || m_session || !trackedFor(w))
+        return;
+    m_dragFromKWin = true;
+    startDrag(w, w->window() ? w->window()->interactiveMoveResizeAnchor() : effects->cursorPos());
+}
+
+void TrellisCanvas::userMoveFinished(EffectWindow *w)
+{
+    if (m_resize && m_resize->window == w) {
+        // KWin requests the initial geometry before emitting finish on Escape.
+        const bool commit = m_resize->decision.value_or(w->window()
+            && (w->window()->moveResizeGeometry() != m_resize->native || m_resize->lastNative == m_resize->native));
+        finishResize(commit);
+        QTimer::singleShot(0, this, [this] { applyRest(); });
+        return;
+    }
+    if (!m_session || w != m_dragWindow || !m_dragFromKWin)
+        return;
+    // KWin restores the original geometry when the user cancels with Escape.
+    const bool commit = w->frameGeometry() != m_dragStartGeometry;
+    endDrag(commit);
+    QTimer::singleShot(0, this, [this] { applyRest(); });
+}
+
+void TrellisCanvas::startDrag(EffectWindow *w, QPointF pointer)
+{
+    m_windowPointer = pointer;
+    const Tracked *t = trackedFor(w);
+    if (!t || m_session)
+        return;
+    refreshRects();
+    const QPointF rel = pointer - m_area.topLeft();
+    m_session = std::make_unique<trellis::DragSession>(*this, t->panel, std::string(), trellis::Point{rel.x(), rel.y()});
+    m_dragWindow = w;
+    m_dragStartGeometry = w->frameGeometry();
+    schedule();
+}
+
+void TrellisCanvas::adoptDrag(EffectWindow *w, QPointF pointer, const QRectF &startGeometry)
+{
+    if (!trackedFor(w) || m_session)
+        return;
+    m_flights.erase(w);
+    m_dragFromKWin = true;
+    // The window just arrived as a tile at the end of this document. Grab it by the middle of its title
+    // bar so the lifted card follows the real pointer instead of inheriting an offset from that slot.
+    refreshRects();
+    const TRect tile = screenRect(trackedFor(w)->panel);
+    startDrag(w, QPointF(tile.x + tile.w / 2, tile.y + 14));
+    m_dragStartGeometry = startGeometry; // Escape restores the original place, which must still read as a cancel
+    moveDrag(pointer);
+}
+
+// Holding Shift while dragging floats the window where it is dropped, and keeps a float from docking.
+bool TrellisCanvas::floatModifierHeld() const
+{
+    return m_simForceFloat >= 0 ? m_simForceFloat > 0 : m_shiftHeld;
+}
+
+void TrellisCanvas::moveDrag(QPointF pointer)
+{
+    m_windowPointer = pointer;
+    if (!m_session)
+        return;
+    m_session->setForceFloat(floatModifierHeld());
+    m_session->setFloatFirst(m_floatFirst);
+    const QPointF rel = pointer - m_area.topLeft();
+    m_session->move({rel.x(), rel.y()}, m_nowMs);
+    applyRest();
+    schedule();
+}
+
+void TrellisCanvas::endDrag(bool commit)
+{
+    if (!m_session)
+        return;
+    EffectWindow *moving = m_dragWindow;
+    const DragOutcome out = m_session->end(commit, m_nowMs);
+    m_session.reset(); // from here the document layout is what is shown
+    m_dragWindow = nullptr;
+    m_dragFromKWin = false;
+    if (!out.wasDrag) {
+        schedule();
+        return;
+    }
+    if (out.committed)
+        m_doc = out.next;
+    // Everything, including the lifted window, glides from where it was just drawn. The tween starts
+    // before the relayout so the first size request is the drawn one, not the final one.
+    std::map<std::string, TRect> from;
+    for (const auto &kv : out.from)
+        if (const auto w = fromScreenRect(kv.second))
+            from[kv.first] = *w;
+    if (m_glide) m_tween.begin(from, m_nowMs);
+    relayout(false);
+    refreshRects();
+    // A window that ends up floating glides from the card it was drawn as.
+    if (const auto lifted = out.from.find(out.liftedId); lifted != out.from.end() && floatScreen(out.liftedId))
+        for (const auto &t : m_windows)
+            if (t.panel == out.liftedId)
+                startFlight(t.window, FlightKind::Glide, {lifted->second.x + m_area.x(), lifted->second.y + m_area.y(), lifted->second.w, lifted->second.h}, {});
+    schedule();
+    if (commit && moving && m_transfer && m_output && !QRectF(QRect(m_output->geometry())).contains(m_windowPointer))
+        m_transfer(moving, m_windowPointer);
+}
+
+// The drop slot: a translucent placeholder where the dragged window will land.
+void TrellisCanvas::updateSlot(double dt)
+{
+    const bool active = m_session && m_session->active();
+    const TRect *world = active ? worldRect(trellis::DROP_SLOT) : nullptr;
+    // A float that would snap to an edge or corner shows where it will land.
+    const std::optional<TRect> snap = active && !world ? m_session->snapZone() : std::nullopt;
+    double want = 0;
+    if (world || snap) {
+        const TRect r = world ? panelAt(m_tween.apply(trellis::DROP_SLOT, *world), m_camera.value)
+                              : TRect{snap->x + m_area.x(), snap->y + m_area.y(), snap->w, snap->h};
+        // A slot that is still collapsing out of a seam is barely there; it fades in as it opens.
+        const double size = std::min(r.w, r.h);
+        want = std::clamp(size / 40.0, 0.0, 1.0);
+        if (r.w >= 1 && r.h >= 1) {
+            if (!m_slot) {
+                m_slot = std::make_unique<OffscreenQuickScene>();
+                m_slot->setSource(QUrl(QStringLiteral("qrc:/" TRELLIS_ID "/slot.qml")));
+                if (!m_slot->rootItem()) {
+                    qCWarning(trellisLog) << "slot.qml failed to load";
+                    m_slot.reset();
+                    return;
+                }
+                m_slot->setGeometry(Rect(m_area.toAlignedRect()));
+            }
+            QQuickItem *item = m_slot->rootItem();
+            item->setProperty("slotX", r.x - m_area.x());
+            item->setProperty("slotY", r.y - m_area.y());
+            item->setProperty("slotW", r.w);
+            item->setProperty("slotH", r.h);
+        }
+    }
+    if (!m_slot)
+        return;
+    // Ease the opacity (about a 70 ms time constant).
+    m_slotOpacity += (want - m_slotOpacity) * (1 - std::exp(-dt / 0.07));
+    if (!world && !snap && m_slotOpacity < 0.01) {
+        const Rect g = m_slot->geometry();
+        m_slot.reset();
+        m_slotOpacity = 0;
+        effects->addRepaint(Region(g));
+        return;
+    }
+    m_slot->rootItem()->setProperty("slotOpacity", m_slotOpacity);
+    effects->addRepaint(Region(m_slot->geometry()));
+}
+
+void TrellisCanvas::toggleFloat(int i)
+{
+    if (m_resize) finishResize(false);
+    if (i < 0 || i >= int(m_windows.size()))
+        return;
+    const Tracked &t = m_windows[size_t(i)];
+    const auto loc = trellis::locatePanel(m_doc, t.panel);
+    double opacity = 1;
+    const TRect from = visualRect(t.window, &opacity).value_or(screenRect(t.panel));
+    if (loc.where == trellis::PanelLocation::Where::Floating) {
+        if (!rulesFor(t.window).side) return;
+        m_doc = trellis::removePanel(m_doc, t.panel);
+        dockAtEnd(loc.panel);
+    } else if (loc.where == trellis::PanelLocation::Where::Docked) {
+        if (!rulesFor(t.window).floating) return;
+        // Keep at least one tiled panel so the canvas never empties.
+        if (leafIds(m_doc.root).size() < 2)
+            return;
+        // Pop out slightly smaller than the tile, centred on it.
+        const TRect a = from;
+        const double w = a.w * 0.8, h = a.h * 0.8;
+        const trellis::Rect rect{(a.x + (a.w - w) / 2 - m_area.x()) / m_area.width(), (a.y + (a.h - h) / 2 - m_area.y()) / m_area.height(),
+                                 w / m_area.width(), h / m_area.height()};
+        m_doc = trellis::floatPanel(m_doc, loc.panel, rect, trellis::FloatingLayer::Overlay);
+    } else {
+        return;
+    }
+    relayout(true);
+    startFlight(t.window, FlightKind::Glide, from, {}, opacity);
+}
+
+bool TrellisCanvas::simDragStart(int i, double x, double y)
+{
+    if (i < 0 || i >= int(m_windows.size()))
+        return false;
+    startDrag(m_windows[size_t(i)].window, {x, y});
+    return m_session != nullptr;
+}
+void TrellisCanvas::simDragMove(double x, double y) { moveDrag({x, y}); }
+void TrellisCanvas::simDragEnd(bool commit) { endDrag(commit); }
+
+void TrellisCanvas::beginFramingName()
+{
+    m_naming = true;
+    m_nameError = false;
+    updateBar();
+    if (m_bar && m_bar->rootItem()) QMetaObject::invokeMethod(m_bar->rootItem(), "beginName");
+}
+void TrellisCanvas::submitFramingName()
+{
+    if (!m_bar || !m_bar->rootItem()) return;
+    const QString name = m_bar->rootItem()->property("framingName").toString().trimmed();
+    if (name.isEmpty()) { m_nameError = true; updateBar(); return; }
+    if (m_nav.saveFraming(name.toStdString())) {
+        m_naming = false;
+        m_nameError = false;
+    }
+    m_barSignature.clear();
+    updateBar();
+    schedule();
+}
+
+// ------------------------------------------------------------------ D-Bus control
+QString TrellisCanvas::dump()
+{
+    QStringList lines;
+    lines << QStringLiteral("camera %1 %2 %3 %4 (target %5 %6 %7 %8)")
+                 .arg(m_camera.value.x).arg(m_camera.value.y).arg(m_camera.value.w).arg(m_camera.value.h)
+                 .arg(m_camera.target.x).arg(m_camera.target.y).arg(m_camera.target.w).arg(m_camera.target.h);
+    lines << QStringLiteral("framed '%1'").arg(QString::fromStdString(m_nav.framed()));
+    for (const auto &t : m_windows) {
+        const TRect s = screenRect(t.panel);
+        const RectF f = t.window->frameGeometry();
+        lines << QStringLiteral("%1 '%2' screen %3,%4 %5x%6 frame %7,%8 %9x%10")
+                     .arg(QString::fromStdString(t.panel), t.window->caption())
+                     .arg(s.x, 0, 'f', 1).arg(s.y, 0, 'f', 1).arg(s.w, 0, 'f', 1).arg(s.h, 0, 'f', 1)
+                     .arg(f.x(), 0, 'f', 1).arg(f.y(), 0, 'f', 1).arg(f.width(), 0, 'f', 1).arg(f.height(), 0, 'f', 1);
+        if (const auto *window = t.window->window()) {
+            const auto body = window->clientGeometry();
+            lines.back() += QStringLiteral(" client %1,%2 %3x%4").arg(body.x()).arg(body.y()).arg(body.width()).arg(body.height());
+        }
+        lines.back() += QStringLiteral(" app '%1'").arg(appId(t.window));
+        if (const auto drawn = visualRect(t.window))
+            lines.back() += QStringLiteral(" drawn %1x%2").arg(drawn->w, 0, 'f', 1).arg(drawn->h, 0, 'f', 1)
+                + QStringLiteral(" drawnpos %1,%2").arg(drawn->x, 0, 'f', 1).arg(drawn->y, 0, 'f', 1);
+        const auto rule = rulesFor(t.window);
+        if (rule.scaling == trellis::ViewScaling::Inert) lines.back() += QStringLiteral(" INERT");
+        if (rule.scaling == trellis::ViewScaling::None) lines.back() += QStringLiteral(" NO_SCALE");
+        if (!rule.closable) lines.back() += QStringLiteral(" NO_CLOSE");
+        if (frameOnly(t.panel)) lines.back() += QStringLiteral(" ICON");
+        if (floatScreen(t.panel))
+            lines.back() += QStringLiteral(" FLOAT");
+        TRect fr;
+        double op = 1;
+        if (flightRect(t.window, t, fr, op))
+            lines.back() += QStringLiteral(" FLY %1,%2 %3x%4 opacity %5").arg(fr.x, 0, 'f', 1).arg(fr.y, 0, 'f', 1).arg(fr.w, 0, 'f', 1).arg(fr.h, 0, 'f', 1).arg(op, 0, 'f', 2);
+        if (const auto flight = m_flights.find(t.window); flight != m_flights.end()) {
+            const auto &f = flight->second;
+            lines.back() += QStringLiteral(" from %1,%2 %3x%4 baseOpacity %5")
+                .arg(f.from.x).arg(f.from.y).arg(f.from.w).arg(f.from.h).arg(f.fromOpacity);
+        }
+    }
+    if (m_resize) lines << QStringLiteral("RESIZE %1 floating %2 boundaries %3 nativeSteps %4").arg(m_resize->window ? m_resize->window->caption() : QString()).arg(m_resize->floating).arg(m_resize->boundaries.size()).arg(m_resize->nativeSteps);
+    if (m_session && m_session->active()) {
+        const auto &tg = m_session->target();
+        const auto &cd = m_session->candidate();
+        lines << QStringLiteral("DRAG lifted %1,%2 %3x%4 target %5 candidate %6 collapsed %7")
+                     .arg(m_lifted.x, 0, 'f', 1).arg(m_lifted.y, 0, 'f', 1).arg(m_lifted.w, 0, 'f', 1).arg(m_lifted.h, 0, 'f', 1)
+                     .arg(tg ? int(tg->kind) : -1).arg(cd ? int(cd->kind) : -1).arg(m_session->collapsed());
+        if (const auto snap = m_session->snapZone())
+            lines << QStringLiteral("SNAP %1,%2 %3x%4").arg(snap->x).arg(snap->y).arg(snap->w).arg(snap->h);
+        if (const TRect *sw = worldRect(trellis::DROP_SLOT)) {
+            const TRect r = panelAt(m_tween.apply(trellis::DROP_SLOT, *sw), m_camera.value);
+            lines << QStringLiteral("SLOT %1,%2 %3x%4 opacity %5").arg(r.x, 0, 'f', 1).arg(r.y, 0, 'f', 1).arg(r.w, 0, 'f', 1).arg(r.h, 0, 'f', 1).arg(m_slotOpacity, 0, 'f', 2);
+        }
+    }
+    {
+        QStringList order;
+        for (const auto &id : leafIds(m_doc.root))
+            order << QString::fromStdString(id);
+        for (const auto &[cw, c] : m_closing) {
+            const double p = std::min(1.0, (m_nowMs - c.start) / CLOSE_MS);
+            lines << QStringLiteral("CLOSING %1 progress %2 opacity %3").arg(cw->caption()).arg(p, 0, 'f', 2).arg(c.opacity * APPEAR_EASE(1 - p), 0, 'f', 2)
+                + QStringLiteral(" from %1,%2 %3x%4 baseOpacity %5").arg(c.rect.x).arg(c.rect.y).arg(c.rect.w).arg(c.rect.h).arg(c.opacity);
+        }
+        if (m_drag == Drag::Rect)
+            lines << QStringLiteral("RECT band %1,%2 %3x%4 candidate '%5' label '%6' opacity band %7 cand %8")
+                         .arg(m_rectBand.x(), 0, 'f', 1).arg(m_rectBand.y(), 0, 'f', 1).arg(m_rectBand.width(), 0, 'f', 1).arg(m_rectBand.height(), 0, 'f', 1)
+                         .arg(QString::fromStdString(m_rectCandidate), m_candLabel).arg(m_bandOpacity, 0, 'f', 2).arg(m_candOpacity, 0, 'f', 2);
+        if (m_map)
+            lines << QStringLiteral("MAP geometry %1,%2 %3x%4 shown %5 settled %6")
+                         .arg(m_map->geometry().x()).arg(m_map->geometry().y()).arg(m_map->geometry().width()).arg(m_map->geometry().height())
+                         .arg(m_mapOn).arg(m_map->rootItem()->property("settled").toBool());
+        lines << QStringLiteral("ORDER ") + order.join(QLatin1Char(' '));
+    }
+    for (EffectWindow *w : effects->stackingOrder()) {
+        if (!w->isPopupWindow() || w->isDeleted()) continue;
+        if (const auto shown = visualRect(w)) {
+            const auto f = w->frameGeometry();
+            lines << QStringLiteral("POPUP '%1' screen %2,%3 %4x%5 frame %6,%7 %8x%9")
+                .arg(w->caption()).arg(shown->x).arg(shown->y).arg(shown->w).arg(shown->h)
+                .arg(f.x()).arg(f.y()).arg(f.width()).arg(f.height());
+        }
+    }
+    lines << QStringLiteral("RULES %1 file %2").arg(m_rules.size()).arg(m_rulesFile);
+    lines << QStringLiteral("NAMING %1 error %2").arg(m_naming).arg(m_nameError);
+    for (const auto &framing : m_nav.framings())
+        lines << QStringLiteral("FRAMING %1 '%2'").arg(QString::fromStdString(framing.id), QString::fromStdString(framing.name));
+    lines << QStringLiteral("area %1,%2 %3x%4 bar %5,%6 %7x48")
+                 .arg(m_area.x()).arg(m_area.y()).arg(m_area.width()).arg(m_area.height())
+                 .arg(m_screen.x()).arg(m_screen.bottom() - BAR_H).arg(m_screen.width());
+    lines << QStringLiteral("BAR %1").arg(m_barOn);
+    return lines.join(QLatin1Char('\n'));
+}
+
+void TrellisCanvas::overview() { m_nav.overview(); applyRest(); }
+void TrellisCanvas::toggleOverview() { m_nav.toggleOverview(); applyRest(); }
+void TrellisCanvas::focusIndex(int i)
+{
+    if (i >= 0 && i < int(m_windows.size()))
+        m_nav.focus(m_windows[size_t(i)].panel);
+    applyRest();
+}
+void TrellisCanvas::toggleMaximize(int i)
+{
+    if (i >= 0 && i < int(m_windows.size()))
+        m_nav.toggle(m_windows[size_t(i)].panel);
+    applyRest();
+}
+void TrellisCanvas::stepOut() { m_nav.stepOut(); applyRest(); }
+void TrellisCanvas::stepIn() { m_nav.stepIn(); applyRest(); }
+void TrellisCanvas::back() { m_nav.back(); applyRest(); }
+void TrellisCanvas::forward() { m_nav.forward(); applyRest(); }
+void TrellisCanvas::zoom(double f, double px, double py) { m_nav.zoom(f, {px, py}); }
+void TrellisCanvas::finishGesture() { m_nav.finishGesture(); applyRest(); }
+
+bool TrellisEffect::simButton(double x, double y, bool press, int modifiers)
+{
+    PointerButtonEvent e{};
+    e.position = {x, y};
+    e.state = press ? PointerButtonState::Pressed : PointerButtonState::Released;
+    e.button = Qt::LeftButton;
+    e.nativeButton = 272; // BTN_LEFT, matching real libinput events
+    e.buttons = press ? Qt::LeftButton : Qt::NoButton;
+    e.modifiers = Qt::KeyboardModifiers(modifiers);
+    return handleButton(e);
+}
+bool TrellisEffect::simMotion(double x, double y)
+{
+    PointerMotionEvent e{};
+    e.position = {x, y};
+    return handleMotion(e);
+}
+bool TrellisEffect::simAxis(double delta, double x, double y, int modifiers)
+{
+    PointerAxisEvent e{};
+    e.position = {x, y};
+    e.delta = delta;
+    e.orientation = Qt::Vertical;
+    e.source = PointerAxisSource::Wheel;
+    e.modifiers = Qt::KeyboardModifiers(modifiers);
+    return handleAxis(e);
+}
+void TrellisEffect::simPinch(double scale, double x, double y) { pinch(scale, {x, y}, {0, 0}); }
+void TrellisEffect::simPinchEnd() { endPinch(); }
+void TrellisEffect::simKey(int qtKey, bool press)
+{
+    KeyboardKeyEvent e{};
+    e.key = Qt::Key(qtKey);
+    e.state = press ? KeyboardKeyState::Pressed : KeyboardKeyState::Released;
+    handleKey(e);
+}
+
+void TrellisEffect::simText(const QString &text)
+{
+    KeyboardKeyEvent event{};
+    event.key = Qt::Key_unknown;
+    event.state = KeyboardKeyState::Pressed;
+    event.text = text;
+    handleKey(event);
+}
+
+KWIN_EFFECT_FACTORY(TrellisEffect, "metadata.json")
+
+} // namespace KWin
+
+#include "trellis_effect.moc"

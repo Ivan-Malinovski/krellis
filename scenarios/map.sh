@@ -1,0 +1,23 @@
+# Minimap: toggle from the bar, click a tile to frame it, click the background for overview, hide it.
+exec >"$NEST_OUT/log.txt" 2>&1
+export WAYLAND_DISPLAY=$NEST_SOCKET
+unset DISPLAY
+call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+for n in A B C; do
+  alacritty --title "win-$n" -e sh -c "echo $n; sleep 600" >/dev/null 2>&1 &
+  sleep 2
+done
+sleep 1
+call toggleBar >/dev/null # the bar is off by default
+sleep 0.5
+Y=776
+click() { call simButton $1 $2 true 0; call simButton $1 $2 false 0; sleep 1.2; }
+echo "--- toggle map"; click 1230 $Y; call dump | grep -E "^MAP"
+/home/ivan/dev/kwin-trellis/tools/shot map >/dev/null
+echo "--- tiles under the pointer"
+for x in 1060 1100 1140 1180; do echo "x=$x '$(call barHit $x 600)'"; done
+echo "--- click middle tile"; click 1140 600; call dump | grep -E "^camera|framed"
+/home/ivan/dev/kwin-trellis/tools/shot map-framed >/dev/null
+echo "--- click map background (overview)"; click 1100 650; call dump | grep -E "^camera|framed"
+echo "--- toggle map off"; click 1230 $Y; sleep 0.6; call dump | grep -E "^MAP" || echo "map destroyed"
+pkill -P "$$" -x alacritty
