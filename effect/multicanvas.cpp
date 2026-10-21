@@ -22,6 +22,7 @@ TrellisEffect::TrellisEffect()
     const QSettings config(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/trellisrc"), QSettings::IniFormat);
     // Qt's INI reader files [General] keys under their bare names, so "General/key" never matches on read.
     m_floatFirst = config.value(QStringLiteral("floatFirst"), false).toBool();
+    m_placeAtPointer = config.value(QStringLiteral("placeAtPointer"), true).toBool();
     m_mapPinned = config.value(QStringLiteral("mapPinned"), false).toBool();
     m_glide = config.value(QStringLiteral("glide"), false).toBool();
     m_landMs = std::max(0.0, config.value(QStringLiteral("landMs"), 200).toDouble());
@@ -171,6 +172,7 @@ void TrellisEffect::syncOutputs()
             continue;
         auto canvas = std::make_unique<TrellisCanvas>(output);
         canvas->m_floatFirst = m_floatFirst;
+        canvas->m_placeAtPointer = m_placeAtPointer;
         canvas->m_glide = m_glide;
         canvas->m_landMs = m_landMs;
         canvas->m_nativeMutation = [this](EffectWindow *window, bool automatic) { rememberNative(window, automatic); };

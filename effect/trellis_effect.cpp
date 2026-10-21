@@ -14,6 +14,7 @@
 #include "effect/offscreenquickview.h"
 #include <QQuickItem>
 #include "window.h"
+#include "pointer_input.h"
 #include "core/output.h"
 
 #include <QDBusConnection>
@@ -455,6 +456,32 @@ void TrellisCanvas::dockAtEnd(const NodePtr &panel)
     }
 }
 
+// Open beside the tile under the cursor, on the side nearest it, as a drop there would. Near a tile's edge
+// that is the edge itself; in its middle the nearer left or right half (a drop would tab, a new window never does).
+void TrellisCanvas::dockAtPointer(const NodePtr &panel)
+{
+    const QPointF cursor = effects->cursorPos();
+    if (!m_placeAtPointer || !m_doc.root || !m_area.contains(cursor) || overUi(cursor)) {
+        dockAtEnd(panel);
+        return;
+    }
+    const auto metrics = layoutMetrics();
+    const auto entries = trellis::layoutRects(m_doc.root, &metrics);
+    const QPointF rel = cursor - m_area.topLeft();
+    const trellis::Point point = fromScreen({rel.x(), rel.y()});
+    for (const auto &id : leafIds(m_doc.root)) {
+        const auto *entry = entries.find(id);
+        if (!entry || point.x < entry->rect.x || point.x > entry->rect.x + entry->rect.w
+            || point.y < entry->rect.y || point.y > entry->rect.y + entry->rect.h)
+            continue;
+        const auto edge = trellis::dropEdge(point, entry->rect).value_or(
+            point.x < entry->rect.x + entry->rect.w / 2 ? trellis::Edge::Left : trellis::Edge::Right);
+        m_doc.root = applyDockTarget(m_doc.root, trellis::tileDropTarget(entries, id, edge), panel, uid("split"));
+        return;
+    }
+    dockAtEnd(panel);
+}
+
 void TrellisCanvas::windowAdded(EffectWindow *w)
 {
     if (!manageable(w) || trackedFor(w))
@@ -495,7 +522,7 @@ void TrellisCanvas::windowAdded(EffectWindow *w)
             m_doc.root = m_doc.root ? trellis::makeSplit(uid("root"), trellis::Axis::X, {stageNode, m_doc.root}) : stageNode;
         }
     } else {
-        dockAtEnd(panel);
+        dockAtPointer(panel);
     }
     m_windows.push_back(t);
     // A native minimized window must enter the hidden model before the first
@@ -1948,6 +1975,7 @@ bool TrellisEffect::simButton(double x, double y, bool press, int modifiers)
 }
 bool TrellisEffect::simMotion(double x, double y)
 {
+    input()->pointer()->warp({x, y}); // new windows read the real cursor
     PointerMotionEvent e{};
     e.position = {x, y};
     return handleMotion(e);
