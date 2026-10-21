@@ -65,6 +65,7 @@ public:
     const trellis::LayoutDocument &doc() const override { return m_doc; }
     trellis::NavMode mode() const override { return trellis::NavMode::Free; }
     trellis::Point viewport() const override;
+    double peekPadding() const override { return m_peekPx; }
     trellis::LayoutMetrics layoutMetrics() const override;
     void schedule() override;
     void changed() override { if (m_changed) m_changed(); }
@@ -265,6 +266,10 @@ private:
     void updateTiles(double dt);
     bool handleIconButton(const PointerButtonEvent &event);
     bool handleIconMotion(const PointerMotionEvent &event);
+    /// A tile outside the framing whose edge shows in the gutter: dimmed, inert, a click widens the frame to it.
+    bool peeking(const std::string &panel) const;
+    bool handlePeekButton(const PointerButtonEvent &event);
+    std::string m_peekPressed;
     struct Tile { double amount = 0, velocity = 0, target = 0; QString icon; };
     std::map<std::string, Tile> m_tiles;
     std::unique_ptr<class OffscreenQuickScene> m_tileScene;
@@ -291,6 +296,7 @@ private:
     RectF m_dragStartGeometry;
     int m_simForceFloat = -1;
     bool m_placeAtPointer = true; // a new tiled window opens beside the tile under the cursor
+    double m_peekPx = 40; // gutter of neighbouring tiles left in view around a zoomed framing; 0 = off
     bool m_floatFirst = false; // floating-first mode: new windows float, and drops tile only at screen edges and corners
     double m_landMs = 200; // glide off: duration of the move-and-scale a window plays when its real geometry changes; 0 = none
     struct Landing { TRect from; double start; };
@@ -466,6 +472,7 @@ private:
     TrellisCanvas *m_pointerCanvas = nullptr, *m_pinchCanvas = nullptr;
     LogicalOutput *m_selectedOutput = nullptr;
     bool m_placeAtPointer = true; // loaded from trellisrc; mirrored into every canvas
+    double m_peekPx = 40;         // likewise ([General] peek, pixels)
     bool m_floatFirst = false; // loaded from trellisrc; mirrored into every canvas
     bool m_mapPinned = false;  // likewise
     double m_landMs = 200; // loaded from trellisrc ([General] landMs); mirrored into every canvas

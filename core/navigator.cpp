@@ -119,9 +119,30 @@ void Navigator::sync()
     retarget();
 }
 
+Rect Navigator::cameraFor(const Rect &frame) const
+{
+    const Point vp = m_host.viewport();
+    const double px = m_host.peekPadding();
+    if (px <= 0 || overviewing() || vp.x <= 0 || vp.y <= 0)
+        return frame;
+    const Rect root = rectOf(rootId());
+    constexpr double EPS = 1e-6, MAX_SHARE = 0.06;
+    Rect out = frame;
+    const auto widen = [&](double &lo, double &size, double rootLo, double rootSize, double view) {
+        const double share = std::min(px / view, MAX_SHARE);
+        const double before = lo > rootLo + EPS ? share : 0, after = lo + size < rootLo + rootSize - EPS ? share : 0;
+        const double whole = size / (1 - before - after);
+        lo -= before * whole;
+        size = whole;
+    };
+    widen(out.x, out.w, root.x, root.w, vp.x);
+    widen(out.y, out.h, root.y, root.h, vp.y);
+    return out;
+}
+
 void Navigator::retarget()
 {
-    const Rect target = framedRect();
+    const Rect target = cameraFor(framedRect());
     if (!sameRect(m_camera.target, target)) {
         m_camera.target = target;
         if (m_host.reducedMotion())

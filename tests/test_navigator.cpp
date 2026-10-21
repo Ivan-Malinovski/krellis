@@ -11,6 +11,7 @@ struct Host : NavigationHost {
     LayoutDocument document;
     NavMode navMode = NavMode::Free;
     int changes = 0;
+    double peek = 0;
     const LayoutDocument &doc() const override { return document; }
     NavMode mode() const override { return navMode; }
     Point viewport() const override { return {1000, 600}; }
@@ -23,6 +24,7 @@ struct Host : NavigationHost {
         return m;
     }
     void changed() override { ++changes; }
+    double peekPadding() const override { return peek; }
 };
 
 static LayoutDocument three()
@@ -286,6 +288,26 @@ private slots:
         QVERIFY(nav.zoomStep(true, {0.1, 0.2})); // out again: the third column and the second row join
         QVERIFY(nav.overviewing());
         QVERIFY(near(cam.target, 0, 0, 1, 1));
+    }
+    void peekLeavesNeighbourEdgesInView()
+    {
+        Host h;
+        h.document = three();
+        h.peek = 50; // 5% of the 1000 px viewport per side
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        QVERIFY(cam.target == UNIT); // showing everything has no neighbours
+        nav.focus("B");
+        const double whole = (1.0 / 3) / 0.9;
+        QVERIFY(qAbs(cam.target.w - whole) < 1e-9);
+        QVERIFY(qAbs(cam.target.x - (1.0 / 3 - 0.05 * whole)) < 1e-9);
+        QVERIFY(near(cam.target, cam.target.x, 0, whole, 1)); // the full height is already in view: no gutter above or below
+        nav.focus("A"); // the first column has nothing on its left
+        const double edge = (1.0 / 3) / 0.95;
+        QVERIFY(qAbs(cam.target.w - edge) < 1e-9);
+        QVERIFY(qAbs(cam.target.x) < 1e-9);
+        QCOMPARE(nav.framedLeaves(), std::vector<std::string>{"A"});
     }
     void floatsFrameTheirStage()
     {

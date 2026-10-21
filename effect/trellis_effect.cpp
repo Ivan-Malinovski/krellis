@@ -1126,6 +1126,10 @@ void TrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp
             if (const auto tile = m_tiles.find(tracked->panel); tile != m_tiles.end())
                 opacity *= 1 - std::clamp(tile->second.amount, 0.0, 1.0);
         data.multiplyOpacity(opacity);
+        if (const auto *tracked = trackedFor(w); tracked && peeking(tracked->panel)) {
+            data.setBrightness(0.55); // out of focus: the edge is there to be found, not to be read
+            data.setSaturation(0.6);
+        }
         const RectF frame = w->frameGeometry();
         if (want.w > 0 && want.h > 0 && frame.width() > 0 && frame.height() > 0) {
             data += QPointF(want.x - frame.x(), want.y - frame.y());
@@ -1330,7 +1334,7 @@ bool TrellisCanvas::handleKey(const KeyboardKeyEvent &e)
 
 bool TrellisCanvas::handleButton(const PointerButtonEvent &e)
 {
-    if (handleIconButton(e)) return true;
+    if (handleIconButton(e) || handlePeekButton(e)) return true;
     if (m_naming && barKey(e.position) == QLatin1String("name-edit") && m_bar) {
         auto event = e;
         m_bar->forwardPointerButtonEvent(&event);

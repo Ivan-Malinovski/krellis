@@ -178,6 +178,46 @@ void TrellisCanvas::updateTiles(double dt)
     }
 }
 
+bool TrellisCanvas::peeking(const std::string &panel) const
+{
+    if (m_peekPx <= 0 || m_session || m_nav.overviewing() || floatScreen(panel) || !m_rects.find(panel)) return false;
+    const auto &inside = m_nav.framedLeaves();
+    return std::find(inside.begin(), inside.end(), panel) == inside.end();
+}
+
+// A click on the edge of a tile that is out of focus widens the framing to take it in.
+bool TrellisCanvas::handlePeekButton(const PointerButtonEvent &event)
+{
+    if (event.button != Qt::LeftButton) return false;
+    if (event.state == PointerButtonState::Released && !m_peekPressed.empty()) {
+        const auto panel = m_peekPressed;
+        m_peekPressed.clear();
+        for (const auto &t : m_windows) if (t.panel == panel) {
+            if (const auto rect = visualRect(t.window); rect && QRectF(rect->x, rect->y, rect->w, rect->h).contains(event.position)) {
+                m_nav.include(trellis::leafIds(m_rects.find(panel)->node));
+                applyRest();
+            }
+            break;
+        }
+        return true;
+    }
+    if (event.state != PointerButtonState::Pressed || m_peekPx <= 0 || overUi(event.position)) return false;
+    const auto stack = effects->stackingOrder();
+    for (auto it = stack.rbegin(); it != stack.rend(); ++it) {
+        auto *window = *it;
+        if (window->isDeleted() || window->isMinimized() || window->isHidden()) continue;
+        const auto rect = visualRect(window);
+        if (rect && QRectF(rect->x, rect->y, rect->w, rect->h).contains(event.position)) {
+            const auto *tracked = trackedFor(window);
+            if (!tracked || !peeking(tracked->panel)) return false;
+            m_peekPressed = tracked->panel;
+            return true;
+        }
+        if (!rect && window->frameGeometry().contains(event.position) && !window->isDesktop()) return false;
+    }
+    return false;
+}
+
 bool TrellisCanvas::handleIconButton(const PointerButtonEvent &event)
 {
     if (event.button != Qt::LeftButton) return false;

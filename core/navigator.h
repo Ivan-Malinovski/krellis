@@ -22,6 +22,8 @@ struct NavigationHost {
     virtual NavMode mode() const = 0;
     virtual bool reducedMotion() const { return false; }
     virtual Point viewport() const = 0; // {w, h} in pixels
+    /// Pixels of the neighbouring tiles left in view on each side of a zoomed framing (0 = none).
+    virtual double peekPadding() const { return 0; }
     virtual LayoutMetrics layoutMetrics() const = 0;
     virtual bool busy() const { return false; }
     virtual void schedule() {}
@@ -71,6 +73,8 @@ public:
 
     const Entries &entries() const { return m_entries; }
     const std::string &framed() const { return m_framed; }
+    /// The tiles inside the framing; everything else is out of focus. Empty while showing everything.
+    const std::vector<std::string> &framedLeaves() const { return m_framedLeaves; }
     /// A grid step can frame a block of tiles that is no node; `framed()` is then the smallest node holding it.
     bool boxed() const { return m_boxed; }
     bool overviewing() const { return m_framed.empty() && !m_boxed; }
@@ -90,6 +94,8 @@ private:
     bool on() const { return m_host.mode() != NavMode::Off; }
     Rect rectOf(const std::string &id) const;
     Rect framedRect() const;
+    /// The camera for a framing: the rect, widened by the peek gutter on each side that has tiles beyond it.
+    Rect cameraFor(const Rect &frame) const;
     /// Frame these leaves: their smallest node, plus a box when that node holds more tiles than they cover.
     void frameSet(const std::vector<std::string> &leaves, bool record = true);
     void retarget();

@@ -53,7 +53,8 @@ std::optional<TrellisEffect::SurfaceHit> TrellisEffect::surfaceHit(QPointF point
         const bool unusable = !decoration && !canvas->rulesFor(w).interactive(scale);
         const auto *tracked = canvas->trackedFor(w);
         const bool icon = tracked && canvas->frameOnly(tracked->panel);
-        return SurfaceHit{w, canvas, *shown, rest, decoration, busy || unusable || icon};
+        const bool outOfFocus = tracked && canvas->peeking(tracked->panel);
+        return SurfaceHit{w, canvas, *shown, rest, decoration, busy || unusable || icon || outOfFocus};
     };
     if (m_clientGrab) return hitWindow(m_clientGrab, true);
     const auto stacking = effects->stackingOrder();
