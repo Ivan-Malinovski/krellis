@@ -41,6 +41,8 @@ class TrellisKcm : public KQuickConfigModule
     Q_PROPERTY(bool scratchpad READ scratchpad WRITE setScratchpad NOTIFY settingsChanged)
     Q_PROPERTY(bool glide READ glide WRITE setGlide NOTIFY settingsChanged)
     Q_PROPERTY(int landMs READ landMs WRITE setLandMs NOTIFY settingsChanged)
+    Q_PROPERTY(int tileMinWidth READ tileMinWidth WRITE setTileMinWidth NOTIFY settingsChanged)
+    Q_PROPERTY(int tileMinHeight READ tileMinHeight WRITE setTileMinHeight NOTIFY settingsChanged)
     Q_PROPERTY(int iconBelow READ iconBelow WRITE setIconBelow NOTIFY settingsChanged)
     Q_PROPERTY(bool followTheme READ followTheme WRITE setFollowTheme NOTIFY settingsChanged)
     Q_PROPERTY(bool toasts READ toasts WRITE setToasts NOTIFY settingsChanged)
@@ -63,6 +65,8 @@ public:
     bool scratchpad() const { return m_current.scratchpad; }
     bool glide() const { return m_current.glide; }
     int landMs() const { return int(m_current.landMs); }
+    int tileMinWidth() const { return m_current.tileMinWidth; }
+    int tileMinHeight() const { return m_current.tileMinHeight; }
     int iconBelow() const { return m_current.iconBelow; }
     bool followTheme() const { return m_current.followTheme; }
     bool toasts() const { return m_current.toasts; }
@@ -77,6 +81,8 @@ public:
     void setScratchpad(bool v) { edit([&] { m_current.scratchpad = v; }); }
     void setGlide(bool v) { edit([&] { m_current.glide = v; }); }
     void setLandMs(int v) { edit([&] { m_current.landMs = v; }); }
+    void setTileMinWidth(int v) { edit([&] { m_current.tileMinWidth = v; }); }
+    void setTileMinHeight(int v) { edit([&] { m_current.tileMinHeight = v; }); }
     void setIconBelow(int v) { edit([&] { m_current.iconBelow = v; }); }
     void setFollowTheme(bool v) { edit([&] { m_current.followTheme = v; }); }
     void setToasts(bool v) { edit([&] { m_current.toasts = v; }); }

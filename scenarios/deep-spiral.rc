@@ -1,0 +1,8 @@
+[General]
+glide=false
+map=false
+followTheme=false
+toasts=false
+whichKey=false
+tileMinWidth=320
+tileMinHeight=200

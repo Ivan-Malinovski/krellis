@@ -25,6 +25,7 @@ struct Settings
     bool flyTo = false;           // long camera jumps zoom out, pan and zoom in (needs glide)
     bool whichKey = true;         // holding Meta+Alt shows the keyboard cheat sheet
     int whichKeyDelayMs = 400;    // how long the chord is held before the cheat sheet shows
+    int tileMinWidth = 1, tileMinHeight = 1; // pixel minimum of a tile for apps without a rule; 1 = pure proportions (deep splits keep shrinking), 320x200 = the old floor
     int iconBelow = 160;          // tiles drawn narrower than this many pixels show an icon; 0 = windows stay live at any size
     double landMs = 200;          // glide off: duration of the move-and-scale after a real geometry change
     bool operator==(const Settings &) const = default;

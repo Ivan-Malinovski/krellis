@@ -120,7 +120,7 @@ Point TrellisCanvas::minSize(const std::vector<std::string> &views) const
         for (const auto &t : m_windows) if (t.view == view) {
             const auto rule = rulesFor(t.window);
             if (rule.scaling == ViewScaling::None) continue;
-            const auto size = m_rules.contains(appId(t.window)) ? rule.minimum : Point{320, 200};
+            const auto size = m_rules.contains(appId(t.window)) ? rule.minimum : m_tileMinimum;
             minimum.x = std::max(minimum.x, size.x);
             minimum.y = std::max(minimum.y, size.y);
         }

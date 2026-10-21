@@ -27,6 +27,8 @@ Settings load(const QString &file)
     s.glide = c.value(QStringLiteral("glide"), s.glide).toBool();
     s.scratchpad = c.value(QStringLiteral("scratchpad"), s.scratchpad).toBool();
     s.landMs = std::max(0.0, c.value(QStringLiteral("landMs"), s.landMs).toDouble());
+    s.tileMinWidth = std::clamp(c.value(QStringLiteral("tileMinWidth"), s.tileMinWidth).toInt(), 1, 4000);
+    s.tileMinHeight = std::clamp(c.value(QStringLiteral("tileMinHeight"), s.tileMinHeight).toInt(), 1, 4000);
     s.iconBelow = std::clamp(c.value(QStringLiteral("iconBelow"), s.iconBelow).toInt(), 0, 1000);
     s.followTheme = c.value(QStringLiteral("followTheme"), s.followTheme).toBool();
     s.toasts = c.value(QStringLiteral("toasts"), s.toasts).toBool();
@@ -49,6 +51,8 @@ bool save(const Settings &s, const QString &file)
     c.setValue(QStringLiteral("glide"), s.glide);
     c.setValue(QStringLiteral("scratchpad"), s.scratchpad);
     c.setValue(QStringLiteral("landMs"), s.landMs);
+    c.setValue(QStringLiteral("tileMinWidth"), s.tileMinWidth);
+    c.setValue(QStringLiteral("tileMinHeight"), s.tileMinHeight);
     c.setValue(QStringLiteral("iconBelow"), s.iconBelow);
     c.setValue(QStringLiteral("followTheme"), s.followTheme);
     c.setValue(QStringLiteral("toasts"), s.toasts);

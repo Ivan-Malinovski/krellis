@@ -45,6 +45,23 @@ KCM.SimpleKCM {
                     valueFromText: (t) => parseInt(t) || 0
                 }
             }
+            RowLayout {
+                Kirigami.FormData.label: i18n("Smallest tile:")
+                QQC2.SpinBox {
+                    from: 1; to: 4000; stepSize: 20
+                    value: kcm.tileMinWidth
+                    onValueModified: kcm.tileMinWidth = value
+                    textFromValue: (v) => i18n("%1 px wide", v)
+                    valueFromText: (t) => parseInt(t) || 1
+                }
+                QQC2.SpinBox {
+                    from: 1; to: 4000; stepSize: 20
+                    value: kcm.tileMinHeight
+                    onValueModified: kcm.tileMinHeight = value
+                    textFromValue: (v) => i18n("%1 px tall", v)
+                    valueFromText: (t) => parseInt(t) || 1
+                }
+            }
             QQC2.Label {
                 Layout.fillWidth: true
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 18

@@ -392,6 +392,7 @@ private:
     std::string m_lastActivePanel; // the panel of the last tracked window to be activated (KWin activates a new window before windowAdded)
     double m_peekPx = 40; // gutter of neighbouring tiles left in view around a zoomed framing; 0 = off
     bool m_floatFirst = false; // floating-first mode: new windows float, and drops tile only at screen edges and corners
+    trellis::Point m_tileMinimum{1, 1}; // layout floor of an app without a rule ([General] tileMinWidth/tileMinHeight)
     int m_iconBelow = 160; // tiles drawn narrower than this show an icon instead of the window; 0 = never
     double m_landMs = 200; // glide off: duration of the move-and-scale a window plays when its real geometry changes; 0 = none
     struct Landing { TRect from; double start; };
@@ -648,6 +649,7 @@ private:
     bool m_floatFirst = false; // loaded from trellisrc; mirrored into every canvas
     bool m_mapPinned = false;  // likewise
     bool m_showMap = true;     // [General] map, default on; the minimap shortcut flips and saves it
+    trellis::Point m_tileMinimum{1, 1}; // loaded from trellisrc; mirrored into every canvas
     int m_iconBelow = 160; // loaded from trellisrc ([General] iconBelow); mirrored into every canvas
     double m_landMs = 200; // loaded from trellisrc ([General] landMs); mirrored into every canvas
     bool m_toastsOn = true, m_flyToOn = false; // loaded from trellisrc; mirrored into every canvas

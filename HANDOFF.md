@@ -197,3 +197,6 @@ All seven items of `docs/plans/05-polish-and-safety.md` are implemented, built a
 
 ## 2026-10-21: tiny windows
 Ivan: tiles stop shrinking, so the fractal does not go deep. Measured in the nested harness (26 Alacritty on 2560 px): cutoff was the icon swap under 160x64 px; Brave (client min 540) was drawn letterboxed. Added `iconBelow` (0 = always live) and uniform scale-up of held clients in `restRect`; see AGENTS.md "Tiny windows". Not installed live. Ivan: run `tools/install.sh`, `tools/live.sh on`, and set `iconBelow=0` in `[General]` of `~/.config/trellisrc` (or the KCM) to try it; the default stays 160. Open: whether live should become the default; camera zoom-out is still capped at 1.35x the root.
+
+## 2026-10-21: tile minimum
+Follow-up to "tiny windows": Ivan's Dolphin spiral stopped deepening because of the 320x200 default layout minimum, not Dolphin. Now `tileMinWidth`/`tileMinHeight` (default 1, KCM "Smallest tile"). Behaviour change for existing layouts: with many windows the weights are followed exactly instead of being evened out at the old floor. Open: whether tiny tiles (<160 px) should stay icons by default (`iconBelow`), and the 1.35x zoom-out cap.
