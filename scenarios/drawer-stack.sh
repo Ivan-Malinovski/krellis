@@ -31,7 +31,9 @@ echo "--- while it is open the other sliver does not take over"
 call simMotion 1275 700 >/dev/null; sleep 0.6
 check "still the upper one" "$(drawer p3 | grep -c ' open ')" 1
 echo "--- leave, then hover the lower sliver"
-call simMotion 300 300 >/dev/null; sleep 1.0
+call simMotion 300 300 >/dev/null; sleep 0.12
+/home/ivan/dev/kwin-trellis/tools/shot stack-closing >/dev/null
+sleep 0.9
 check "all closed again" "$(call dump | grep -c '^DRAWER .* open ')" 0
 call simMotion 1275 700 >/dev/null; sleep 1.0
 check "lower drawer open" "$(drawer p4 | grep -c ' open ')" 1

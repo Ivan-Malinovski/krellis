@@ -1329,7 +1329,8 @@ void TrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp
     Region clipped = region;
     if (const auto *tracked = trackedFor(w)) {
         const auto d = m_drawers.find(tracked->panel);
-        if (d != m_drawers.end() && !d->second.open && m_drawers.size() > 1)
+        // Not while it slides back in (flight or landing): the clip would cut it down to the sliver at once.
+        if (d != m_drawers.end() && !d->second.open && m_drawers.size() > 1 && !m_flights.count(w) && !m_landings.count(w))
             if (const auto slice = drawerSlice(tracked->panel))
                 clipped = region & vp.mapToDeviceCoordinatesAligned(Region(RectF(slice->x, slice->y, slice->w, slice->h).toAlignedRect()));
     }
