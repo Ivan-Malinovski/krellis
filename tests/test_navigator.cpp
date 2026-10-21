@@ -162,8 +162,191 @@ private slots:
         Navigator nav(h, cam);
         nav.sync();
         nav.zoom(5.0, {0.5, 0.5});
-        QVERIFY(cam.value.w <= 1.35 + 1e-9);
+        // A rubber band: it gives a little past the 1.35 limit, never more than exp(0.12) beyond it.
+        QVERIFY(cam.value.w > 1.35);
+        QVERIFY(cam.value.w <= 1.35 * std::exp(0.12) + 1e-9);
         QVERIFY(cam.value.x >= -cam.value.w * 0.3 - 1e-9);
+        nav.finishGesture();
+        QVERIFY(cam.target.w <= 1.35 + 1e-9);
+    }
+    void zoomOvershootIsBoundedAndResistsMore()
+    {
+        Host h;
+        h.document = three();
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        double last = 1.0, lastGain = 1e9;
+        for (int i = 0; i < 40; ++i) {
+            nav.zoom(1.1, {0.5, 0.5});
+            const double gain = cam.value.w / last;
+            QVERIFY(gain <= lastGain + 1e-12); // each push gains less than the one before
+            lastGain = gain;
+            last = cam.value.w;
+            QVERIFY(last <= 1.35 * std::exp(0.12) + 1e-9);
+        }
+        QVERIFY(last > 1.35);
+    }
+    void zoomPullingBackRetracesTheBand()
+    {
+        Host h;
+        h.document = three();
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        nav.zoom(1.2, {0.5, 0.5}); // 1.2 x 1.0 is still inside the 1.35 limit
+        nav.zoom(1.15, {0.5, 0.5}); // this one crosses it
+        const double before = cam.value.w;
+        nav.zoom(1.5, {0.5, 0.5});
+        nav.zoom(1.0 / 1.5, {0.5, 0.5});
+        QVERIFY(qAbs(cam.value.w - before) < 1e-9);
+        // Panning alone never changes the size, in or past the band.
+        nav.zoom(1.5, {0.5, 0.5});
+        const double stretched = cam.value.w;
+        nav.zoom(1.0, {0.5, 0.5}, {20, 0});
+        QCOMPARE(cam.value.w, stretched);
+    }
+    void zoomInOvershootIsBounded()
+    {
+        Host h;
+        h.document = three();
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        for (int i = 0; i < 40; ++i)
+            nav.zoom(0.7, {0.1, 0.5});
+        const double minSide = (1.0 / 3) * 0.65; // 65% of the smallest tile
+        QVERIFY(cam.value.h < minSide);
+        QVERIFY(cam.value.h >= minSide * std::exp(-0.12) - 1e-9);
+        nav.finishGesture();
+        QCOMPARE(nav.framed(), std::string("A")); // snaps to the nearest tile
+    }
+    void bestFitStaysCheapWithManyTiles()
+    {
+        Host h;
+        std::vector<LayoutSpec> cols;
+        for (int i = 0; i < 24; ++i)
+            cols.push_back(L::panel({L::view("t", "v" + std::to_string(i))}, "P" + std::to_string(i)));
+        auto root = L::row(cols);
+        h.document = createDocument(&root);
+        RectSpring cam;
+        Navigator nav(h, cam);
+        QElapsedTimer t;
+        t.start();
+        nav.sync();
+        const qint64 syncNs = t.nsecsElapsed();
+        t.restart();
+        for (int i = 0; i < 100; ++i)
+            nav.zoom(0.99, {0.5, 0.5});
+        const qint64 zoomNs = t.nsecsElapsed() / 100;
+        t.restart();
+        nav.finishGesture();
+        qInfo() << "24 tiles:" << nav.entries().size() << "entries, sync" << syncNs / 1000 << "us, zoom"
+                << zoomNs / 1000 << "us/event, finishGesture" << t.nsecsElapsed() / 1000 << "us";
+        QVERIFY(zoomNs < 1000000); // an event must stay well under a millisecond
+    }
+    static LayoutDocument row8(std::vector<double> weights = {})
+    {
+        std::vector<LayoutSpec> cols;
+        for (int i = 1; i <= 8; ++i)
+            cols.push_back(L::panel({L::view("t", "v" + std::to_string(i))}, "P" + std::to_string(i)));
+        auto root = L::row(cols, weights);
+        return createDocument(&root);
+    }
+    static std::vector<std::string> sorted(std::vector<std::string> v)
+    {
+        std::sort(v.begin(), v.end());
+        return v;
+    }
+    void revealKeepsAFramedTile()
+    {
+        Host h;
+        h.document = row8();
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        nav.frameTiles({"P1", "P2"});
+        const Rect before = cam.target;
+        nav.reveal("P2");
+        QVERIFY(cam.target == before);
+        nav.reveal("nope"); // unknown ids (a drawer window) change nothing
+        QVERIFY(cam.target == before);
+    }
+    void revealSlidesAtTheSameSize()
+    {
+        Host h;
+        h.document = row8();
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        nav.frameTiles({"P1", "P2"});
+        QVERIFY(qAbs(cam.target.w - 0.25) < 1e-9);
+        nav.reveal("P8");
+        QVERIFY(qAbs(cam.target.w - 0.25) < 1e-9);
+        QCOMPARE(sorted(nav.framedLeaves()), (std::vector<std::string>{"P7", "P8"}));
+        nav.reveal("P4"); // a middle one: still two tiles wide, the least slide that covers it
+        QCOMPARE(sorted(nav.framedLeaves()), (std::vector<std::string>{"P4", "P5"}));
+        nav.reveal("P3");
+        QCOMPARE(sorted(nav.framedLeaves()), (std::vector<std::string>{"P3", "P4"}));
+    }
+    void revealFromOneTileStaysOneTile()
+    {
+        Host h;
+        h.document = row8();
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        nav.focus("P1");
+        nav.reveal("P5");
+        QCOMPARE(nav.framedLeaves(), (std::vector<std::string>{"P5"}));
+        QVERIFY(qAbs(cam.target.w - 0.125) < 1e-9);
+    }
+    void revealStretchesForALongerTile()
+    {
+        Host h;
+        h.document = row8({1, 1, 1, 1, 1, 1, 1, 5});
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        nav.frameTiles({"P1", "P2"});
+        nav.reveal("P8"); // wider than the frame: the frame takes its width
+        QCOMPARE(nav.framedLeaves(), (std::vector<std::string>{"P8"}));
+    }
+    void revealDoesNothingInOverview()
+    {
+        Host h;
+        h.document = row8();
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        nav.reveal("P3");
+        QVERIFY(nav.overviewing());
+    }
+    void revealWidensForANewNeighbourOnly()
+    {
+        Host h;
+        h.document = row8();
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        nav.focus("P1");
+        nav.reveal("P2", true); // just opened beside the frame: both in view
+        QCOMPARE(sorted(nav.framedLeaves()), (std::vector<std::string>{"P1", "P2"}));
+        nav.reveal("P8", true); // a far tile would quadruple the frame: slide instead
+        QCOMPARE(sorted(nav.framedLeaves()), (std::vector<std::string>{"P7", "P8"}));
+    }
+    void revealDoesNotFillTheHistory()
+    {
+        Host h;
+        h.document = row8();
+        RectSpring cam;
+        Navigator nav(h, cam);
+        nav.sync();
+        nav.focus("P1");
+        const bool back = nav.canGoBack();
+        for (const char *id : {"P3", "P5", "P7", "P2"})
+            nav.reveal(id);
+        QCOMPARE(nav.canGoBack(), back);
     }
     void wheelStepsOncePerGesture()
     {

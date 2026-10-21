@@ -10,6 +10,8 @@ namespace trellis {
 constexpr int MAX_HISTORY = 100;
 constexpr double WHEEL_QUIET_MS = 180; // a pause this long ends a scroll gesture
 constexpr double GRID_EPS = 1e-6;
+constexpr double WIDEN_LIMIT = 2.2; // a new tile widens the frame when that at most doubles its area
+constexpr double ZOOM_OVERSHOOT = 0.12; // the rubber band stops this far (log scale, ~13%) past a zoom limit
 
 namespace {
 struct Leaf {
@@ -41,6 +43,24 @@ void setSpan(Rect &r, int a, double l, double h)
 double distanceTo(const Rect &r, Point p)
 {
     return std::hypot(std::max({r.x - p.x, 0.0, p.x - (r.x + r.w)}), std::max({r.y - p.y, 0.0, p.y - (r.y + r.h)}));
+}
+/// A zoom push `f` against the limits, as a rubber band. `inRatio` is how far the camera is below its smallest
+/// size and `outRatio` how far above its largest (a value over 1 means past the limit). Inside the limits a push
+/// goes through unchanged; past one, the camera's overshoot o (log scale) is the compressed image of a raw pull r,
+/// o = M (1 - exp(-r / M)), so it can never get further than M, and pulling back retraces the same curve.
+double bandedFactor(double f, double inRatio, double outRatio)
+{
+    const double M = ZOOM_OVERSHOOT;
+    const double push = std::log(f);
+    const auto band = [&](double x, double d) { // x: overshoot (< 0 inside the limit), d: the push toward it
+        const double xc = std::min(x, M * (1 - 1e-9));
+        const double raw = (xc > 0 ? -M * std::log(1 - xc / M) : xc) + d;
+        return (raw > 0 ? M * (1 - std::exp(-raw / M)) : raw) - x;
+    };
+    const double xIn = std::log(inRatio), xOut = std::log(outRatio);
+    if (xIn > 0 || (xOut <= 0 && push < 0))
+        return std::exp(-band(xIn, -push));
+    return std::exp(band(xOut, push));
 }
 } // namespace
 
@@ -116,6 +136,9 @@ void Navigator::sync()
     }
     if (m_session && !m_entries.has(m_session->id))
         m_session.reset();
+    m_minTile = std::numeric_limits<double>::infinity();
+    for (const auto &kv : m_entries)
+        m_minTile = std::min(m_minTile, std::min(kv.second.rect.w, kv.second.rect.h));
     retarget();
 }
 
@@ -295,17 +318,15 @@ void Navigator::frameIds(const std::vector<std::string> &targets)
     focus(frameLeaves(m_host.doc().root, ids));
 }
 
-void Navigator::ensureVisible(const std::string &panelId)
+void Navigator::reveal(const std::string &panelId, bool preferWiden)
 {
     if (overviewing())
         return;
     const auto &doc = m_host.doc();
-    if (m_framed.empty()) { // a block inside the whole layout: a new tile outside it widens the frame
-        if (m_entries.has(panelId) && std::find(m_framedLeaves.begin(), m_framedLeaves.end(), panelId) == m_framedLeaves.end()) {
-            auto ids = m_framedLeaves;
-            ids.push_back(panelId);
-            focus(frameLeaves(doc.root, ids));
-        }
+    if (m_framed.empty()) { // a block inside the whole layout
+        if (!m_entries.has(panelId) || std::find(m_framedLeaves.begin(), m_framedLeaves.end(), panelId) != m_framedLeaves.end())
+            return;
+        slideTo(panelId, preferWiden);
         return;
     }
     const Entry *fe = m_entries.find(m_framed);
@@ -328,12 +349,51 @@ void Navigator::ensureVisible(const std::string &panelId)
         focus(stage ? stage->id : std::string());
         return;
     }
+    if (!m_entries.has(panelId)) // a drawer window or a stale id: nothing to reveal
+        return;
     if (m_boxed ? std::find(m_framedLeaves.begin(), m_framedLeaves.end(), panelId) != m_framedLeaves.end()
                 : containsNode(node, panelId))
         return;
-    auto ids = m_framedLeaves;
-    ids.push_back(panelId);
-    focus(frameLeaves(doc.root, ids));
+    slideTo(panelId, preferWiden);
+}
+
+void Navigator::slideTo(const std::string &panelId, bool preferWiden)
+{
+    const Rect box = framedRect();
+    const Rect target = m_entries.at(panelId).rect;
+    std::vector<std::string> framed;
+    for (const auto &id : m_framedLeaves)
+        if (m_entries.has(id))
+            framed.push_back(id);
+    framed.push_back(panelId);
+    if (preferWiden) {
+        // A tile that just appeared beside the frame belongs in it, as long as that does not blow the frame up.
+        const std::string wide = frameLeaves(m_host.doc().root, framed);
+        const Rect r = rectOf(wide);
+        if (r.w * r.h <= WIDEN_LIMIT * box.w * box.h) {
+            focus(wide);
+            return;
+        }
+    }
+    // Keep the frame's size and slide it the least distance that covers the tile; stretch it only on an axis
+    // where the tile alone is longer than the frame.
+    Rect slid = box;
+    for (int a = 0; a < 2; ++a) {
+        const double size = hi(box, a) - lo(box, a);
+        if (hi(target, a) - lo(target, a) > size + GRID_EPS)
+            setSpan(slid, a, lo(target, a), hi(target, a));
+        else if (lo(target, a) < lo(box, a) - GRID_EPS)
+            setSpan(slid, a, lo(target, a), lo(target, a) + size);
+        else if (hi(target, a) > hi(box, a) + GRID_EPS)
+            setSpan(slid, a, hi(target, a) - size, hi(target, a));
+    }
+    std::vector<std::string> ids;
+    for (const auto &id : leafIds(m_host.doc().root))
+        if (const Entry *e = m_entries.find(id))
+            if (id == panelId || inside(slid, e->rect))
+                ids.push_back(id);
+    // An automatic slide is not a visit: cycling through windows must not fill the history.
+    frameSet(ids, false);
 }
 
 void Navigator::include(const std::vector<std::string> &ids)
@@ -359,11 +419,9 @@ void Navigator::zoom(double factor, Point p, Point pan)
     m_camera.velocity = {0, 0, 0, 0};
     const Rect c = m_camera.value;
     const Point vp = m_host.viewport();
-    double minSize = std::numeric_limits<double>::infinity();
-    for (const auto &kv : m_entries)
-        minSize = std::min(minSize, std::min(kv.second.rect.w, kv.second.rect.h));
-    minSize *= 0.65;
-    factor = std::max(minSize / std::min(c.w, c.h), std::min(factor, 1.35 / std::max(c.w, c.h)));
+    const double minSize = m_minTile * 0.65;
+    if (factor != 1.0)
+        factor = bandedFactor(factor, minSize / std::min(c.w, c.h), std::max(c.w, c.h) / 1.35);
     Rect next{c.x + c.w * p.x * (1 - factor) - (pan.x / vp.x) * c.w,
               c.y + c.h * p.y * (1 - factor) - (pan.y / vp.y) * c.h, c.w * factor, c.h * factor};
     next.x = std::max(-next.w * 0.3, std::min(1 - next.w * 0.7, next.x));

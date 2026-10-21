@@ -15,7 +15,12 @@ Settings load(const QString &file)
     const QSettings c(file, QSettings::IniFormat);
     Settings s;
     s.floatFirst = c.value(QStringLiteral("floatFirst"), s.floatFirst).toBool();
-    s.placeAtPointer = c.value(QStringLiteral("placeAtPointer"), s.placeAtPointer).toBool();
+    if (c.contains(QStringLiteral("spawnTarget"))) {
+        const QString v = c.value(QStringLiteral("spawnTarget")).toString();
+        s.spawnTarget = v == QLatin1String("focused") ? SpawnTarget::Focused : v == QLatin1String("end") ? SpawnTarget::End : SpawnTarget::Pointer;
+    } else if (!c.value(QStringLiteral("placeAtPointer"), true).toBool()) {
+        s.spawnTarget = SpawnTarget::End; // the key this setting replaced: off meant "at the end"
+    }
     s.peek = std::max(0.0, c.value(QStringLiteral("peek"), s.peek).toDouble());
     s.map = c.value(QStringLiteral("map"), s.map).toBool();
     s.mapPinned = c.value(QStringLiteral("mapPinned"), s.mapPinned).toBool();
@@ -29,7 +34,9 @@ bool save(const Settings &s, const QString &file)
 {
     QSettings c(file, QSettings::IniFormat);
     c.setValue(QStringLiteral("floatFirst"), s.floatFirst);
-    c.setValue(QStringLiteral("placeAtPointer"), s.placeAtPointer);
+    c.setValue(QStringLiteral("spawnTarget"),
+               s.spawnTarget == SpawnTarget::Focused ? QStringLiteral("focused")
+                   : s.spawnTarget == SpawnTarget::End ? QStringLiteral("end") : QStringLiteral("pointer"));
     c.setValue(QStringLiteral("peek"), s.peek);
     c.setValue(QStringLiteral("map"), s.map);
     c.setValue(QStringLiteral("mapPinned"), s.mapPinned);

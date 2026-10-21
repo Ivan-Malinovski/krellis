@@ -14,11 +14,35 @@ private Q_SLOTS:
         QTemporaryDir dir;
         const QString file = dir.filePath("trellisrc");
         Settings s;
-        s.floatFirst = true; s.placeAtPointer = false; s.peek = 12; s.map = false; s.mapPinned = true; s.glide = true; s.landMs = 90; s.scratchpad = true;
+        s.floatFirst = true; s.spawnTarget = SpawnTarget::Focused; s.peek = 12; s.map = false; s.mapPinned = true; s.glide = true; s.landMs = 90; s.scratchpad = true;
         QVERIFY(save(s, file));
         QCOMPARE(load(file), s);
         QVERIFY(!Settings{}.scratchpad);
         QVERIFY(Settings{}.map);
+    }
+    void spawnTargetValuesAndLegacyKey()
+    {
+        QTemporaryDir dir;
+        const QString file = dir.filePath("trellisrc");
+        for (auto t : {SpawnTarget::Pointer, SpawnTarget::Focused, SpawnTarget::End}) {
+            Settings s;
+            s.spawnTarget = t;
+            QVERIFY(save(s, file));
+            QCOMPARE(load(file).spawnTarget, t);
+        }
+        // The file of an older version: placeAtPointer=false meant "at the end", true the default.
+        const QString old = dir.filePath("old");
+        QVERIFY(saveValue("placeAtPointer", false, old));
+        QCOMPARE(load(old).spawnTarget, SpawnTarget::End);
+        QVERIFY(saveValue("placeAtPointer", true, old));
+        QCOMPARE(load(old).spawnTarget, SpawnTarget::Pointer);
+        // The new key wins over a stale old one, and a value we do not know falls back to the default.
+        QVERIFY(saveValue("placeAtPointer", false, old));
+        QVERIFY(saveValue("spawnTarget", "focused", old));
+        QCOMPARE(load(old).spawnTarget, SpawnTarget::Focused);
+        QVERIFY(saveValue("spawnTarget", "sideways", old));
+        QCOMPARE(load(old).spawnTarget, SpawnTarget::Pointer);
+        QVERIFY(Settings{}.spawnTarget == SpawnTarget::Pointer);
     }
     void defaultsWhenMissing()
     {

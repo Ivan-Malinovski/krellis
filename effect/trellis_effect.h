@@ -242,7 +242,9 @@ private:
     const TRect *worldRect(const std::string &panel) const;
     std::optional<TRect> floatScreen(const std::string &panel) const;
     void dockAtEnd(const trellis::NodePtr &panel);
+    void dockAtSpawn(const trellis::NodePtr &panel); // by m_spawnTarget
     void dockAtPointer(const trellis::NodePtr &panel);
+    void dockAtFocused(const trellis::NodePtr &panel);
     void startDrag(EffectWindow *w, QPointF pointer);
     void moveDrag(QPointF pointer);
     void endDrag(bool commit);
@@ -341,7 +343,8 @@ private:
     EffectWindow *m_dragWindow = nullptr;
     RectF m_dragStartGeometry;
     int m_simForceFloat = -1;
-    bool m_placeAtPointer = true; // a new tiled window opens beside the tile under the cursor
+    trellis::config::SpawnTarget m_spawnTarget = trellis::config::SpawnTarget::Pointer; // where a new tiled window opens
+    std::string m_lastActivePanel; // the panel of the last tracked window to be activated (KWin activates a new window before windowAdded)
     double m_peekPx = 40; // gutter of neighbouring tiles left in view around a zoomed framing; 0 = off
     bool m_floatFirst = false; // floating-first mode: new windows float, and drops tile only at screen edges and corners
     double m_landMs = 200; // glide off: duration of the move-and-scale a window plays when its real geometry changes; 0 = none
@@ -563,7 +566,7 @@ private:
     std::unique_ptr<TrellisInput> m_input;
     TrellisCanvas *m_pointerCanvas = nullptr, *m_pinchCanvas = nullptr;
     LogicalOutput *m_selectedOutput = nullptr;
-    bool m_placeAtPointer = true; // loaded from trellisrc; mirrored into every canvas
+    trellis::config::SpawnTarget m_spawnTarget = trellis::config::SpawnTarget::Pointer; // loaded from trellisrc; mirrored into every canvas
     double m_peekPx = 40;         // likewise ([General] peek, pixels)
     bool m_floatFirst = false; // loaded from trellisrc; mirrored into every canvas
     bool m_mapPinned = false;  // likewise

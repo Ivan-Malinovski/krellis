@@ -44,10 +44,11 @@ KCM.SimpleKCM {
                 font: Kirigami.Theme.smallFont
                 text: i18n("Windows float freely, and dropping one at a screen edge or corner tiles it there.")
             }
-            QQC2.CheckBox {
-                text: i18n("Open beside the tile under the pointer")
-                checked: kcm.placeAtPointer
-                onToggled: kcm.placeAtPointer = checked
+            QQC2.ComboBox {
+                Kirigami.FormData.label: i18n("New tiled windows open:")
+                model: [i18n("Beside the tile under the pointer"), i18n("Beside the focused window"), i18n("At the end of the row")]
+                currentIndex: kcm.spawnTarget
+                onActivated: index => kcm.spawnTarget = index
             }
 
             Kirigami.Separator { Kirigami.FormData.isSection: true; Kirigami.FormData.label: i18n("Zoomed view") }

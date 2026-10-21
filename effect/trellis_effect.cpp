@@ -148,7 +148,7 @@ void TrellisCanvas::cyclePanel(int step)
     long pos = at == shown.end() ? 0 : long(at - shown.begin());
     pos = ((pos + step) % long(shown.size()) + long(shown.size())) % long(shown.size());
     const size_t pick = shown[size_t(pos)];
-    m_nav.focus(m_windows[pick].panel);
+    m_nav.reveal(m_windows[pick].panel);
     effects->activateWindow(m_windows[pick].window);
     applyRest();
 }
@@ -171,9 +171,7 @@ void TrellisCanvas::focusDirection(trellis::Edge dir)
     if (to.empty()) return;
     const auto at = std::find_if(m_windows.begin(), m_windows.end(), [&](const Tracked &t) { return t.panel == to && !t.window->isMinimized(); });
     if (at == m_windows.end()) return;
-    const auto &leaves = m_nav.framedLeaves();
-    if (!m_nav.overviewing() && std::find(leaves.begin(), leaves.end(), to) == leaves.end())
-        m_nav.focus(to);
+    m_nav.reveal(to);
     effects->activateWindow(at->window);
     applyRest();
 }
@@ -190,7 +188,7 @@ void TrellisCanvas::moveDirection(trellis::Edge dir)
     if (!moved) return;
     m_doc = std::move(next);
     relayout(true);
-    m_nav.ensureVisible(panel);
+    m_nav.reveal(panel);
     applyRest();
 }
 
@@ -708,9 +706,9 @@ void TrellisCanvas::dockAtEnd(const NodePtr &panel)
 void TrellisCanvas::dockAtPointer(const NodePtr &panel)
 {
     const QPointF cursor = effects->cursorPos();
-    if (fillVacancyFor(panel, m_placeAtPointer && !overUi(cursor) ? std::optional<QPointF>(cursor) : std::nullopt))
+    if (fillVacancyFor(panel, !overUi(cursor) ? std::optional<QPointF>(cursor) : std::nullopt))
         return;
-    if (!m_placeAtPointer || !m_doc.root || !m_area.contains(cursor) || overUi(cursor)) {
+    if (!m_doc.root || !m_area.contains(cursor) || overUi(cursor)) {
         dockAtEnd(panel);
         return;
     }
@@ -729,6 +727,43 @@ void TrellisCanvas::dockAtPointer(const NodePtr &panel)
         return;
     }
     dockAtEnd(panel);
+}
+
+// Open beside the focused window: on its right, or below it when the tile is taller than wide. Without a docked
+// focused window here (nothing active, a float, another screen) the window goes to the end.
+void TrellisCanvas::dockAtFocused(const NodePtr &panel)
+{
+    if (fillVacancyFor(panel, std::nullopt))
+        return;
+    std::vector<std::string> panels;
+    for (const auto &t : m_windows) panels.push_back(t.panel);
+    std::string from = dockedPanelOf(*this, m_doc, activeIndex(), panels);
+    // The new window is usually active already but not tracked yet: the one that had focus before it is the target.
+    if (from.empty() && !m_lastActivePanel.empty()
+        && trellis::locatePanel(m_doc, m_lastActivePanel).where == trellis::PanelLocation::Where::Docked)
+        from = m_lastActivePanel;
+    if (from.empty() || !m_doc.root) {
+        dockAtEnd(panel);
+        return;
+    }
+    const auto metrics = layoutMetrics();
+    const auto entries = trellis::layoutRects(m_doc.root, &metrics);
+    const auto *entry = entries.find(from);
+    if (!entry) {
+        dockAtEnd(panel);
+        return;
+    }
+    const auto edge = entry->rect.w * m_area.width() >= entry->rect.h * m_area.height() ? trellis::Edge::Right : trellis::Edge::Bottom;
+    m_doc.root = applyDockTarget(m_doc.root, trellis::tileDropTarget(entries, from, edge), panel, uid("split"));
+}
+
+void TrellisCanvas::dockAtSpawn(const NodePtr &panel)
+{
+    switch (m_spawnTarget) {
+    case trellis::config::SpawnTarget::Focused: dockAtFocused(panel); break;
+    case trellis::config::SpawnTarget::End: dockAtEnd(panel); break;
+    case trellis::config::SpawnTarget::Pointer: dockAtPointer(panel); break;
+    }
 }
 
 void TrellisCanvas::windowAdded(EffectWindow *w)
@@ -771,15 +806,16 @@ void TrellisCanvas::windowAdded(EffectWindow *w)
             m_doc.root = m_doc.root ? trellis::makeSplit(uid("root"), trellis::Axis::X, {stageNode, m_doc.root}) : stageNode;
         }
     } else {
-        dockAtPointer(panel);
+        dockAtSpawn(panel);
     }
     m_windows.push_back(t);
+    if (effects->activeWindow() == w) m_lastActivePanel = t.panel; // KWin activated it before we heard of it
     // A native minimized window must enter the hidden model before the first
     // layout can issue a configure. Hidden clients may not acknowledge resizes.
     if (w->isMinimized()) m_doc = hidePanel(m_doc, t.panel);
     relayout(true);
     if (!w->isMinimized()) {
-        m_nav.ensureVisible(t.panel);
+        m_nav.reveal(t.panel, true);
         if (m_glide && m_nowMs > 0) startFlight(w, FlightKind::Appear, {}, {});
     }
     qCDebug(trellisLog) << "added" << w->caption() << QString::fromStdString(t.panel);
@@ -825,10 +861,11 @@ void TrellisCanvas::windowActivated(EffectWindow *w)
     Tracked *t = trackedFor(w);
     if (!t)
         return;
+    m_lastActivePanel = t->panel;
     if (floatScreen(t->panel))
         m_doc = raiseFloat(m_doc, t->panel);
     else
-        m_nav.ensureVisible(t->panel);
+        m_nav.reveal(t->panel);
 }
 
 void TrellisCanvas::updateDock()
@@ -1278,7 +1315,7 @@ void TrellisCanvas::minimizedChanged(EffectWindow *w)
             from = visualRect(w, &opacity).value_or(from);
         m_doc = restorePanel(m_doc, t->panel, trellis::FloatingLayer::Overlay);
         relayout(true);
-        m_nav.ensureVisible(t->panel);
+        m_nav.reveal(t->panel);
         applyRest();
         updateDock();
         startFlight(w, FlightKind::Restore, from, {}, opacity);
@@ -2187,7 +2224,7 @@ void TrellisCanvas::flipActive()
     if (!next) return;
     m_doc = std::move(*next);
     relayout(true);
-    m_nav.ensureVisible(panel);
+    m_nav.reveal(panel);
     applyRest();
 }
 

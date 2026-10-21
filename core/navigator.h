@@ -52,7 +52,10 @@ public:
     void frameIds(const std::vector<std::string> &ids);
     /// Frame exactly these tiles: their smallest node, boxed down to just them when that node holds more.
     void frameTiles(const std::vector<std::string> &leaves) { frameSet(leaves); }
-    void ensureVisible(const std::string &panelId);
+    /// Bring a tile into view without disturbing the rest: nothing if it is framed, otherwise the frame keeps its
+    /// size and slides to cover it. `preferWiden` (a window that just opened) takes the tile in beside the
+    /// frame instead when that keeps the frame small enough.
+    void reveal(const std::string &panelId, bool preferWiden = false);
     void include(const std::vector<std::string> &ids);
 
     // Gestures. `p` is the pointer as a fraction of the viewport (0..1).
@@ -99,6 +102,7 @@ private:
     /// Frame these leaves: their smallest node, plus a box when that node holds more tiles than they cover.
     void frameSet(const std::vector<std::string> &leaves, bool record = true);
     void retarget();
+    void slideTo(const std::string &panelId, bool preferWiden);
     void historyGo(int direction);
 
     NavigationHost &m_host;
@@ -113,6 +117,7 @@ private:
     std::optional<std::vector<std::string>> m_overviewReturn;
     std::vector<Framing> m_framings;
     bool m_gesture = false;
+    double m_minTile = 0; // the smallest tile side, in layout units
 
     struct StepWheel {
         double last = -1e18;

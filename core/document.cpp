@@ -81,10 +81,10 @@ static bool has(const std::vector<std::string> &v, const std::string &s)
     return std::find(v.begin(), v.end(), s) != v.end();
 }
 
-LayoutDocument updatePanel(LayoutDocument doc, NodePtr panel)
+LayoutDocument updatePanel(LayoutDocument doc, NodePtr panel, bool keepProportions)
 {
     if (panel->views.empty())
-        return removePanel(std::move(doc), panel->id);
+        return removePanel(std::move(doc), panel->id, keepProportions);
     if (!has(panel->views, panel->selected))
         panel = withViews(panel, panel->views, panel->views.front());
     const auto loc = locatePanel(doc, panel->id);
@@ -154,7 +154,7 @@ LayoutDocument fillVacancy(LayoutDocument doc, const std::string &vacancyId, Nod
     return doc;
 }
 
-LayoutDocument detachView(LayoutDocument doc, const std::string &viewId)
+LayoutDocument detachView(LayoutDocument doc, const std::string &viewId, bool keepProportions)
 {
     NodePtr panel = panelOfView(doc, viewId);
     if (!panel)
@@ -168,12 +168,13 @@ LayoutDocument detachView(LayoutDocument doc, const std::string &viewId)
         const auto index = std::find(panel->views.begin(), panel->views.end(), viewId) - panel->views.begin();
         selected = views.empty() ? std::string() : views[std::min<size_t>(index, views.size() - 1)];
     }
-    return updatePanel(std::move(doc), withViews(panel, views, selected));
+    return updatePanel(std::move(doc), withViews(panel, views, selected), keepProportions);
 }
 
 LayoutDocument closeView(LayoutDocument doc, const std::string &viewId)
 {
-    doc = detachView(std::move(doc), viewId);
+    // The window is gone: its share goes back to every sibling in proportion, not to the next one.
+    doc = detachView(std::move(doc), viewId, true);
     doc.views.erase(viewId);
     return doc;
 }

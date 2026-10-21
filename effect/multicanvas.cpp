@@ -166,7 +166,7 @@ void TrellisEffect::syncOutputs()
             continue;
         auto canvas = std::make_unique<TrellisCanvas>(output);
         canvas->m_floatFirst = m_floatFirst;
-        canvas->m_placeAtPointer = m_placeAtPointer;
+        canvas->m_spawnTarget = m_spawnTarget;
         canvas->m_peekPx = m_peekPx;
         canvas->m_scratchpad = m_scratchpad;
         canvas->m_glide = m_glide;
@@ -701,7 +701,7 @@ void TrellisEffect::toggleBar()
 void TrellisEffect::applySettings(const trellis::config::Settings &settings)
 {
     m_floatFirst = settings.floatFirst;
-    m_placeAtPointer = settings.placeAtPointer;
+    m_spawnTarget = settings.spawnTarget;
     m_peekPx = settings.peek;
     m_mapPinned = settings.mapPinned;
     m_showMap = settings.map;
@@ -719,7 +719,7 @@ void TrellisEffect::applySettings(const trellis::config::Settings &settings)
     syncScratchShortcuts();
     for (const auto &canvas : m_canvases) {
         canvas->m_floatFirst = m_floatFirst;
-        canvas->m_placeAtPointer = m_placeAtPointer;
+        canvas->m_spawnTarget = m_spawnTarget;
         canvas->m_peekPx = m_peekPx;
         canvas->m_mapPinned = m_mapPinned;
         canvas->m_mapOn = m_showMap;

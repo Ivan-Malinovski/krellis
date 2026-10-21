@@ -99,6 +99,32 @@ private slots:
         QVERIFY(findStage(doc.root) && !findStage(doc.root)->child);
         QVERIFY(!doc.views.count("a"));
     }
+    void closeSharesProportionally()
+    {
+        auto root = L::row({L::panel({L::view("t", "a")}, "pa"), L::panel({L::view("t", "b")}, "pb"),
+                            L::panel({L::view("t", "c")}, "pc")},
+                           {1, 2, 1});
+        auto doc = closeView(createDocument(&root), "b");
+        QCOMPARE(doc.root->weights.size(), size_t(2));
+        QVERIFY(qAbs(doc.root->weights[0] - 0.5) < 1e-12);
+        // Open a column at the end, then close it again: the three columns are equal once more.
+        root = L::row({L::panel({L::view("t", "a")}, "pa"), L::panel({L::view("t", "b")}, "pb"),
+                       L::panel({L::view("t", "c")}, "pc")});
+        doc = createDocument(&root);
+        doc.views["n"] = ViewRecord{"t", {}, {}};
+        doc.root = applyDockTarget(doc.root, seamTarget(doc.root, 3), P("pn", {"n"}), "sn");
+        QCOMPARE(doc.root->children.size(), size_t(4));
+        doc = closeView(doc, "n");
+        QCOMPARE(doc.root->children.size(), size_t(3));
+        for (double w : doc.root->weights)
+            QVERIFY(qAbs(w - 1.0 / 3) < 1e-9);
+        // Detaching (a tab move, a transfer to another canvas's tab) still lets the next sibling absorb.
+        root = L::row({L::panel({L::view("t", "a")}, "pa"), L::panel({L::view("t", "b")}, "pb"),
+                       L::panel({L::view("t", "c")}, "pc")});
+        doc = detachView(createDocument(&root), "b");
+        QVERIFY(qAbs(doc.root->weights[0] - 1.0 / 3) < 1e-9);
+        QVERIFY(qAbs(doc.root->weights[1] - 2.0 / 3) < 1e-9);
+    }
     void detachAndAddTab()
     {
         auto doc = detachView(ide(), "b");

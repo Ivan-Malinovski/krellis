@@ -8,10 +8,13 @@
 // they cannot disagree about the file's shape.
 namespace trellis::config {
 
+// Where a new tiled window opens.
+enum class SpawnTarget { Pointer, Focused, End };
+
 struct Settings
 {
     bool floatFirst = false;      // new windows float; drops tile only at screen edges and corners
-    bool placeAtPointer = true;   // a new tiled window opens beside the tile under the cursor
+    SpawnTarget spawnTarget = SpawnTarget::Pointer; // beside the tile under the cursor | the focused tile | the end of the row
     double peek = 40;             // pixels of neighbouring tiles kept in view around a zoomed framing; 0 = off
     bool map = true;              // the minimap is available (it tucks itself away at the screen edge)
     bool mapPinned = false;       // the minimap stays out instead of sliding off the edge

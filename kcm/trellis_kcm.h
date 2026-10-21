@@ -34,7 +34,7 @@ class TrellisKcm : public KQuickConfigModule
 {
     Q_OBJECT
     Q_PROPERTY(bool floatFirst READ floatFirst WRITE setFloatFirst NOTIFY settingsChanged)
-    Q_PROPERTY(bool placeAtPointer READ placeAtPointer WRITE setPlaceAtPointer NOTIFY settingsChanged)
+    Q_PROPERTY(int spawnTarget READ spawnTarget WRITE setSpawnTarget NOTIFY settingsChanged) // 0 pointer, 1 focused, 2 end
     Q_PROPERTY(int peek READ peek WRITE setPeek NOTIFY settingsChanged)
     Q_PROPERTY(bool map READ map WRITE setMap NOTIFY settingsChanged)
     Q_PROPERTY(bool mapPinned READ mapPinned WRITE setMapPinned NOTIFY settingsChanged)
@@ -50,7 +50,7 @@ public:
     void defaults() override;
 
     bool floatFirst() const { return m_current.floatFirst; }
-    bool placeAtPointer() const { return m_current.placeAtPointer; }
+    int spawnTarget() const { return int(m_current.spawnTarget); }
     int peek() const { return int(m_current.peek); }
     bool map() const { return m_current.map; }
     bool mapPinned() const { return m_current.mapPinned; }
@@ -58,7 +58,7 @@ public:
     bool glide() const { return m_current.glide; }
     int landMs() const { return int(m_current.landMs); }
     void setFloatFirst(bool v) { edit([&] { m_current.floatFirst = v; }); }
-    void setPlaceAtPointer(bool v) { edit([&] { m_current.placeAtPointer = v; }); }
+    void setSpawnTarget(int v) { edit([&] { m_current.spawnTarget = trellis::config::SpawnTarget(std::clamp(v, 0, 2)); }); }
     void setPeek(int v) { edit([&] { m_current.peek = v; }); }
     void setMap(bool v) { edit([&] { m_current.map = v; }); }
     void setMapPinned(bool v) { edit([&] { m_current.mapPinned = v; }); }

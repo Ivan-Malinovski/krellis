@@ -26,7 +26,7 @@ NodePtr panelOfView(const LayoutDocument &doc, const std::string &viewId);
 
 NodePtr withViews(const NodePtr &panel, std::vector<std::string> views, std::string selected);
 
-LayoutDocument updatePanel(LayoutDocument doc, NodePtr panel);
+LayoutDocument updatePanel(LayoutDocument doc, NodePtr panel, bool keepProportions = false);
 LayoutDocument removePanel(LayoutDocument doc, const std::string &panelId, bool keepProportions = false);
 /// A vacancy is a docked panel with no views: the slot a window left when it was pulled out into float. It keeps
 /// its size so the neighbours stay put, and takes the next window dropped or opened there.
@@ -37,7 +37,7 @@ std::vector<std::string> vacancies(const NodePtr &root);
 std::optional<LayoutDocument> vacatePanel(const LayoutDocument &doc, const std::string &panelId);
 /// Put `panel` in the vacancy's slot.
 LayoutDocument fillVacancy(LayoutDocument doc, const std::string &vacancyId, NodePtr panel);
-LayoutDocument detachView(LayoutDocument doc, const std::string &viewId);
+LayoutDocument detachView(LayoutDocument doc, const std::string &viewId, bool keepProportions = false);
 LayoutDocument closeView(LayoutDocument doc, const std::string &viewId);
 LayoutDocument selectView(LayoutDocument doc, const std::string &viewId);
 LayoutDocument addTab(LayoutDocument doc, const std::string &panelId, const std::string &viewId,
