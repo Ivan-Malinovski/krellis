@@ -106,15 +106,19 @@ void TrellisCanvas::resizeAt(EffectWindow *w, QPointF pointer)
             if (self && root) {
                 const auto &a = self->rect, &b = root->rect;
                 const double eps = 0.5;
-                if (leftEdge && std::abs(a.x + a.w - (b.x + b.w)) < eps && state.painted.w - delta.x() < m_drawerCollapsePx) state.stash = trellis::Edge::Right;
-                else if (rightEdge && std::abs(a.x - b.x) < eps && state.painted.w + delta.x() < m_drawerCollapsePx) state.stash = trellis::Edge::Left;
-                else if (topEdge && std::abs(a.y + a.h - (b.y + b.h)) < eps && state.painted.h - delta.y() < m_drawerCollapsePx) state.stash = trellis::Edge::Bottom;
-                else if (bottomEdge && std::abs(a.y - b.y) < eps && state.painted.h + delta.y() < m_drawerCollapsePx) state.stash = trellis::Edge::Top;
+                std::optional<trellis::Edge> want;
+                if (leftEdge && std::abs(a.x + a.w - (b.x + b.w)) < eps && state.painted.w - delta.x() < m_drawerCollapsePx) want = trellis::Edge::Right;
+                else if (rightEdge && std::abs(a.x - b.x) < eps && state.painted.w + delta.x() < m_drawerCollapsePx) want = trellis::Edge::Left;
+                else if (topEdge && std::abs(a.y + a.h - (b.y + b.h)) < eps && state.painted.h - delta.y() < m_drawerCollapsePx) want = trellis::Edge::Bottom;
+                else if (bottomEdge && std::abs(a.y - b.y) < eps && state.painted.h + delta.y() < m_drawerCollapsePx) want = trellis::Edge::Top;
+                // Not where another display joins this one: the pointer crossing over would open the drawer.
+                if (want && drawerEdgeFree(*want)) state.stash = want;
             }
         }
     }
     relayout(false);
     m_camera.jump(state.camera);
+    updateMarquee(0);
 }
 
 void TrellisCanvas::finishResize(bool commit)

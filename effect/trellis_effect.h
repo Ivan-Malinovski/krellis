@@ -195,7 +195,7 @@ private:
     std::map<std::string, TRect> m_rememberedFloats;
     // Drawers: an edge tile resized to a sliver. It becomes an overlay float (its revealed rect) that rests mostly
     // past the screen edge, leaving `m_drawerStripPx` visible, and slides out while the pointer is over it.
-    struct Drawer { trellis::Edge edge; bool open = false; int seq = 0; }; // seq: stash order, which is the order along the edge
+    struct Drawer { trellis::Edge edge; bool open = false; int seq = 0; bool pinned = false; }; // seq: stash order, which is the order along the edge
     std::map<std::string, Drawer> m_drawers;
     double m_drawerStripPx = 12;     // sliver left in view while closed
     double m_drawerCollapsePx = 40;  // an edge tile squeezed thinner than this collapses
@@ -205,6 +205,8 @@ private:
     QString m_drawerTabsSignature;
     std::optional<TRect> drawerTab(const std::string &panel) const; // a closed drawer's tab on screen
     void updateDrawerTabs();
+    void setDrawerOpen(const std::string &panel, bool open, bool pinned = false); // slide a drawer out or back; pinned stays out until the pointer has visited it
+    bool drawerEdgeFree(trellis::Edge edge) const; // false where another display joins this one: a drawer there would open onto it
     void stashPanel(const std::string &panel, trellis::Edge edge, const TRect &from);
     TRect drawerMapRect(const std::string &panel, const trellis::Rect &open) const; // what the minimap draws of a float
     std::optional<TRect> drawerSlice(const std::string &panel) const; // what a closed drawer shows of its edge: its share of it
@@ -363,7 +365,9 @@ private:
     std::string m_rectCandidate;
     TRect m_candTarget, m_candShown;
     QString m_candLabel;
-    double m_bandOpacity = 0, m_candOpacity = 0;
+    double m_bandOpacity = 0, m_candOpacity = 0, m_squeezeOpacity = 0;
+    QRectF m_squeezeHint;  // the strip a squeezed edge tile would leave as a drawer (screen coordinates)
+    int m_squeezeEdge = 0;
     // Windows that have closed but are still painted while they fade out (kept alive by the ref).
     struct Closing {
         EffectWindowDeletedRef ref;

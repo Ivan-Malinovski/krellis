@@ -1146,8 +1146,15 @@ void TrellisCanvas::barAction(const QString &key)
                     if (w.panel == key.mid(10).toStdString())
                         return &w;
                 return nullptr;
-            }())
+            }()) {
+            // A drawer's sliver on the map slides it out, and keeps it out while the pointer is off at the map.
+            if (const std::string panel = t->panel; m_drawers.count(panel) && !m_drawers.at(panel).open) {
+                for (const auto &[other, d] : std::map<std::string, Drawer>(m_drawers))
+                    if (d.open) setDrawerOpen(other, false);
+                setDrawerOpen(panel, true, true);
+            }
             effects->activateWindow(t->window);
+        }
     } else if (key.startsWith(QLatin1String("framing:"))) {
         m_nav.goFraming(key.mid(8).toStdString());
     } else if (key.startsWith(QLatin1String("rm:"))) {
@@ -1789,7 +1796,23 @@ void TrellisCanvas::updateMarquee(double dt)
 {
     const bool live = m_drag == Drag::Rect;
     const bool hasCand = live && !m_rectCandidate.empty();
+    const bool hinting = m_resize && !m_resize->floating && m_resize->stash;
     const double k = dt > 0 ? 1 - std::exp(-dt / 0.07) : 0;
+    if (hinting) {
+        // Where the drawer would sit: a tab-thick strip of the edge, as long as the tile is.
+        const QRectF p(m_resize->painted.x, m_resize->painted.y, m_resize->painted.w, m_resize->painted.h);
+        const QRectF a = m_area;
+        const double t = m_drawerTabPx;
+        switch (*m_resize->stash) {
+        case trellis::Edge::Left: m_squeezeHint = QRectF(a.x(), p.y(), t, p.height()); break;
+        case trellis::Edge::Right: m_squeezeHint = QRectF(a.right() - t, p.y(), t, p.height()); break;
+        case trellis::Edge::Top: m_squeezeHint = QRectF(p.x(), a.y(), p.width(), t); break;
+        case trellis::Edge::Bottom: m_squeezeHint = QRectF(p.x(), a.bottom() - t, p.width(), t); break;
+        }
+        m_squeezeHint = m_squeezeHint.intersected(a);
+        m_squeezeEdge = int(*m_resize->stash);
+    }
+    m_squeezeOpacity += ((hinting ? 1.0 : 0.0) - m_squeezeOpacity) * (dt > 0 ? k : 1);
     m_bandOpacity += ((live && !m_rectBand.isEmpty() ? 1.0 : 0.0) - m_bandOpacity) * (dt > 0 ? k : 1);
     m_candOpacity += ((hasCand ? 1.0 : 0.0) - m_candOpacity) * (dt > 0 ? k : 0.5);
     if (hasCand) {
@@ -1801,7 +1824,7 @@ void TrellisCanvas::updateMarquee(double dt)
             m_candShown = trellis::lerpRect(m_candShown, m_candTarget, kc);
     }
     if (!m_marquee) {
-        if (!live)
+        if (!live && !hinting)
             return;
         m_marquee = std::make_unique<OffscreenQuickScene>();
         m_marquee->setSource(QUrl(QStringLiteral("qrc:/" TRELLIS_ID "/marquee.qml")));
@@ -1812,10 +1835,10 @@ void TrellisCanvas::updateMarquee(double dt)
         }
         m_marquee->setGeometry(Rect(m_area.toAlignedRect()));
     }
-    if (!live && m_bandOpacity < 0.01 && m_candOpacity < 0.01) {
+    if (!live && !hinting && m_bandOpacity < 0.01 && m_candOpacity < 0.01 && m_squeezeOpacity < 0.01) {
         const Rect g = m_marquee->geometry();
         m_marquee.reset();
-        m_bandOpacity = m_candOpacity = 0;
+        m_bandOpacity = m_candOpacity = m_squeezeOpacity = 0;
         effects->addRepaint(Region(g));
         return;
     }
@@ -1830,6 +1853,14 @@ void TrellisCanvas::updateMarquee(double dt)
     item->setProperty("cW", m_candShown.w);
     item->setProperty("cH", m_candShown.h);
     item->setProperty("cOpacity", m_candOpacity);
+    item->setProperty("hX", m_squeezeHint.x() - m_area.x());
+    item->setProperty("hY", m_squeezeHint.y() - m_area.y());
+    item->setProperty("hW", m_squeezeHint.width());
+    item->setProperty("hH", m_squeezeHint.height());
+    item->setProperty("hEdge", m_squeezeEdge);
+    item->setProperty("hOpacity", m_squeezeOpacity);
+    if (hinting)
+        item->setProperty("hLabel", QStringLiteral("Release to stash as a drawer"));
     if (hasCand)
         item->setProperty("cLabel", m_candLabel);
     effects->addRepaint(Region(m_marquee->geometry()));
@@ -2091,8 +2122,28 @@ void TrellisCanvas::updateSlot(double dt)
     effects->addRepaint(Region(m_slot->geometry()));
 }
 
+bool TrellisCanvas::drawerEdgeFree(trellis::Edge edge) const
+{
+    if (!m_output) return true;
+    const QRectF mine(m_output->geometry());
+    for (const auto &other : effects->screens()) {
+        if (other == m_output) continue;
+        const QRectF g(other->geometry());
+        const bool overlapX = std::min(g.right(), mine.right()) - std::max(g.left(), mine.left()) > 0;
+        const bool overlapY = std::min(g.bottom(), mine.bottom()) - std::max(g.top(), mine.top()) > 0;
+        switch (edge) {
+        case trellis::Edge::Left: if (overlapY && std::abs(g.right() - mine.left()) <= 1) return false; break;
+        case trellis::Edge::Right: if (overlapY && std::abs(g.left() - mine.right()) <= 1) return false; break;
+        case trellis::Edge::Top: if (overlapX && std::abs(g.bottom() - mine.top()) <= 1) return false; break;
+        case trellis::Edge::Bottom: if (overlapX && std::abs(g.top() - mine.bottom()) <= 1) return false; break;
+        }
+    }
+    return true;
+}
+
 void TrellisCanvas::stashPanel(const std::string &panel, trellis::Edge edge, const TRect &from)
 {
+    if (!drawerEdgeFree(edge)) return;
     const auto loc = trellis::locatePanel(m_doc, panel);
     if (loc.where != trellis::PanelLocation::Where::Docked || leafIds(m_doc.root).size() < 2) return;
     // Revealed, it keeps the tile's own size and hugs the edge it slides out of; the neighbours reflow into the tile's place.
@@ -2125,7 +2176,10 @@ void TrellisCanvas::stashActive()
     const TRect from = visualRect(t.window, &opacity).value_or(screenRect(t.panel));
     // Always a side one: the top and bottom edges are where the panels sit. Drawers on a side stack.
     const double cx = from.x + from.w / 2 - m_area.x();
-    const trellis::Edge edge = cx <= m_area.width() - cx ? trellis::Edge::Left : trellis::Edge::Right;
+    // A side that joins another display is out (the pointer crossing over would open the drawer): take the other one.
+    trellis::Edge edge = cx <= m_area.width() - cx ? trellis::Edge::Left : trellis::Edge::Right;
+    if (!drawerEdgeFree(edge)) edge = edge == trellis::Edge::Left ? trellis::Edge::Right : trellis::Edge::Left;
+    if (!drawerEdgeFree(edge)) return;
     if (loc.where == trellis::PanelLocation::Where::Docked) {
         if (!rulesFor(t.window).floating) return;
         stashPanel(t.panel, edge, from);
@@ -2162,6 +2216,24 @@ void TrellisCanvas::forgetDrawer(const std::string &panel)
         if (t.panel == panel) effects->setElevatedWindow(t.window, false);
 }
 
+void TrellisCanvas::setDrawerOpen(const std::string &panel, bool open, bool pinned)
+{
+    const auto d = m_drawers.find(panel);
+    if (d == m_drawers.end() || d->second.open == open) return;
+    for (const auto &t : m_windows) {
+        if (t.panel != panel) continue;
+        double opacity = 1;
+        const TRect from = visualRect(t.window, &opacity).value_or(floatScreen(panel).value_or(screenRect(panel)));
+        d->second.open = open;
+        d->second.pinned = open && pinned;
+        effects->setElevatedWindow(t.window, open); // paint above the other slivers
+        if (open) m_doc = trellis::raiseFloat(m_doc, panel);
+        relayout(true);
+        startFlight(t.window, FlightKind::Glide, from, {}, opacity);
+        return;
+    }
+}
+
 void TrellisCanvas::updateDrawerHover(const PointerMotionEvent &event)
 {
     if (m_drawers.empty() || m_session || m_resize || event.buttons != Qt::NoButton) return;
@@ -2175,20 +2247,14 @@ void TrellisCanvas::updateDrawerHover(const PointerMotionEvent &event)
             if (const auto tab = drawerTab(panel)) zone = zone.united(QRectF(tab->x, tab->y, tab->w, tab->h));
         }
         const bool want = zone.contains(event.position);
+        if (d.pinned) { // opened from the minimap: it stays until the pointer has been over it and left
+            if (want) d.pinned = false;
+            continue;
+        }
         if (want == d.open) continue;
         // Only one slides out at a time: one still open keeps the pointer until it leaves.
         if (want && std::any_of(m_drawers.begin(), m_drawers.end(), [](const auto &o) { return o.second.open; })) continue;
-        for (const auto &t : m_windows) {
-            if (t.panel != panel) continue;
-            double opacity = 1;
-            const TRect from = visualRect(t.window, &opacity).value_or(*r);
-            d.open = want;
-            effects->setElevatedWindow(t.window, want); // paint above the other slivers
-            if (want) m_doc = trellis::raiseFloat(m_doc, panel);
-            relayout(true);
-            startFlight(t.window, FlightKind::Glide, from, {}, opacity);
-            break;
-        }
+        setDrawerOpen(panel, want);
         return; // relayout may have invalidated the map iteration
     }
 }
@@ -2365,6 +2431,18 @@ QString TrellisCanvas::dump()
                          .arg(m_map->size().width()).arg(m_map->size().height())
                          .arg(m_map->rootItem()->width()).arg(m_map->rootItem()->height())
                          .arg(m_map->rootItem()->property("slide").toDouble(), 0, 'f', 2).arg(m_mapPinned);
+        if (m_map)
+            for (const auto &f : m_doc.floating) {
+                if (!m_drawers.count(f.panel->id)) continue;
+                // Where the drawer's tile sits on screen in the minimap, for clicking it.
+                const TRect t = drawerMapRect(f.panel->id, f.rect);
+                const QRectF stage = m_map->rootItem()->property("stageRect").toRectF().translated(m_map->geometry().x(), m_map->geometry().y());
+                lines << QStringLiteral("MAPTILE %1 at %2,%3 %4x%5").arg(QString::fromStdString(f.panel->id)).arg(stage.x() + t.x * stage.width(), 0, 'f', 1)
+                             .arg(stage.y() + t.y * stage.height(), 0, 'f', 1).arg(t.w * stage.width(), 0, 'f', 1).arg(t.h * stage.height(), 0, 'f', 1);
+            }
+        if (m_squeezeOpacity > 0.01)
+            lines << QStringLiteral("SQUEEZE edge %1 at %2,%3 %4x%5 opacity %6").arg(m_squeezeEdge).arg(m_squeezeHint.x(), 0, 'f', 1).arg(m_squeezeHint.y(), 0, 'f', 1)
+                         .arg(m_squeezeHint.width(), 0, 'f', 1).arg(m_squeezeHint.height(), 0, 'f', 1).arg(m_squeezeOpacity, 0, 'f', 2);
         lines << QStringLiteral("ORDER ") + order.join(QLatin1Char(' '));
     }
     for (EffectWindow *w : effects->stackingOrder()) {
