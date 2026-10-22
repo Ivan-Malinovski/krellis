@@ -409,6 +409,7 @@ private:
     krellis::RectMap m_lastRects; // what was drawn last frame; rebuilt by refreshRects()
     void refreshRects();
     std::unique_ptr<class OffscreenQuickScene> m_slot;
+    bool m_overlaysCovered = false; // a fullscreen window is up: the overlay scenes are hidden, they would draw over it
     double m_slotOpacity = 0;
     // Action toast: text, the frame-clock time it started, and whether it replaces a visible one.
     std::unique_ptr<class OffscreenQuickScene> m_toast;

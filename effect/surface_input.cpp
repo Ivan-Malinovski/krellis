@@ -61,6 +61,8 @@ std::optional<KrellisEffect::SurfaceHit> KrellisEffect::surfaceHit(QPointF point
     for (auto it = stacking.rbegin(); it != stacking.rend(); ++it) {
         auto *w = *it;
         if (w->isDeleted() || w->isMinimized() || w->isHidden() || !w->isOnCurrentDesktop() || !w->isOnCurrentActivity()) continue;
+        // A fullscreen window is not transformed: KWin routes input to it, and nothing beneath may take it.
+        if (w->isFullScreen() && owner(w) && w->frameGeometry().contains(point)) return std::nullopt;
         if (auto hit = hitWindow(w, false)) return hit;
         // A float's resize band belongs to it even where another window lies underneath; a docked tile's band
         // is only offered below, when no body is under the pointer (it would overlap its neighbours).

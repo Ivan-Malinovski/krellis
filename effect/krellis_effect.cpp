@@ -351,6 +351,19 @@ void KrellisCanvas::watch(EffectWindow *w)
         });
     });
     connect(w, &EffectWindow::minimizedChanged, this, &KrellisCanvas::minimizedChanged);
+    // A video going fullscreen (Brave, mpv) must really cover the output, so it is drawn and placed by KWin
+    // while it lasts; leaving it hands the window back to its tile.
+    connect(w, &EffectWindow::windowFullScreenChanged, this, [this](EffectWindow *win) {
+        if (m_unloading) return;
+        m_landings.erase(win);
+        if (auto *t = trackedFor(win); t && !win->isFullScreen()) t->requested.reset();
+        applyRest();
+        QPointer<EffectWindow> guard(win);
+        QTimer::singleShot(0, this, [this, guard] { // KWin restores its remembered geometry after the signal
+            if (guard && !m_unloading && !guard->isFullScreen()) applyRest();
+        });
+        schedule();
+    });
     connect(w, &EffectWindow::windowStartUserMovedResized, this, &KrellisCanvas::userMoveStarted);
     connect(w, &EffectWindow::windowStepUserMovedResized, this, [this](EffectWindow *win) {
         if (!m_dragFromKWin || win != m_dragWindow)
@@ -710,8 +723,8 @@ void KrellisCanvas::applyRest(bool stepping)
     };
     for (auto &t : m_windows) {
         Window *window = t.window->window();
-        if (!window || t.window->isMinimized() || t.window->isUserMove() || t.window->isUserResize() || hidden(t.panel))
-            continue;
+        if (!window || t.window->isMinimized() || t.window->isFullScreen() || t.window->isUserMove() || t.window->isUserResize() || hidden(t.panel))
+            continue; // a fullscreen window covers its output by KWin's rule, not ours
         // While a drag previews a drop, the other windows really take their previewed size, so the
         // client redraws crisply instead of being stretched; the lifted one keeps its own.
         const TRect *previewed = previewing ? worldRect(t.panel) : nullptr;
@@ -980,7 +993,7 @@ static QString sceneKey(const std::unique_ptr<OffscreenQuickScene> &scene, QPoin
     return out.toString();
 }
 
-bool KrellisCanvas::overUi(QPointF p) const { return sceneContains(m_bar, p) || (m_mapOn && sceneContains(m_map, p)); }
+bool KrellisCanvas::overUi(QPointF p) const { return !m_overlaysCovered && (sceneContains(m_bar, p) || (m_mapOn && sceneContains(m_map, p))); }
 
 QString KrellisCanvas::barKey(QPointF pointer) const
 {
@@ -1415,6 +1428,10 @@ void KrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
 {
     const auto ms = m_clock.tick(data.view).count();
     m_nowMs += double(ms);
+    // The scenes live in KWin's overlay item, above every window, a fullscreen one included.
+    m_overlaysCovered = std::any_of(m_windows.begin(), m_windows.end(), [](const Tracked &t) { return t.window->isFullScreen() && !t.window->isMinimized(); });
+    for (auto *scene : {&m_bar, &m_map, &m_tileScene, &m_drawerTabs, &m_slot, &m_toast, &m_sheet, &m_marquee})
+        if (*scene) (*scene)->setVisible(!m_overlaysCovered);
     m_layerTarget = layerShown() ? 1 : 0;
     if (m_layerDim != m_layerTarget) {
         const double step = double(ms) / 180.0; // the dim eases in and out in about a fifth of a second
@@ -1566,7 +1583,7 @@ void KrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp
 // The content is already laid out at the new size, so nothing is re-flowed mid-animation.
 void KrellisCanvas::frameChanged(EffectWindow *w, const RectF &old)
 {
-    if (m_glide || m_landMs <= 0 || (m_session && w == m_dragWindow) || m_resize || m_flights.count(w) || !trackedFor(w)) return;
+    if (m_glide || m_landMs <= 0 || (m_session && w == m_dragWindow) || m_resize || m_flights.count(w) || !trackedFor(w) || w->isFullScreen()) return;
     if (w->isUserMove() || w->isUserResize() || w->isMinimized() || w->isHidden()) return;
     const QRectF now = w->frameGeometry();
     if (old.width() <= 0 || old.height() <= 0 || now.width() <= 0 || now.height() <= 0) return;
@@ -1585,7 +1602,7 @@ void KrellisCanvas::frameChanged(EffectWindow *w, const RectF &old)
 bool KrellisCanvas::awaitingLanding(const Tracked &t) const
 {
     const EffectWindow *w = t.window;
-    if (!t.requested || w->isMinimized() || w->isHidden() || m_flights.count(t.window)) return false;
+    if (!t.requested || w->isMinimized() || w->isHidden() || w->isFullScreen() || m_flights.count(t.window)) return false;
     if (m_nowMs - t.requestedMs >= LandingPatienceMs) return false;
     const QRectF frame = w->frameGeometry();
     if (frame.width() <= 0 || frame.height() <= 0 || t.requested->width() <= 0) return false;
@@ -1606,6 +1623,7 @@ std::optional<TRect> KrellisCanvas::visualRect(EffectWindow *w, double *opacity)
     if (m_closing.count(w)) return std::nullopt;
     for (const auto &t : m_windows) {
         if (t.window != w) continue;
+        if (w->isFullScreen()) return std::nullopt; // painted and hit-tested untransformed, as KWin places it
         TRect rect = screenRect(t.panel);
         double alpha = 1;
         if (m_session && m_session->active() && w == m_dragWindow)
