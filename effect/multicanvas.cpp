@@ -752,7 +752,40 @@ void KrellisEffect::focusDirection(const QString &direction)
 void KrellisEffect::moveDirection(const QString &direction)
 {
     markSessionInteraction();
-    if (const auto dir = parseDirection(direction)) if (auto *canvas = current()) canvas->moveDirection(*dir);
+    const auto dir = parseDirection(direction);
+    auto *canvas = dir ? current() : nullptr;
+    if (!canvas || canvas->moveDirection(*dir)) return;
+    // Already at the edge of this output: carry the window on to the output beside it, entering at the near edge.
+    auto *window = effects->activeWindow();
+    auto *target = outputBeside(canvas, *dir);
+    if (!window || !target || owner(window) != canvas) return;
+    transfer(window, target);
+    target->enterFrom(window, krellis::oppositeEdge(*dir));
+    effects->activateWindow(window);
+}
+// The canvas whose output lies next to `from`'s on the `dir` side: it must share some of its extent, and the
+// nearest one wins (then the one sharing most).
+KrellisCanvas *KrellisEffect::outputBeside(KrellisCanvas *from, krellis::Edge dir) const
+{
+    const QRectF g(from->m_output->geometry());
+    const bool horizontal = krellis::edgeAxis(dir) == krellis::Axis::X;
+    KrellisCanvas *best = nullptr;
+    double bestGap = 0, bestOverlap = 0;
+    for (const auto &canvas : m_canvases) {
+        if (canvas.get() == from || !effects->screens().contains(canvas->m_output)) continue;
+        const QRectF r(canvas->m_output->geometry());
+        const double gap = dir == krellis::Edge::Right ? r.left() - g.right() : dir == krellis::Edge::Left ? g.left() - r.right()
+                         : dir == krellis::Edge::Bottom ? r.top() - g.bottom() : g.top() - r.bottom();
+        const double overlap = horizontal ? std::min(g.bottom(), r.bottom()) - std::max(g.top(), r.top())
+                                          : std::min(g.right(), r.right()) - std::max(g.left(), r.left());
+        if (gap < -1 || overlap <= 0) continue;
+        if (!best || gap < bestGap - 1 || (std::abs(gap - bestGap) <= 1 && overlap > bestOverlap)) {
+            best = canvas.get();
+            bestGap = gap;
+            bestOverlap = overlap;
+        }
+    }
+    return best;
 }
 bool KrellisEffect::resizeStep(const QString &direction, double fraction)
 {

@@ -186,18 +186,32 @@ void KrellisCanvas::focusDirection(krellis::Edge dir)
     applyRest();
 }
 
-void KrellisCanvas::moveDirection(krellis::Edge dir)
+bool KrellisCanvas::moveDirection(krellis::Edge dir)
 {
     if (m_resize) finishResize(false);
     std::vector<std::string> panels;
     for (const auto &t : m_windows) panels.push_back(t.panel);
     const std::string panel = dockedPanelOf(*this, m_doc, activeIndex(), panels);
-    if (panel.empty() || m_session) return;
+    if (panel.empty() || m_session) return true;
     bool moved = false;
     auto next = krellis::moveInDirection(m_doc, panel, dir, layoutMetrics(), &moved);
-    if (!moved) return;
+    if (!moved) return false;
     EditScope edit(*this, "move tile");
     m_doc = std::move(next);
+    relayout(true);
+    m_nav.reveal(panel);
+    applyRest();
+    return true;
+}
+
+void KrellisCanvas::enterFrom(EffectWindow *w, krellis::Edge entry)
+{
+    const auto *tracked = trackedFor(w);
+    if (!tracked || m_session) return;
+    const std::string panel = tracked->panel;
+    if (krellis::locatePanel(m_doc, panel).where != krellis::PanelLocation::Where::Docked) return;
+    EditScope edit(*this, "move tile");
+    m_doc = krellis::dockAtEdge(std::move(m_doc), panel, entry);
     relayout(true);
     m_nav.reveal(panel);
     applyRest();

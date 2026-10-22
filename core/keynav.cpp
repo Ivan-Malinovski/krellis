@@ -17,16 +17,6 @@ double hi(const Rect &r, Axis a) { return a == Axis::X ? r.x + r.w : r.y + r.h; 
 
 Axis crossAxis(Axis a) { return a == Axis::X ? Axis::Y : Axis::X; }
 
-Edge opposite(Edge e)
-{
-    switch (e) {
-    case Edge::Left: return Edge::Right;
-    case Edge::Right: return Edge::Left;
-    case Edge::Top: return Edge::Bottom;
-    default: return Edge::Top;
-    }
-}
-
 // Where a panel stepping `dir` into `target` lands, as if it were dropped in the middle of that tile: the tile
 // splits along its longer side (a square counts as wide). Entering along that side the panel takes the half it
 // came through; entering across it, the half on its own side of the tile's middle (level with it counts as after).
@@ -35,7 +25,7 @@ Edge landingEdge(const Rect &origin, const Rect &target, Edge dir, const LayoutM
     const double w = target.w * (metrics.width > 0 ? metrics.width : 1), h = target.h * (metrics.height > 0 ? metrics.height : 1);
     const Axis along = w >= h ? Axis::X : Axis::Y;
     if (edgeAxis(dir) == along)
-        return opposite(dir);
+        return oppositeEdge(dir);
     const double mine = (lo(origin, along) + hi(origin, along)) / 2, middle = (lo(target, along) + hi(target, along)) / 2;
     if (along == Axis::X)
         return mine < middle - kEps ? Edge::Left : Edge::Right;
@@ -144,13 +134,21 @@ LayoutDocument moveInDirection(LayoutDocument doc, const std::string &panelId, E
     // A panel that is flush with the edge inside a split along another axis can still pop out of that column.
     if (alone || (flush && (!parent || parent->axis == axis)))
         return doc;
-    doc = removePanel(std::move(doc), panelId, true);
-    if (!doc.root)
-        return doc;
-    doc = insertPanel(std::move(doc), panel, DockTarget::beside(doc.root->id, dir, 0.3));
+    doc = dockAtEdge(std::move(doc), panelId, dir);
     if (moved)
         *moved = true;
     return doc;
+}
+
+LayoutDocument dockAtEdge(LayoutDocument doc, const std::string &panelId, Edge edge)
+{
+    const NodePtr panel = findNode(doc.root, panelId);
+    if (!panel || panelsOf(doc.root).size() < 2)
+        return doc;
+    doc = removePanel(std::move(doc), panelId, true);
+    if (!doc.root)
+        return doc;
+    return insertPanel(std::move(doc), panel, DockTarget::beside(doc.root->id, edge, 0.3));
 }
 
 NodePtr resizeInDirection(const NodePtr &root, const LayoutMetrics &metrics, const std::string &panelId, Edge dir,

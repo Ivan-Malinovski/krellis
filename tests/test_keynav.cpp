@@ -113,6 +113,17 @@ private slots:
         QVERIFY(e.at("c").rect.x > e.at("a").rect.x);
         QVERIFY(e.at("a").rect.h > 0.99);
     }
+    void dockAtEdgeTakesTheWholeSide()
+    {
+        auto root = makeSplit("r", Axis::X, {makeSplit("s", Axis::Y, {P("a"), P("b")}), P("c")});
+        const auto d = dockAtEdge(docOf(root), "b", Edge::Left);
+        const auto e = layoutRects(d.root);
+        QCOMPARE(e.at("b").rect.x, 0.0);
+        QVERIFY(e.at("b").rect.h > 0.99);
+        QCOMPARE(panelsOf(d.root).size(), size_t(3));
+        // A lone panel has nowhere to go.
+        QCOMPARE(dockAtEdge(docOf(P("only")), "only", Edge::Left).root->id, std::string("only"));
+    }
     void flushPanelStaysPut()
     {
         bool moved = true;

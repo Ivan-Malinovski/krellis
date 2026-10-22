@@ -21,6 +21,15 @@ enum class Edge { Left, Right, Top, Bottom };
 
 inline Axis edgeAxis(Edge e) { return (e == Edge::Left || e == Edge::Right) ? Axis::X : Axis::Y; }
 inline bool edgeBefore(Edge e) { return e == Edge::Left || e == Edge::Top; }
+inline Edge oppositeEdge(Edge e)
+{
+    switch (e) {
+    case Edge::Left: return Edge::Right;
+    case Edge::Right: return Edge::Left;
+    case Edge::Top: return Edge::Bottom;
+    default: return Edge::Top;
+    }
+}
 
 struct Node;
 using NodePtr = std::shared_ptr<const Node>;

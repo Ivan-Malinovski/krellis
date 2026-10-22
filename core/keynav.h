@@ -19,6 +19,10 @@ std::string neighbourInDirection(const Entries &entries, const std::string &from
 LayoutDocument moveInDirection(LayoutDocument doc, const std::string &panelId, Edge dir, const LayoutMetrics &metrics,
                                bool *moved = nullptr);
 
+/// Dock a panel along `edge` of the whole layout as a new full-height (or full-width) slot. Unchanged when it is
+/// the only panel.
+LayoutDocument dockAtEdge(LayoutDocument doc, const std::string &panelId, Edge edge);
+
 /// Move the divider on the `dir` side of the panel one step towards `dir` (growing the panel); when the
 /// panel has no neighbour that way, its opposite divider moves instead (shrinking it). `fraction` is the
 /// step as a share of the panel's own size. Returns the new root, or null when no divider can move.

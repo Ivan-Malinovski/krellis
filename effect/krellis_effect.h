@@ -136,7 +136,10 @@ public Q_SLOTS:
     void toggleDockActive();
     // Keyboard navigation (directions are screen sides): act on the active window.
     void focusDirection(krellis::Edge dir);
-    void moveDirection(krellis::Edge dir);
+    // False when the active tile is docked but cannot move that way (it is at the edge): the caller may hand it on.
+    bool moveDirection(krellis::Edge dir);
+    // The window just arrived from the output on the `entry` side: dock it along that edge of the layout.
+    void enterFrom(EffectWindow *w, krellis::Edge entry);
     bool resizeStep(krellis::Edge dir, double fraction);
     bool undoRedo(bool redo); // false when there is nothing to do or an edit is in progress (both say so in a toast)
     void clearHistory() { m_history.clear(); }
@@ -638,6 +641,7 @@ private:
     QList<QAction *> m_scratchActions;
     bool m_scratchpad = false;
     void transfer(EffectWindow *window, KrellisCanvas *target);
+    KrellisCanvas *outputBeside(KrellisCanvas *from, krellis::Edge dir) const;
     KrellisCanvas *canvasAt(QPointF point) const;
     KrellisCanvas *owner(EffectWindow *window) const;
     KrellisCanvas *current() const;
