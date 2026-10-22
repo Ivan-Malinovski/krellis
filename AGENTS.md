@@ -1,14 +1,23 @@
 # Krellis
 
-Krellis (formerly kwin-trellis, renamed 2026-10-22; "Krellis" = KDE + Trellis) is a port of DanFessler/trellis (infinite-canvas "desktop": camera over a tiled layout, springs, docking, minimap) to KDE Plasma 6 / KWin Wayland. Clean-room: follow the semantics of the Trellis TypeScript, do not copy its code (noncommercial license). Reference sources are read-only at `~/dev/trellis_kde/trellis/packages/core/src/`.
+Krellis ("KDE + Trellis") is a port of DanFessler/trellis (infinite-canvas "desktop": camera over a tiled layout, springs, docking, minimap) to KDE Plasma 6 / KWin Wayland, MIT licensed and public at github.com/Ivan-Malinovski/krellis (branch `master`, release `v0.0.1`). It was formerly called kwin-trellis. The goal behind it: Ivan liked Hyprland but found it not mouse-friendly enough, and wanted that plus Trellis in KDE. The whole code base is AI-written ("vibe coded"); the README says so.
+
+Clean-room: follow the semantics of the Trellis TypeScript, do not copy its code (noncommercial license). Reference sources are read-only at `~/dev/trellis_kde/trellis/packages/core/src/` on Ivan's machine; they are not part of this repo.
+
+User-facing docs are `README.md` (install, keys, settings, safety) and `CHANGELOG.md`. Keep them in step when behaviour, shortcuts or settings change. This file is the developer guide.
 
 ## Layout
 
 - `core/`: pure C++20 model library `krellis_core` (no Qt GUI, no KWin). tree, document, spatial (focus layout, framing, docking targets), resize (push drags), motion (springs, tweens, easing), builder, navigator (camera state machine).
-- `tests/`: QtTest, one executable per core module. Ported from the Krellis tests where they exist.
+- `effect/`: the KWin effect (`KrellisEffect` coordinator, one `KrellisCanvas` per output, input, painting, QML overlays).
+- `config/`: `krellis_config`, the one reader/writer of `krellisrc` (see Settings GUI).
+- `kcm/`: the System Settings module (`kcm_krellis`).
+- `tests/`: QtTest, one executable per core module (`ctest`).
+- `scenarios/`: nested-KWin test scripts (about 100 files, with `.rc` seeds and small Qt clients).
+- `tools/`: `nested.sh` (nested harness, exports `KRELLIS_ROOT`; scenarios use it instead of absolute paths), `shot`, `preview.sh`, `live.sh`, and Ivan's dev installer `install.sh` / `uninstall.sh`.
+- `install.sh` (repo root): the public installer (see Installing).
 - `spikes/hello/`: minimal out-of-tree KWin effect used to prove the toolchain.
-- `tools/nested.sh`, `tools/shot`: nested-KWin test harness and screenshots.
-- `third_party/`: ECM, Vulkan headers and the KWin 6.7 source (gitignored, local workaround for missing dev packages).
+- `third_party/`: ECM, Vulkan headers and the KWin 6.7 source on Ivan's machine only (gitignored, a workaround for missing dev packages). A normal checkout has none of it and uses system packages.
 
 ## Build and test
 
@@ -17,17 +26,23 @@ Core only (fast, no KWin needed):
     cmake -S . -B build-core -G Ninja -DCMAKE_BUILD_TYPE=Debug
     cmake --build build-core && ctest --test-dir build-core --output-on-failure
 
-KWin effect (needs `PATH=$HOME/.local/bin:$PATH`):
+KWin effect (with system dev packages; see README Requirements):
 
-    cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_PREFIX_PATH=$PWD/third_party/ecm-prefix \
-      -DVulkan_INCLUDE_DIR=$PWD/third_party/vulkan-headers/include
+    cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DKRELLIS_BUILD_EFFECT=ON
+
+On Ivan's machine the KWin dev files are not installed system-wide, so add `PATH=$HOME/.local/bin:$PATH` and
+`-DCMAKE_PREFIX_PATH=$PWD/third_party/ecm-prefix -DVulkan_INCLUDE_DIR=$PWD/third_party/vulkan-headers/include`.
 
 ## Testing effects safely
 
 Never load experimental effects into the live session. Use the nested compositor:
 
     tools/nested.sh <plugin-root> <effect-id,...> <scenario-script> [width height]
+
+Typical unattended run (results in `$NEST_WORK/out/log.txt`; redirect output to a file and never pipe it to `tail`):
+
+    NEST_OUTPUTS=2 KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 NEST_BACKEND=virtual NEST_SOCKET=krellis-test-X NEST_WORK=/tmp/krellis-X \
+      tools/nested.sh build/root krellis scenarios/<name>.sh 1280 800 >out 2>&1 </dev/null
 
 Set `NEST_BACKEND=virtual` to render off-screen: no window opens on Ivan's desktop, so automated runs cannot steal focus (verified with `basic.sh`; always use this for unattended tests, and a distinct `NEST_SOCKET`/`NEST_WORK` when his preview is running). Only `tools/preview.sh` should use the default windowed backend.
 
@@ -50,7 +65,7 @@ It runs its own D-Bus session and throwaway `XDG_CONFIG_HOME`, socket `krellis-n
 
 ## Current implementation
 
-The ordered implementation list received implementations, but full desktop-demo parity is not complete; real-hardware input, fractional scaling and unusual monitor layouts remain unverified. `KrellisEffect` coordinates independent `KrellisCanvas` instances per output. `effect/surface_input.cpp` implements scaled Wayland input and popup transforms; `effect/view_rules.cpp`, `bar.qml`, and `tiles.qml` implement rules, framing names and small icon tiles. `effect/persistence.cpp` and `session_store.cpp` provide session storage backed by pure model rebinding in `core/session.cpp`.
+Full desktop-demo parity is not complete; real-hardware input, fractional scaling and unusual monitor layouts remain unverified. `KrellisEffect` coordinates independent `KrellisCanvas` instances per output. `effect/surface_input.cpp` implements scaled Wayland input and popup transforms; `effect/view_rules.cpp`, `bar.qml`, and `tiles.qml` implement rules, framing names and small icon tiles. `effect/persistence.cpp` and `session_store.cpp` provide session storage backed by pure model rebinding in `core/session.cpp`.
 
 Animations: camera spring 210/29; layout 460 ms easeOutQuint; appear 220 ms; dock hide 300 ms; restore 380 ms; close 180 ms. Keep every visible transition animated.
 
@@ -96,7 +111,7 @@ Follow `~/AGENTS.md`: no pushes, no commits unless asked, no secrets.
 
 ## Audit corrections
 
-Stage-relative floating, the original launcher/magnifying dock, collapsed-group detail and reduced motion remain gaps. Lifecycle, interrupted flights and native resize now have implementations and nested coverage; see the latest HANDOFF.md continuation notes. No install rule/package exists. Do not infer subjective polish or full parity from scenario exit codes or matching timing constants.
+Stage-relative floating, the original launcher/magnifying dock and collapsed-group detail remain gaps (reduced motion exists as the `glide` setting). Lifecycle, interrupted flights and native resize have implementations and nested coverage. Installation is covered by `install.sh` (no distro package yet). Do not infer subjective polish or full parity from scenario exit codes or matching timing constants.
 
 - Nested native-state fixtures use KWin scripting with `console.warn` and the harness forces Qt stderr logging, keeping snapshots in its own `out/kwin.log`. Do not inspect the live session journal for test output. Set `WAYLAND_DISPLAY=$NEST_SOCKET` inside the scenario; the incoming display belongs to the outer compositor.
 - Before recording fixture geometry, wait for native Wayland configure commits, then minimize in a separate script turn. A requested rectangle and committed frame can differ while a client is hidden.
@@ -120,10 +135,11 @@ Stage-relative floating, the original launcher/magnifying dock, collapsed-group 
 
 ## Installing and trying it on the live desktop (2026-10-20)
 
+- **Two installers.** The public one is `./install.sh` in the repo root (`--prefix`, `--no-kcm`, `--enable`, `--uninstall`; builds in `build-release/`, honours `DESTDIR`, `CMAKE_ARGS`, `BUILD_DIR`; with `DESTDIR` set it skips every D-Bus/kwriteconfig action; `--uninstall` follows `install_manifest.txt`). Tested only as a staged `DESTDIR` install. The notes below are about Ivan's dev installer `tools/install.sh`.
 - `tools/install.sh` builds in `build-live/` and runs `sudo cmake --install --prefix /usr`, putting `krellis_<stamp>.so` in `/usr/lib/qt6/plugins/kwin/effects/plugins/` (older `krellis*.so` are removed). Every install uses a fresh plugin id (`-DKRELLIS_ID`; also the .so name and the `qrc:/<id>/` prefix) because KWin never re-reads a plugin file it has already mapped, so reusing `krellis.so` kept the old code running until a logout. `tools/live.sh on` unloads whatever Krellis is loaded and loads the newest installed id; `status` compares the running `version` D-Bus stamp with the installed file. The harness keeps the default id `krellis`. KWin only searches the system Qt plugin path (`/usr/lib/qt6/plugins`); a `~/.local` install is not found. ECM's own plugin dir resolves to `lib/plugins` here, so `effect/CMakeLists.txt` uses `KRELLIS_PLUGIN_DIR` (`lib/qt6/plugins`). The installed library has no RPATH.
-- Installing does not enable it (`EnabledByDefault` false). `tools/live.sh on|off|status` loads/unloads it through `/Effects` and writes nothing to kwinrc, so a logout or KWin restart clears it. `tools/uninstall.sh` removes the file.
+- Installing does not enable it (`EnabledByDefault` false). `tools/live.sh on|off|status` loads/unloads it through `/Effects` and writes nothing to kwinrc, so a logout or KWin restart clears it. `tools/uninstall.sh` removes the files.
 - Emergency exit: global shortcut Meta+Alt+Escape ("Krellis: Turn Off", D-Bus `turnOff`) unloads the effect; `scenarios/turnoff.sh` shows windows return to native geometry. The ABI is locked to KWin 6.7.5, so reinstall after every KWin upgrade, and never enable the effect permanently across an upgrade without rebuilding.
-- Do not run `install.sh`, `live.sh on` or any `sudo` from an agent session unprompted; Ivan runs them (`! tools/install.sh`). A crash of the effect would take down every Wayland app, including the agent's terminal.
+- Do not run either `install.sh`, `live.sh on` or any `sudo` from an agent session unprompted; Ivan runs them (`! tools/install.sh`). A crash of the effect would take down every Wayland app, including the agent's terminal.
 
 ## Bar, shortcuts and drag sizing (2026-10-20)
 
@@ -159,7 +175,7 @@ Ivan runs two outputs (DP-2 3440x1440 landscape, HDMI-A-1 1440x2560 portrait to 
 
 Re-reading `examples/desktop/src` (App.tsx, desktop.ts, AppWindow.tsx): the demo mounts `<Workspace floating="stage">` with an empty `<Stage>` as the desktop, every app type has `placement="float"`, and `launch` opens windows as stage floats cascaded over the desktop. Tiling is the secondary mode: dragging a window past the stage edge docks it beside the desktop, the green button / "Dock Beside Desktop" calls `toggleDock`, and "Maximize" (frame the panel) is offered only for docked windows. Floats are stage-relative (they follow the camera and zoom with the desktop).
 
-The effect only has viewport-fixed Overlay floats (`floatingLayer()` returns Overlay, `floatWorld` returns nothing). A tiled window can therefore never be dragged into a float; only Meta+Shift+D or a `placement=floating` rule makes one, and an existing float re-docks when released within the overlay edge band. Matching the demo means a Stage-as-desktop mode: `floatingLayer()` = Stage, an empty Stage root, `floatWorld`/`floatScreen` for stage floats, new windows opening as stage floats, and stage floats in persistence, resize and painting. Not built yet; see the open decision in docs/dev/HANDOFF.md.
+The effect only has viewport-fixed Overlay floats (`floatingLayer()` returns Overlay, `floatWorld` returns nothing). A tiled window can therefore never be dragged into a float; only Meta+Shift+D or a `placement=floating` rule makes one, and an existing float re-docks when released within the overlay edge band. Matching the demo means a Stage-as-desktop mode: `floatingLayer()` = Stage, an empty Stage root, `floatWorld`/`floatScreen` for stage floats, new windows opening as stage floats, and stage floats in persistence, resize and painting. Not built; Shift-drag floats, floating-first mode and drawers (below) cover the need differently.
 
 ## Shift-drag floats (2026-10-20)
 
@@ -194,7 +210,7 @@ Brave/GTK-style CSD windows keep their resize band in the shadow their surface d
 
 `NEST_BACKEND=virtual` has no pointer device, so Qt clients never get `wl_pointer`: `rules.sh`, `scaled.sh` and `decorations.sh` (which assert client CLICK lines) only pass on the Wayland nested backend. `lifecycle.sh` needs `NEST_SOCKET=krellis-nest`. `persist-restore.sh` needs `NEST_SESSION_FILE=<persist-save out/session.json>`; `persist-corrupt.sh` needs a `{"schema":99}` seed. `persist-save.sh` toggles the bar first (off by default).
 
-**Glide switch (2026-10-21).** `[General] glide=false` in `~/.config/krellisrc` (default true) turns off the camera spring and the layout tween: `reducedMotion()` makes `Navigator::retarget` finish the camera at once, and the three `m_tween.begin` sites are skipped. Windows then jump to their final rects, one real size request per action. Added because the spring still felt stuttery with the throttle. Pickup/drop session animations are untouched. Tests: `NEST_KRELLISRC=<file>` seeds `krellisrc` in `tools/nested.sh`; zoom-blink, maximize-blink, drag, resize, anim pass with glide off.
+**Glide switch (2026-10-21).** `[General] glide=false` in `~/.config/krellisrc` (this is the default since the correction below; it was briefly true) turns off the camera spring and the layout tween: `reducedMotion()` makes `Navigator::retarget` finish the camera at once, and the three `m_tween.begin` sites are skipped. Windows then jump to their final rects, one real size request per action. Added because the spring still felt stuttery with the throttle. Pickup/drop session animations are untouched. Tests: `NEST_KRELLISRC=<file>` seeds `krellisrc` in `tools/nested.sh`; zoom-blink, maximize-blink, drag, resize, anim pass with glide off.
 
 **Glide correction (2026-10-21, later).** The first `glide` switch never took effect live: Qt's INI reader files `[General]` keys under bare names, so `value("General/glide")` always returned the default (same latent bug for `floatFirst`). Read bare keys. `glide` now defaults to **false** and, when off, also disables flights (duration 1 ms, bookkeeping kept), appear, popup and close animations, besides the camera spring and layout tween. `tools/nested.sh` writes `glide=true` into the test `krellisrc` unless `NEST_KRELLISRC` is given, so animation scenarios still test the glide paths. Lesson: a passing nested test with a config key proves nothing unless the log shows the key was read.
 
@@ -242,7 +258,7 @@ Drop/hover animation (2026-10-21): `frameChanged` now also runs while a drag ses
 
 ## Settings GUI (2026-10-21)
 
-- **Config library** `config/` (`krellis::config`, static lib `krellis_config`): the one place that reads and writes `krellisrc`. `Settings` (floatFirst, spawnTarget, peek, map, mapPinned, scratchpad, glide, landMs) with `load/save/saveValue`, and `AppRule` with `loadRules/saveRules`. Always bare keys. **Never `setValue("General/x")`:** Qt writes that to a `[%General]` section the loader never reads, so `setFloatFirst`/`setMapPinned` never persisted until this change (a stale `[%General]` section in an old krellisrc is harmless). `save` keeps rules and unknown keys; `saveRules` replaces `[ViewRules]` only. Rule app ids are case-sensitive (`Alacritty`, not `alacritty`); `/` and `\` in ids become `_`. Tests: `tests/test_config.cpp`.
+- **Config library** `config/` (`krellis::config`, static lib `krellis_config`): the one place that reads and writes `krellisrc`. `Settings` (the struct in `config/krellis_config.h` is the full list: closeFocus, floatFirst, spawnTarget, peek, map, mapPinned, glide, scratchpad, followTheme, toasts, flyTo, whichKey, whichKeyDelayMs, tileMinWidth/Height, iconBelow, landMs) with `load/save/saveValue`, and `AppRule` with `loadRules/saveRules`. Always bare keys. **Never `setValue("General/x")`:** Qt writes that to a `[%General]` section the loader never reads, so `setFloatFirst`/`setMapPinned` never persisted until this change (a stale `[%General]` section in an old krellisrc is harmless). `save` keeps rules and unknown keys; `saveRules` replaces `[ViewRules]` only. Rule app ids are case-sensitive (`Alacritty`, not `alacritty`); `/` and `\` in ids become `_`. Tests: `tests/test_config.cpp`.
 - **Apply live:** D-Bus `reloadSettings` = `applySettings(load())` (mirrors into every canvas, resyncs the camera and minimap) + `reloadRules()`. The ctor uses the same `applySettings`.
 - **KCM** `kcm/` (`kcm_krellis`, `KQuickConfigModule` + Kirigami, `ui/main.qml`): General settings plus a per-app rules editor (`RulesModel`). `save()` writes the file, then fires an async `reloadSettings` at `org.kde.KWin /Krellis`. One .so is installed twice: `plasma/kcms/systemsettings` (System Settings, Window Management) and `kwin/effects/configs` (the effect's Configure button, found via top-level `"X-KDE-ConfigModule": "kcm_krellis"` in the effect metadata, written by `effect/CMakeLists.txt` when `KRELLIS_BUILD_KCM` is on). `tools/install.sh` builds and installs it; `tools/uninstall.sh` removes it.
 - **Nested test:** `scenarios/settings.sh` (run with `NEST_KRELLISRC=<seed with a rule or two>`, size 1100x1500 shows the whole rules list) launches `kcmshell6 kcm_krellis`, screenshots it (`settings-kcm`), then rewrites krellisrc and calls `reloadSettings`, asserting the peek gutter closes and a rule applies. **Redirect nested runs to a file, never `| tail`:** `kcmshell6` makes the nested bus start xdg-desktop-portal helpers that keep a pipe open and the run hangs for minutes.
@@ -250,7 +266,7 @@ Drop/hover animation (2026-10-21): `frameChanged` now also runs while a drag ses
 
 ## Keyboard navigation (2026-10-21)
 
-- **Core** `core/keynav.{h,cpp}` (tests `tests/test_keynav.cpp`): `neighbourInDirection(entries, from, dir)` (panels wholly past the origin's edge; most shared cross-axis extent, then nearest gap, then centre distance), `moveInDirection(doc, panel, dir, metrics, &moved)` (swaps only with a vacant slot; every other neighbour, siblings included, takes the panel: removes and docks into the neighbour as if dropped in its middle (`landingEdge`: the tile splits along its longer side; along that side the panel takes the half it came through, across it the half on its own side of the tile's middle, level = after, so a tall tile gets it underneath), else pops out to that edge of the whole layout; `KrellisEffect::moveDirection` hands it to the adjacent output, and with none there the tile gives up 20% along that axis via `resizeStep(dir, 0.2)`; `key-nav.sh`/`key-output.sh` assert both) and `resizeInDirection(root, metrics, panel, dir, fraction)` (moves the nearest divider on that side, else the opposite one, through `dragBoundary`, so minimums hold).
+- **Core** `core/keynav.{h,cpp}` (tests `tests/test_keynav.cpp`): `neighbourInDirection(entries, from, dir)` (panels wholly past the origin's edge; most shared cross-axis extent, then nearest gap, then centre distance), `moveInDirection(doc, panel, dir, metrics, &moved)` (swaps with a vacant slot, and also with a neighbour when the two are the only children of their split along the move axis, a "lone pair", keeping both slot sizes; every other neighbour, siblings among several included, takes the panel: removes and docks into the neighbour as if dropped in its middle (`landingEdge`: the tile splits along its longer side; along that side the panel takes the half it came through, across it the half on its own side of the tile's middle, level = after, so a tall tile gets it underneath), else pops out to that edge of the whole layout; `KrellisEffect::moveDirection` hands it to the adjacent output, and with none there the tile gives up 20% along that axis via `resizeStep(dir, 0.2)`; `key-nav.sh`/`key-output.sh` assert both) and `resizeInDirection(root, metrics, panel, dir, fraction)` (moves the nearest divider on that side, else the opposite one, through `dragBoundary`, so minimums hold).
 - **Effect:** `KrellisCanvas::focusDirection/moveDirection/resizeStep` act on the active window's docked panel (floats are skipped; no cross-output hop). Focus keeps the zoom: `m_nav.reveal(to)` slides the frame the minimum distance at the same size when the target is outside it (see the next bullet). D-Bus `focusDirection(left|right|up|down)`, `moveDirection(..)`, `resizeStep(dir, fraction)`, `toggleResizeMode`, `resizeModeActive`.
 - **Shortcuts (changed 2026-10-22):** Meta+Ctrl+arrows focus, Meta+arrows and Meta+A/S/D/F (left/down/up/right) move (was Meta+Ctrl+Shift+arrows; at the edge of an output the move hands the tile to the output beside it, `KrellisEffect::moveDirection`/`outputBeside`/`KrellisCanvas::enterFrom`, scenario `key-output.sh`), Meta+Ctrl+R resize mode. Meta+arrows are KWin Quick Tile on Ivan's machine, and KGlobalAccel keeps a previously stored key over a new default, so he must free them in System Settings > Shortcuts and rebind `KrellisMove*` there (done 2026-10-22 over D-Bus: Quick Tile cleared, plus kwin Show Desktop = Meta+D and plasmashell next activity = Meta+A cleared for the WASD-style keys) (kglobalshortcutsrc still holds the old chord). Meta+Alt+arrows are Krellis navigation. Resize mode (`KrellisEffect::m_resizeMode`, `handleResizeKey`) swallows the keyboard: arrows resize by 5%, Shift by 20%, Return/Escape leave, 8 s idle leaves. The hint is `bar.qml`'s `hint` property (`KrellisCanvas::setHint`); the bar floats over the windows while a hint is set, like naming a view. Do not use `effects->showOnScreenMessage` for it: the OSD window got tracked as a panel in the nested run (`manageable` now also refuses `isOnScreenDisplay`/`isNotification`).
 - `dump` gained an `ACTIVE <panel>` line. Scenario `key-nav.sh`.
@@ -317,7 +333,7 @@ Drop/hover animation (2026-10-21): `frameChanged` now also runs while a drag ses
 - **Mouse.** Middle-click on the gap between two tiles flips that pair (`KrellisCanvas::seamAt` finds the split and index from `m_rects`; reach is the gap plus 2 px, so a click on a window is left alone). The release is swallowed too (`m_swallowMiddle`). `simMiddleButton x y press` is the test hook. Zoomed or in overview, the seams follow the camera.
 - Test: `scenarios/flip-split.sh`.
 
-## Navigation rules added with plan 04
+## Navigation rules
 
 - **`Navigator::reveal(id, preferWiden=false)`** replaced `ensureVisible`. A target outside the frame slides the frame the minimum distance per axis at the same size (stretching only on an axis where the target is longer than the frame) and re-frames the leaves inside with `record=false`, so history isn't flooded. Only `windowAdded` passes `preferWiden`: a new neighbour widens the frame to include both when the result stays within `WIDEN_LIMIT` (2.2) times the current area, else it slides. Used by activation, spawn, move, restore, flip, `focusDirection` and `cyclePanel`. `slideTo` uses `m_entries` rects, never mix them with `frameLeaves`/`focusLayout` rects (no metrics).
 - **Close redistribution:** `closeView` calls `detachView(..., true)`, so a closed window's share goes back to every sibling in proportion (`removeNode(..., keepProportions)`). Hide, restore and `floatPanel` still absorb into the next sibling, because `restoreTargetFor` records `share = own/(own+nb)`. The cross-canvas transfer in `multicanvas.cpp` goes through `closeView` too and follows the new rule.
@@ -325,7 +341,7 @@ Drop/hover animation (2026-10-21): `frameChanged` now also runs while a drag ses
 - **Dropped (E3):** a float's initial size still comes from the fixed `{0.2.., 0.15.., 0.6, 0.65}` rect. `w->frameGeometry()` at `windowAdded` is KWin's placeholder (1000x718 for every window in the nested harness), not the client's size, so sizing from the client needs the first commit instead.
 - **Open (E4):** `dockAtPointer` samples `effects->cursorPos()` in `windowAdded`. Whether the cursor moves between the window being announced and being drawn is unverified on the real compositor; the nested harness can't show it.
 
-## Plan 05: polish and safety (2026-10-21)
+## Theme, toasts, undo, which-key and safe mode (2026-10-21)
 
 - **Theme.** `effect/theme.{h,cpp}` + `theme_tokens.h` derive the overlay colours from the Plasma scheme (KConfigWatcher on kdeglobals) when `followTheme` is on; QML only uses `theme.*` tokens (`tests/check_qml_colors.sh` enforces it). Every overlay scene is made by `KrellisCanvas::makeScene(file)` with `required property QtObject theme`. `D-Bus dumpTheme` prints `THEME follow=.. dark=.. surface=.. text=.. accent=..`.
 - **Toasts.** `KrellisCanvas::toast(text)` (`toast.qml`, driven from `updateToast()` in the frame loop, 180/1400/220 ms). No-op with `toasts` off. `KrellisEffect::toast` targets `current()`.
