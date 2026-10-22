@@ -364,7 +364,7 @@ private:
     bool peeking(const std::string &panel) const;
     bool handlePeekButton(const PointerButtonEvent &event);
     std::string m_peekPressed;
-    struct Tile { double amount = 0, velocity = 0, target = 0; QString icon; };
+    struct Tile { double amount = 0, velocity = 0, target = 0; QString icon; bool idle = false; };
     std::map<std::string, Tile> m_tiles;
     std::unique_ptr<class OffscreenQuickScene> m_tileScene;
     QStringList m_tileIds;

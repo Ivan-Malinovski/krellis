@@ -688,10 +688,12 @@ void KrellisCanvas::applyRest(bool stepping)
     if (m_unloading) return;
     QScopedValueRollback<bool> applying(m_applyingRest, true);
     const bool previewing = m_session && m_session->active();
+    const auto hidden = [this](const std::string &panel) { // a panel is hidden or somewhere in the layout, so no tree search
+        return std::any_of(m_doc.hidden.begin(), m_doc.hidden.end(), [&](const auto &h) { return h.panel->id == panel; });
+    };
     for (auto &t : m_windows) {
         Window *window = t.window->window();
-        if (!window || t.window->isMinimized() || t.window->isUserMove() || t.window->isUserResize()
-            || krellis::locatePanel(m_doc, t.panel).where == krellis::PanelLocation::Where::Hidden)
+        if (!window || t.window->isMinimized() || t.window->isUserMove() || t.window->isUserResize() || hidden(t.panel))
             continue;
         // While a drag previews a drop, the other windows really take their previewed size, so the
         // client redraws crisply instead of being stretched; the lifted one keeps its own.

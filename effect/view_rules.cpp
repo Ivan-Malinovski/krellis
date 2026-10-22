@@ -209,6 +209,10 @@ void KrellisCanvas::updateTiles(double dt)
         tile.velocity += (Motion::stiffness * (target - tile.amount) - Motion::damping * tile.velocity) * h;
         tile.amount += tile.velocity * h;
         if (std::abs(target - tile.amount) < 0.0001 && std::abs(tile.velocity) < 0.001) { tile.amount = target; tile.velocity = 0; }
+        // An invisible overlay has nothing to update; its last push left it at zero opacity.
+        const bool resting = tile.amount == 0 && target == 0;
+        if (resting && tile.idle) continue;
+        tile.idle = resting;
         if (tile.icon.isNull()) {
             QByteArray bytes;
             QBuffer buffer(&bytes);
@@ -218,17 +222,21 @@ void KrellisCanvas::updateTiles(double dt)
         }
         double opacity = 1;
         const auto rect = visualRect(t.window, &opacity).value_or(TRect{});
-        QRegion visible(QRectF(0, 0, rect.w, rect.h).toAlignedRect());
-        bool above = false;
-        for (auto *window : effects->stackingOrder()) {
-            if (window == t.window) { above = true; continue; }
-            if (!above || window->isDeleted() || window->isMinimized() || window->isHidden()) continue;
-            if (const auto cover = visualRect(window))
-                visible -= QRectF(cover->x - rect.x, cover->y - rect.y, cover->w, cover->h).toAlignedRect();
-        }
+        // The icon overlay is only drawn while it is showing; which parts of it are uncovered matters only then,
+        // and finding out costs every window above this one.
         QVariantList pieces;
-        for (const QRect &piece : visible)
-            pieces << QVariantMap{{"x", piece.x()}, {"y", piece.y()}, {"w", piece.width()}, {"h", piece.height()}};
+        if (tile.amount > 0 || target > 0) {
+            QRegion visible(QRectF(0, 0, rect.w, rect.h).toAlignedRect());
+            bool above = false;
+            for (auto *window : effects->stackingOrder()) {
+                if (window == t.window) { above = true; continue; }
+                if (!above || window->isDeleted() || window->isMinimized() || window->isHidden()) continue;
+                if (const auto cover = visualRect(window))
+                    visible -= QRectF(cover->x - rect.x, cover->y - rect.y, cover->w, cover->h).toAlignedRect();
+            }
+            for (const QRect &piece : visible)
+                pieces << QVariantMap{{"x", piece.x()}, {"y", piece.y()}, {"w", piece.width()}, {"h", piece.height()}};
+        }
         QVariantMap properties{{"pieces", pieces}, {"x", rect.x - m_area.x()}, {"y", rect.y - m_area.y()}, {"w", rect.w}, {"h", rect.h},
             {"amount", std::clamp(tile.amount, 0.0, 1.0) * opacity}, {"icon", tile.icon}, {"title", t.window->caption()}};
         QMetaObject::invokeMethod(root, "setTile", Q_ARG(QVariant, int(i)), Q_ARG(QVariant, properties));
