@@ -1,6 +1,6 @@
 # Krellis
 
-Krellis ("KDE + Trellis") is a port of DanFessler/trellis (infinite-canvas "desktop": camera over a tiled layout, springs, docking, minimap) to KDE Plasma 6 / KWin Wayland, MIT licensed and public at github.com/Ivan-Malinovski/krellis (branch `master`, release `v0.0.1`). It was formerly called kwin-trellis. The goal behind it: Ivan liked Hyprland but found it not mouse-friendly enough, and wanted that plus Trellis in KDE. The whole code base is AI-written ("vibe coded"); the README says so.
+Krellis ("KDE + Trellis") is a port of DanFessler/trellis (infinite-canvas "desktop": camera over a tiled layout, springs, docking, minimap) to KDE Plasma 6 / KWin Wayland, MIT licensed and public at github.com/Ivan-Malinovski/krellis (branch `master`, release `v0.0.2`). It was formerly called kwin-trellis. The goal behind it: Ivan liked Hyprland but found it not mouse-friendly enough, and wanted that plus Trellis in KDE. The whole code base is AI-written ("vibe coded"); the README says so.
 
 Clean-room: follow the semantics of the Trellis TypeScript, do not copy its code (noncommercial license). Reference sources are read-only at `~/dev/trellis_kde/trellis/packages/core/src/` on Ivan's machine; they are not part of this repo.
 

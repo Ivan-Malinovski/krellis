@@ -12,7 +12,7 @@ I liked Hyprland, but I found it not mouse-friendly enough. Then I came across T
 
 The aim is to stay mouse-first without giving up keyboard friendliness or floatiness. The main actions work from the keyboard as well as the mouse, and you can still float any window, or make floating the default, instead of being forced into tiles.
 
-> **Status: 0.0.1, early, and entirely vibe coded with Sonnet 5.5.** I did not write the code by hand; I steered an AI model through it and tested the result on my own desktop. It runs daily on one machine (CachyOS, Plasma 6.7.5, two monitors). Expect rough edges, and read [Safety](#safety) before enabling it.
+> **Status: 0.0.2, early, and entirely vibe coded with Sonnet 5.5.** I did not write the code by hand; I steered an AI model through it and tested the result on my own desktop. It runs daily on one machine (CachyOS, Plasma 6.7.5, two monitors). Expect rough edges, and read [Safety](#safety) before enabling it.
 
 ## Features
 

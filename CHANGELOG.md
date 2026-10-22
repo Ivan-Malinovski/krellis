@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.0.2
 
 - A tiled window that goes fullscreen (a Brave video, a game) now covers the whole output instead of being scaled into its tile, gets native input, and returns to its tile afterwards. The overlays (bar, minimap, toasts) are hidden while a window is fullscreen.
 
