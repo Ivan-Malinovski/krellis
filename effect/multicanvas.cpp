@@ -758,7 +758,9 @@ void KrellisEffect::moveDirection(const QString &direction)
     // Already at the edge of this output: carry the window on to the output beside it, entering at the near edge.
     auto *window = effects->activeWindow();
     auto *target = outputBeside(canvas, *dir);
-    if (!window || !target || owner(window) != canvas) return;
+    if (!window || owner(window) != canvas) return;
+    // No output that way either: the tile has nowhere to go, so it gives up 20% of its size instead.
+    if (!target) { canvas->resizeStep(*dir, 0.2); return; }
     transfer(window, target);
     target->enterFrom(window, krellis::oppositeEdge(*dir));
     effects->activateWindow(window);

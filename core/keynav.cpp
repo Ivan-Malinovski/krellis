@@ -92,21 +92,6 @@ LayoutDocument moveInDirection(LayoutDocument doc, const std::string &panelId, E
 
     const std::string neighbour = neighbourInDirection(entries, panelId, dir, false);
     if (!neighbour.empty()) {
-        // Direct siblings along the axis trade places and keep their slots' sizes.
-        const NodePtr parent = parentSplit(doc.root, panelId);
-        if (parent && parent->axis == axis) {
-            const auto &kids = parent->children;
-            const auto at = std::find_if(kids.begin(), kids.end(), [&](const NodePtr &c) { return c->id == panelId; });
-            const long i = at - kids.begin(), j = i + (before ? -1 : 1);
-            if (j >= 0 && j < long(kids.size()) && kids[size_t(j)]->id == neighbour) {
-                auto order = kids;
-                std::swap(order[size_t(i)], order[size_t(j)]);
-                doc.root = replaceNode(doc.root, parent->id, makeSplit(parent->id, parent->axis, order, parent->weights));
-                if (moved)
-                    *moved = true;
-                return doc;
-            }
-        }
         // Moving into an empty slot trades places with it rather than splitting a tile.
         if (isVacant(findNode(doc.root, neighbour))) {
             if (auto vacated = vacatePanel(doc, panelId)) {

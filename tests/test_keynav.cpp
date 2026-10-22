@@ -59,15 +59,14 @@ private slots:
         QCOMPARE(neighbourInDirection(e, "x", Edge::Top), std::string("t"));
         QCOMPARE(neighbourInDirection(e, "t", Edge::Bottom), std::string("x"));
     }
-    void siblingsSwapAndKeepSlotSizes()
+    void siblingsAreNotSwapped()
     {
+        // b is 750x800 (tall): a, level with its middle, goes under it rather than trading places.
         bool moved = false;
         auto d = moveInDirection(docOf(makeSplit("r", Axis::X, {P("a"), P("b")}, {1, 3})), "a", Edge::Right, metrics(), &moved);
         QVERIFY(moved);
-        QCOMPARE(d.root->children[0]->id, std::string("b"));
-        QCOMPARE(d.root->children[1]->id, std::string("a"));
-        QCOMPARE(d.root->weights[0], 1.0);
-        QCOMPARE(d.root->weights[1], 3.0);
+        const auto e = layoutRects(d.root);
+        QVERIFY(e.at("a").rect.y >= e.at("b").rect.y + e.at("b").rect.h - 1e-9);
     }
     void steppingIntoATallTileLandsUnderOrOverIt()
     {

@@ -22,6 +22,12 @@ call focusDirection up; sleep 0.5;  check "focus up with nothing above stays" "$
 call moveDirection left; sleep 1.2
 check "move left keeps focus" "$(active)" p3
 check "move left puts it first" "$(xof p3)" 6.0
+# p3 now sits in a stacked column: the first press pops it out to the left edge, the next has nowhere to go.
+call moveDirection left; sleep 1.5
+before=$(wof p3)
+call moveDirection left; sleep 1.5
+after=$(wof p3)
+awk "BEGIN{exit !($after < $before * 0.9 && $after > $before * 0.7)}" && echo "PASS move into the edge shrinks by about 20%" || echo "FAIL move into the edge shrinks by about 20%: $before -> $after"
 w=$(wof p3)
 call resizeStep right 0.1; sleep 0.6
 grown=$(wof p3)
