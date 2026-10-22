@@ -174,7 +174,7 @@ void DragSession::activate(double nowMs)
 
 std::optional<DropTarget> DragSession::tabTarget(const NodePtr &panel, Point p, const Rect &screen) const
 {
-    const double bar = m_host.tabbarHeight(*panel);
+    const double bar = m_host.tabDropHeight(*panel);
     if (!bar || !(p.x >= screen.x && p.x <= screen.x + screen.w && p.y >= screen.y && p.y <= screen.y + bar))
         return std::nullopt;
     DropTarget t;
@@ -258,7 +258,7 @@ void DragSession::retarget()
             if (it == last.end() || !inside(p, it->second))
                 continue;
             next = tabTarget(f.panel, p, it->second);
-            if (!next && !dropEdge(p, it->second)) {
+            if (!next && m_host.bodyTabs() && !dropEdge(p, it->second)) {
                 DropTarget t;
                 t.kind = DropTarget::Kind::Tab;
                 t.panel = f.panel->id;
@@ -310,16 +310,20 @@ void DragSession::retarget()
         } else {
             auto edge = floatMove ? overlayEdge(p, screen) : dropEdge(point, hoveredWorld);
             DropTarget t;
+            bool take = true; // a tile body that does not take tabs leaves the drop without a target
             if (edge) {
                 t.kind = DropTarget::Kind::Dock;
                 t.spec = tileDropTarget(m_dropBase, hovered, *edge);
             } else if (floatMove) {
                 t.kind = DropTarget::Kind::Float;
-            } else {
+            } else if (m_host.bodyTabs()) {
                 t.kind = DropTarget::Kind::Tab;
                 t.panel = hovered;
+            } else {
+                take = false;
             }
-            next = t;
+            if (take)
+                next = t;
         }
     }
 
@@ -394,7 +398,7 @@ void DragSession::retarget()
                 bar = tabTarget(f.panel, p, screen->second);
             if (bar) {
                 next = bar;
-            } else if (!dropEdge(point, *r)) {
+            } else if (m_host.bodyTabs() && !dropEdge(point, *r)) {
                 DropTarget t;
                 t.kind = DropTarget::Kind::Tab;
                 t.panel = f.panel->id;
@@ -946,7 +950,11 @@ DragOutcome DragSession::end(bool commit, double nowMs)
         out.settle = m_lifted->id;
         return out;
     }
-    const LayoutDocument base = m_host.doc();
+    LayoutDocument base = m_host.doc();
+    // A host that keeps its own document (the effect) never saw the tab leave its panel: take it out here, or it would
+    // be in both places. Harmless when the host did follow along.
+    if (m_tabRollback && m_lifted && !m_lifted->views.empty())
+        base = detachView(std::move(base), m_lifted->views.front());
     LayoutDocument without = m_inDoc ? removePanel(base, m_lifted->id, true) : base;
     if (leavesVacancy(*target))
         if (auto vacated = vacatePanel(base, m_lifted->id))

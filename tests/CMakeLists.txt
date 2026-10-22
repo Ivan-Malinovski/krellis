@@ -13,6 +13,7 @@ krellis_test(test_drag)
 krellis_test(test_keynav)
 krellis_test(test_history)
 krellis_test(test_chord_safemode)
+krellis_test(test_fuzzy)
 
 krellis_test(test_input_geometry)
 

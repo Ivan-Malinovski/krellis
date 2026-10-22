@@ -8,5 +8,7 @@
     <file alias="marquee.qml">@CMAKE_CURRENT_SOURCE_DIR@/marquee.qml</file>
     <file alias="toast.qml">@CMAKE_CURRENT_SOURCE_DIR@/toast.qml</file>
     <file alias="whichkey.qml">@CMAKE_CURRENT_SOURCE_DIR@/whichkey.qml</file>
+    <file alias="palette.qml">@CMAKE_CURRENT_SOURCE_DIR@/palette.qml</file>
+    <file alias="tabstrips.qml">@CMAKE_CURRENT_SOURCE_DIR@/tabstrips.qml</file>
   </qresource>
 </RCC>

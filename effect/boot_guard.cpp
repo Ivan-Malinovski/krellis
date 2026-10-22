@@ -1,9 +1,11 @@
 #include "boot_guard.h"
 
 #include "krellis_config.h"
+#include "kwin_match.h"
 #include "safemode.h"
 
 #include <QDateTime>
+#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QJsonDocument>
@@ -72,7 +74,55 @@ void notifyBlocked()
                                             "Run tools/live.sh reset once the cause is fixed.'")});
 }
 
+// The KWin the plugin was compiled against, in a form the installer can read back out of the .so
+// (`./install.sh --check`). `used` keeps the linker from dropping it.
+[[maybe_unused]] __attribute__((used)) const char kBuiltFor[] = "krellis-built-for-kwin=" KRELLIS_KWIN_VERSION;
+
+QString runningKWin()
+{
+    // KRELLIS_ASSUME_KWIN stands in for the running version in the nested tests.
+    const QByteArray forced = qgetenv("KRELLIS_ASSUME_KWIN");
+    return forced.isEmpty() ? QCoreApplication::applicationVersion() : QString::fromLocal8Bit(forced);
+}
+
+void notifyMismatch(const QString &built, const QString &running)
+{
+    const QString hint = QStringLiteral(KRELLIS_SOURCE_DIR);
+    QProcess::startDetached(QStringLiteral("sh"),
+                            {QStringLiteral("-c"),
+                             QStringLiteral("sleep 20; notify-send -a krellis -i dialog-warning 'Krellis was not loaded' "
+                                            "\"Krellis was built for KWin %1 but KWin %2 is running, so it stays off. "
+                                            "Rebuild it: %3/install.sh\"")
+                                 .arg(built, running, hint)});
+}
+
 } // namespace
+
+bool krellisKWinMatches()
+{
+    const QString built = QStringLiteral(KRELLIS_KWIN_VERSION);
+    const QString running = runningKWin();
+    if (krellis::kwinVersionMatches(built.toStdString(), running.toStdString())) return true;
+    if (qEnvironmentVariableIntValue("KRELLIS_ALLOW_KWIN_MISMATCH") == 1) {
+        qWarning() << "Krellis built for KWin" << built << "is loading into KWin" << running << "(KRELLIS_ALLOW_KWIN_MISMATCH)";
+        return true;
+    }
+    qWarning() << "Krellis not loaded: it was built for KWin" << built << "but KWin" << running << "is running. Rebuild with"
+               << QStringLiteral(KRELLIS_SOURCE_DIR "/install.sh");
+    // One notification per pair, so a session that queries support many times says it once.
+    const QString pair = built + QStringLiteral("->") + running;
+    QFile f(krellis::config::stateFile(QStringLiteral("kwin-mismatch")));
+    if (f.open(QIODevice::ReadOnly) && QString::fromUtf8(f.readAll()).trimmed() == pair) return false;
+    f.close();
+    QDir().mkpath(QFileInfo(f.fileName()).absolutePath());
+    QSaveFile out(f.fileName());
+    if (out.open(QIODevice::WriteOnly)) {
+        out.write(pair.toUtf8());
+        out.commit();
+    }
+    notifyMismatch(built, running);
+    return false;
+}
 
 bool krellisBootAllowed()
 {

@@ -40,6 +40,10 @@ struct DragHost {
     virtual Point viewport() const = 0;
     virtual double inset() const = 0;
     virtual double tabbarHeight(const Node &panel) const = 0;
+    /// Height of the band along the top of a tile that takes a dropped window as a tab: the tab bar, or where it would be.
+    virtual double tabDropHeight(const Node &panel) const { return tabbarHeight(panel); }
+    /// Whether the body of a tile, away from its edges, also takes a dropped window as a tab (the original behaviour).
+    virtual bool bodyTabs() const { return true; }
     /// Index a tab dropped at screen x would take in a panel's tab bar.
     virtual int tabIndexAt(const Node &panel, double x) const = 0;
     virtual Rect toScreen(const Rect &world) const = 0;

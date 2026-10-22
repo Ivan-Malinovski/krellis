@@ -17,6 +17,7 @@ struct HelpGroup {
 };
 
 inline constexpr HelpRow kHelpNavigate[] = {
+    {"KrellisPalette", "Jump to window or view"},
     {"KrellisOverview", "Overview"},
     {"KrellisBack", "Back"},
     {"KrellisForward", "Forward"},
@@ -30,6 +31,11 @@ inline constexpr HelpRow kHelpArrange[] = {
     {"KrellisResizeMode", "Resize mode"},
     {"KrellisMaximize", "Maximize"},
     {"KrellisFloat", "Float"},
+    {"KrellisPin", "Pin to the corner"},
+    {"KrellisNextTab", "Next tab"},
+    {"KrellisPreviousTab", "Previous tab"},
+    {"KrellisGroupLeft", "Group into tabs", true},
+    {"KrellisSplitTab", "Split tab out"},
     {"KrellisFlip", "Flip split"},
     {"KrellisStash", "Stash in edge drawer"},
     {"KrellisHide", "Hide to dock"},

@@ -1,4 +1,5 @@
 #include "chord_hint.h"
+#include "kwin_match.h"
 #include "safemode.h"
 
 #include <QtTest>
@@ -102,6 +103,21 @@ private slots:
     {
         BootMarker m{50'000, false, false, 1};
         QVERIFY(decideBoot(m, 10'000).allow);
+    }
+    void kwinMustBeTheExactBuild()
+    {
+        QVERIFY(kwinVersionMatches("6.7.5", "6.7.5"));
+        QVERIFY(kwinVersionMatches("6.7.5", "6.7.5-1")); // a distribution suffix is not a different KWin
+        QVERIFY(!kwinVersionMatches("6.7.5", "6.7.6"));
+        QVERIFY(!kwinVersionMatches("6.7.5", "6.8.0"));
+        QVERIFY(!kwinVersionMatches("6.7.5", "6.7"));    // a shorter version is a different one, not a prefix match
+        QVERIFY(!kwinVersionMatches("6.7.5", "6.7.50"));
+    }
+    void anUnknownKwinNeverLocksTheEffectOut()
+    {
+        QVERIFY(kwinVersionMatches("6.7.5", ""));
+        QVERIFY(kwinVersionMatches("", "6.7.5"));
+        QCOMPARE(kwinCoreVersion("6.7.5."), std::string("6.7.5"));
     }
 };
 

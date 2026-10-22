@@ -25,6 +25,7 @@
 #include <QString>
 #include <QStringList>
 #include <chrono>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -80,8 +81,10 @@ public:
 
     // DragHost (screen space is relative to the work area's top-left)
     double inset() const override;
-    double tabbarHeight(const krellis::Node &) const override { return 0; }
-    int tabIndexAt(const krellis::Node &panel, double) const override { return int(panel.views.size()); }
+    double tabbarHeight(const krellis::Node &panel) const override { return tabInset(panel.id); }
+    double tabDropHeight(const krellis::Node &panel) const override; // the title-bar band of any tile, tabbed or not
+    bool bodyTabs() const override { return false; }                 // a window is tabbed by dropping it on a title bar
+    int tabIndexAt(const krellis::Node &panel, double x) const override;
     krellis::Rect toScreen(const krellis::Rect &world) const override;
     krellis::Point fromScreen(krellis::Point screen) const override;
     krellis::Rect panelScreen(const krellis::Rect &world) const override;
@@ -95,7 +98,7 @@ public:
     bool reducedMotion() const override { return !m_glide; }
     bool flyTo() const override { return m_flyTo; }
     double clockMs() const override { return realMs(); }
-    bool tabsAllowed() const override { return false; }
+    bool tabsAllowed() const override { return m_tabsOn; }
     const krellis::RectMap &lastRects() const override;
     void beginTween(const krellis::RectMap &previous, double nowMs) override;
 
@@ -106,6 +109,26 @@ public:
     bool handleKey(const KeyboardKeyEvent &e);
     void pinch(double scaleSinceLast, QPointF at, QPointF delta);
     void endPinch();
+
+    // The quick-jump palette. The coordinator builds the candidates (it sees every output); this canvas shows them,
+    // ranks them against what is typed and runs the chosen one's `go`.
+    struct PaletteItem {
+        QString title, app, detail;
+        bool view = false; // a saved view rather than a window
+        std::function<void()> go;
+    };
+    void openPalette(std::vector<PaletteItem> items);
+    void closePalette();
+    bool paletteOpen() const { return m_paletteOn; }
+    bool capturesKeys() const { return m_naming || m_paletteOn; } // a text field has the keyboard
+    QString paletteHit(QPointF p) const; // "row:N", "card", or empty outside the card
+    void paletteHover(int row);          // select a visible row
+    void paletteScroll(double delta, bool wheel);
+    void jumpTo(EffectWindow *w); // bring a tracked window into view and focus it
+    EffectWindow *pinAt(QPointF p) const; // the pinned window whose thumbnail is under p, if any
+    bool isPinned(const std::string &panel) const;
+    void togglePinActive();
+    void setPinOn(bool on); // off drops every pin, thumbnails glide back to their tiles
 
 public Q_SLOTS:
     // D-Bus control (also used by the nested test harness).
@@ -225,6 +248,7 @@ private:
     std::optional<TRect> drawerTab(const std::string &panel) const; // a closed drawer's tab on screen
     void updateDrawerTabs();
     void setDrawerOpen(const std::string &panel, bool open, bool pinned = false); // slide a drawer out or back; pinned stays out until the pointer has visited it
+    void slideOutDrawer(const std::string &panel); // brings a stashed window into view, closing any other drawer first; a no-op for anything else
     bool drawerEdgeFree(krellis::Edge edge) const; // false where another display joins this one: a drawer there would open onto it
     void stashPanel(const std::string &panel, krellis::Edge edge, const TRect &from);
     TRect drawerMapRect(const std::string &panel, const krellis::Rect &open) const; // what the minimap draws of a float
@@ -248,6 +272,8 @@ private:
     // A scratch window is a floating overlay that the scratchpad shortcut shows and hides: marked at run time or by a rule.
     bool scratchWindow(EffectWindow *w) const;
     // Turn the docked window into a centred overlay float. False when it can't (nothing left to tile, or not docked).
+    bool m_pinOn = false; // [General] pin, mirrored from the effect
+    bool m_tabsOn = false; // [General] tabs, mirrored from the effect
     bool m_scratchpad = false; // [General] scratchpad, mirrored from the effect; off, no window counts as scratch
     krellis::Theme *m_theme = nullptr; // owned by the effect; the tokens every overlay scene binds to
     // An overlay scene with the theme handed in as its `theme` property; null (and logged) when the QML fails to load.
@@ -259,6 +285,40 @@ private:
     double m_layerDim = 0, m_layerTarget = 0;
     Tracked *trackedFor(EffectWindow *w);
     Tracked *trackedForPanel(const std::string &panel);
+    // Tabbed tiles (opt-in, `tabs`). A panel can hold several windows; one is shown under a tab strip and the rest are
+    // stowed: sized like it, kept out of paint and input. m_windows holds only the shown window of each panel, so the
+    // rest of the canvas sees one window per panel as before.
+    void setTabsOn(bool on); // off splits every tabbed panel back into one tile per window
+    bool tabsOn() const { return m_tabsOn; }
+    Tracked *stowedFor(EffectWindow *w);
+    Tracked *trackedOfView(const std::string &view); // shown or stowed
+    bool behindTab(EffectWindow *w) const;            // stowed, or a popup of a stowed window: neither painted nor hit
+    const Tracked *stowedFor(const EffectWindow *w) const;
+    double tabInset(const std::string &panel) const; // height of the strip a panel wears, 0 when it has none
+    TRect belowTabs(const std::string &panel, TRect rect) const; // the part of a panel's rect under its strip
+    void syncTabs();                                  // re-seat every window to the panel and tab the document says
+    void updateTabStrips();
+    struct TabHit { std::string panel, view; };
+    std::optional<TabHit> tabAt(QPointF p) const;     // the tab under p, if p is on a strip
+    bool tabButton(const PointerButtonEvent &e);
+    bool tabMotion(QPointF p);
+    void selectTab(const std::string &view, bool activate = true);
+    void cycleTab(int step);                          // the active panel's next or previous tab
+    void closeTab(const std::string &view);
+    bool groupWithNeighbour(krellis::Edge dir);       // tab the active window into the tile that way; false when there is none
+    void splitTabOut();                               // the active window leaves its tabs for a tile of its own
+
+    std::vector<Tracked> m_stowed;  // windows behind another tab of their panel
+    std::set<std::string> m_tabbed; // panels wearing a strip: tabs on and two or more windows
+    std::unique_ptr<class OffscreenQuickScene> m_tabStrips;
+    QString m_tabStripsSignature;
+    struct TabPress { std::string panel, view; QPointF at; bool bar = false; }; // bar: pressed on the bare strip, so it drags the tab on show and a click does nothing
+    std::optional<TabPress> m_tabPress; // a button is down on a tab and has not become a drag yet
+    std::string m_dragTabView;          // the tab being torn out: its strip entry is gone while it is in hand
+    struct Strip { std::string panel; TRect rect; double tabW; std::vector<std::string> views, titles; std::string selected; };
+    std::vector<Strip> m_strips;        // the strips on show, absolute screen coordinates
+    void computeStrips();
+    static constexpr double TAB_H = 28, TAB_MAX_W = 220;
     void relayout(bool animate);
     TRect panelAt(const TRect &world, const TRect &camera) const;
     // The layout rect (world space) a panel is drawn from: the live drag preview, else the document.
@@ -268,7 +328,7 @@ private:
     void dockAtSpawn(const krellis::NodePtr &panel); // by m_spawnTarget
     void dockAtPointer(const krellis::NodePtr &panel);
     void dockAtFocused(const krellis::NodePtr &panel);
-    void startDrag(EffectWindow *w, QPointF pointer);
+    void startDrag(EffectWindow *w, QPointF pointer, const std::string &viewId = std::string());
     void moveDrag(QPointF pointer);
     void endDrag(bool commit);
     void updateSlot(double dt);
@@ -428,6 +488,35 @@ private:
     double m_sheetOpacity = 0;
     bool m_sheetBusy = false; // fading in or out; a fully shown sheet needs no frames
     void updateSheet(double dt);
+    // Quick-jump palette: m_paletteOn means it has the keyboard and pointer; the scene outlives that by its fade-out.
+    std::unique_ptr<class OffscreenQuickScene> m_palette;
+    std::vector<PaletteItem> m_paletteItems;
+    std::vector<size_t> m_paletteRanked; // indices into m_paletteItems, best first
+    QString m_paletteQuery;
+    int m_paletteSel = 0, m_paletteFirst = 0; // rank of the selected row and of the first visible one
+    bool m_paletteOn = false, m_paletteDirty = false, m_paletteBusy = false;
+    double m_paletteOpacity = 0, m_paletteWheel = 0;
+    static constexpr int PALETTE_ROWS = 8;
+    void updatePalette(double dt);
+    void rankPalette();
+    void paletteMove(int delta);
+    void paletteGo(int rank);
+    bool paletteKey(const KeyboardKeyEvent &e);
+    void ensurePaletteScene();
+    // A pinned window keeps its slot in the layout. While the slot is mostly out of view the window is drawn live as a
+    // thumbnail in the bottom-left corner instead, above everything. Paint and input both go through visualRect, so the
+    // thumbnail is where the window is for the pointer too (a click on it reveals the slot).
+    struct Pin {
+        std::string panel;
+        QPointer<EffectWindow> window; // outlives the panel when the window moves to another output, so it can be un-elevated
+        bool shown = false;            // currently drawn as a thumbnail
+    };
+    std::vector<Pin> m_pins;
+    static constexpr double PIN_SHOW_BELOW = 0.4, PIN_HIDE_ABOVE = 0.6; // share of the slot in view; the gap stops flicker
+    double pinVisibility(const std::string &panel) const; // share of the slot inside the work area at the camera's destination
+    std::optional<TRect> pinRect(const std::string &panel) const;
+    TRect shownRect(const std::string &panel) const { return pinRect(panel).value_or(belowTabs(panel, screenRect(panel))); }
+    void updatePins();
     TRect m_lifted; // the lifted window's screen rect this frame (absolute)
     void watch(EffectWindow *w);
     // Rectangle-select gesture (Ctrl+Alt+Shift drag): a rubber band plus the framing a release would pick.
@@ -530,6 +619,17 @@ public Q_SLOTS:
     bool mapPinned() const;
     void toggleMap();
     void saveView();
+    void pinActive();
+    void nextTab();
+    void previousTab();
+    void splitTab();
+    void groupLeft() { if (m_tabsOn) groupDirection(QStringLiteral("left")); }
+    void groupRight() { if (m_tabsOn) groupDirection(QStringLiteral("right")); }
+    void groupUp() { if (m_tabsOn) groupDirection(QStringLiteral("up")); }
+    void groupDown() { if (m_tabsOn) groupDirection(QStringLiteral("down")); }
+    EffectWindow *pinUnder(QPointF p) const;
+    bool pinButton(const PointerButtonEvent &e);
+    void togglePalette(); // the quick-jump palette: type part of a window title, app or saved view, and go there
     void back();
     void forward();
     void zoom(double factor, double px, double py);
@@ -622,6 +722,9 @@ private:
     void hideScratch(const std::vector<EffectWindow *> &windows);
     void scratchActivated(EffectWindow *w);
     void scratchClick(QPointF point);
+    KrellisCanvas *paletteCanvas() const; // the canvas whose palette is open, if any
+    bool paletteButton(const PointerButtonEvent &e);
+    bool m_swallowRelease = false; // a click went to the palette: its release must not reach a window
     bool m_resizeMode = false; // arrow keys resize the active tile; see handleResizeKey
     QTimer *m_resizeModeTimer = nullptr;
     void setResizeMode(bool on);
@@ -641,6 +744,14 @@ private:
     void syncScratchShortcuts(); // Meta+G and Meta+Shift+G exist only while the scratchpad is enabled
     QList<QAction *> m_scratchActions;
     bool m_scratchpad = false;
+    void syncPinShortcut(); // Meta+Shift+P exists only while pin is enabled
+    QList<QAction *> m_pinActions;
+    bool m_pinOn = false;
+    void syncTabShortcuts(); // the tab chords exist only while tabs are enabled
+    QList<QAction *> m_tabActions;
+    bool m_tabsOn = false;
+private:
+    void groupDirection(const QString &direction);
     void transfer(EffectWindow *window, KrellisCanvas *target);
     KrellisCanvas *outputBeside(KrellisCanvas *from, krellis::Edge dir) const;
     KrellisCanvas *canvasAt(QPointF point) const;

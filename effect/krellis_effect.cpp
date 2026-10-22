@@ -91,6 +91,10 @@ void KrellisCanvas::prepareUnload()
 {
     m_unloading = true;
     for (const auto &t : m_windows) effects->setElevatedWindow(t.window, false);
+    for (const auto &t : m_stowed) effects->setElevatedWindow(t.window, false);
+    m_dragTabView.clear();
+    m_tabPress.reset();
+    m_tabStrips.reset();
     m_changed = {};
     m_transfer = {};
     for (auto *timer : findChildren<QTimer *>()) timer->stop();
@@ -132,6 +136,11 @@ void KrellisCanvas::prepareUnload()
     m_sheetWanted = false;
     m_sheetOpacity = 0;
     m_sheetBusy = false;
+    m_palette.reset();
+    m_paletteOn = m_paletteBusy = m_paletteDirty = false;
+    m_paletteOpacity = 0;
+    m_paletteItems.clear();
+    m_paletteRanked.clear();
     m_animating = false;
 }
 
@@ -281,6 +290,7 @@ void KrellisEffect::registerShortcuts()
         {"KrellisMoveDown", "Krellis: Move Panel Down", Qt::META | Qt::Key_Down, &KrellisEffect::moveDown, QKeySequence(Qt::META | Qt::Key_S)},
         {"KrellisResizeMode", "Krellis: Resize Mode", Qt::META | Qt::CTRL | Qt::Key_R, &KrellisEffect::toggleResizeMode},
         {"KrellisSaveView", "Krellis: Save View", Qt::META | Qt::ALT | Qt::Key_S, &KrellisEffect::saveView},
+        {"KrellisPalette", "Krellis: Quick Jump", Qt::META | Qt::Key_Slash, &KrellisEffect::togglePalette},
         {"KrellisUndo", "Krellis: Undo Layout Edit", Qt::META | Qt::ALT | Qt::Key_Z, &KrellisEffect::undo},
         {"KrellisRedo", "Krellis: Redo Layout Edit", Qt::META | Qt::ALT | Qt::SHIFT | Qt::Key_Z, &KrellisEffect::redo},
     };
@@ -323,6 +333,23 @@ void KrellisEffect::syncScratchShortcuts()
     }
 }
 
+// Registered on demand: pin is opt-in, so a disabled one does not hold Meta+Shift+P.
+void KrellisEffect::syncPinShortcut()
+{
+    if (!m_pinOn) {
+        qDeleteAll(m_pinActions);
+        m_pinActions.clear();
+        return;
+    }
+    if (!m_pinActions.isEmpty()) return;
+    auto *a = new QAction(this);
+    a->setObjectName(QStringLiteral("KrellisPin"));
+    a->setText(QStringLiteral("Krellis: Pin Panel"));
+    KGlobalAccel::self()->setGlobalShortcut(a, QKeySequence(Qt::META | Qt::SHIFT | Qt::Key_P));
+    connect(a, &QAction::triggered, this, [this] { hideHint(); pinActive(); });
+    m_pinActions << a;
+}
+
 void KrellisCanvas::watch(EffectWindow *w)
 {
     if (w->window()) {
@@ -333,7 +360,7 @@ void KrellisCanvas::watch(EffectWindow *w)
             if (const auto *t = trackedFor(w)) { m_tiles[t->panel].icon = QString(); schedule(); }
         });
         connect(w->window(), &Window::captionChanged, this, [this, w] {
-            if (trackedFor(w)) { m_barSignature.clear(); updateBar(); schedule(); }
+            if (trackedFor(w) || stowedFor(w)) { m_barSignature.clear(); updateBar(); updateTabStrips(); schedule(); }
         });
     }
     // A title-bar double click (or the maximize button) maximizes natively; Krellis answers with its own
@@ -643,6 +670,7 @@ TRect KrellisCanvas::restRect(const std::string &panel, const TRect *world) cons
         if (!entry) return {};
         r = panelAt(entry->rect, sizingCamera());
     }
+    r = belowTabs(panel, r); // a tabbed tile's windows sit under its strip
     // Clients get a sane real size even when the canvas is zoomed far out or in; the paint
     // transform covers the difference.
     for (const auto &t : m_windows) if (t.panel == panel) {
@@ -696,6 +724,7 @@ void KrellisCanvas::relayout(bool animate)
         ++it;
         forgetDrawer(gone);
     }
+    syncTabs();
     std::map<std::string, TRect> before;
     for (const auto &kv : m_rects)
         before[kv.first] = m_tween.apply(kv.first, kv.second.rect);
@@ -709,6 +738,7 @@ void KrellisCanvas::relayout(bool animate)
     updateBar();
     updateTiles(0);
     updateDrawerTabs();
+    updateTabStrips();
     changed();
     schedule();
 }
@@ -721,7 +751,8 @@ void KrellisCanvas::applyRest(bool stepping)
     const auto hidden = [this](const std::string &panel) { // a panel is hidden or somewhere in the layout, so no tree search
         return std::any_of(m_doc.hidden.begin(), m_doc.hidden.end(), [&](const auto &h) { return h.panel->id == panel; });
     };
-    for (auto &t : m_windows) {
+    for (auto *list : {&m_windows, &m_stowed})
+    for (auto &t : *list) {
         Window *window = t.window->window();
         if (!window || t.window->isMinimized() || t.window->isFullScreen() || t.window->isUserMove() || t.window->isUserResize() || hidden(t.panel))
             continue; // a fullscreen window covers its output by KWin's rule, not ours
@@ -851,7 +882,7 @@ void KrellisCanvas::dockAtSpawn(const NodePtr &panel)
 
 void KrellisCanvas::windowAdded(EffectWindow *w)
 {
-    if (!manageable(w) || trackedFor(w))
+    if (!manageable(w) || trackedFor(w) || stowedFor(w))
         return;
     if (m_resize) finishResize(false);
     const auto rule = rulesFor(w);
@@ -915,6 +946,20 @@ void KrellisCanvas::windowClosed(EffectWindow *w)
         schedule();
         return;
     }
+    if (const Tracked *hidden = stowedFor(w)) { // a tab behind another one: nothing was drawn, only the tab goes
+        const std::string view = hidden->view;
+        std::erase_if(m_stowed, [w](const Tracked &t) { return t.window == w; });
+        if (w == m_dragWindow) {
+            m_session.reset();
+            m_dragWindow = nullptr;
+            m_dragTabView.clear();
+            m_tabPress.reset();
+        }
+        m_doc = closeView(m_doc, view);
+        relayout(true);
+        updateDock();
+        return;
+    }
     for (size_t i = 0; i < m_windows.size(); ++i) {
         if (m_windows[i].window != w)
             continue;
@@ -936,8 +981,12 @@ void KrellisCanvas::windowClosed(EffectWindow *w)
         std::string next;
         if (m_closeFocus && (effects->activeWindow() == w || m_lastActivePanel == m_windows[i].panel))
             next = closeFocusPanel(m_doc, m_windows[i].view);
+        const std::string panelId = m_windows[i].panel;
+        const bool wasActive = effects->activeWindow() == w || m_lastActivePanel == panelId;
         m_doc = closeView(m_doc, m_windows[i].view);
         m_windows.erase(m_windows.begin() + long(i));
+        // The tile outlives its shown tab when other tabs are left: focus goes to the tab that takes over.
+        if (wasActive && locatePanel(m_doc, panelId).where != PanelLocation::Where::None) next = panelId;
         relayout(true);
         updateDock();
         if (!next.empty())
@@ -952,9 +1001,15 @@ void KrellisCanvas::windowClosed(EffectWindow *w)
 void KrellisCanvas::windowActivated(EffectWindow *w)
 {
     Tracked *t = trackedFor(w);
+    if (!t && stowedFor(w)) { // something asked for a tab that is behind another (a launcher, the app itself): bring it forward
+        selectTab(stowedFor(w)->view, false);
+        t = trackedFor(w);
+    }
     if (!t)
         return;
     m_lastActivePanel = t->panel;
+    // Whoever asked for this window (the start menu, a launcher, the app itself) wants to see it: a stashed one slides out.
+    slideOutDrawer(t->panel);
     if (floatScreen(t->panel))
         m_doc = raiseFloat(m_doc, t->panel);
     else
@@ -1277,11 +1332,7 @@ void KrellisCanvas::barAction(const QString &key)
                 return nullptr;
             }()) {
             // A drawer's sliver on the map slides it out, and keeps it out while the pointer is off at the map.
-            if (const std::string panel = t->panel; m_drawers.count(panel) && !m_drawers.at(panel).open) {
-                for (const auto &[other, d] : std::map<std::string, Drawer>(m_drawers))
-                    if (d.open) setDrawerOpen(other, false);
-                setDrawerOpen(panel, true, true);
-            }
+            slideOutDrawer(t->panel);
             effects->activateWindow(t->window);
         }
     } else if (key.startsWith(QLatin1String("framing:"))) {
@@ -1338,7 +1389,7 @@ bool KrellisCanvas::flightRect(EffectWindow *w, const Tracked &t, TRect &rect, d
     switch (f.kind) {
     case FlightKind::Appear: {
         const double e = APPEAR_EASE(p);
-        const TRect r = screenRect(t.panel);
+        const TRect r = belowTabs(t.panel, screenRect(t.panel));
         const double s = 0.97 + 0.03 * e;
         rect = {r.x + r.w * (1 - s) / 2, r.y + r.h * (1 - s) / 2, r.w * s, r.h * s};
         opacity = e;
@@ -1353,13 +1404,13 @@ bool KrellisCanvas::flightRect(EffectWindow *w, const Tracked &t, TRect &rect, d
         return true;
     }
     case FlightKind::Glide: {
-        rect = krellis::lerpRect(f.from, screenRect(t.panel), krellis::easeOutQuint(p));
+        rect = krellis::lerpRect(f.from, shownRect(t.panel), krellis::easeOutQuint(p));
         opacity = f.fromOpacity + (1 - f.fromOpacity) * krellis::easeOutQuint(p);
         return true;
     }
     case FlightKind::Restore: {
         const double e = krellis::DOCK_EASE(p);
-        rect = krellis::lerpRect(f.from, screenRect(t.panel), e);
+        rect = krellis::lerpRect(f.from, belowTabs(t.panel, screenRect(t.panel)), e);
         opacity = f.fromOpacity + (1 - f.fromOpacity) * e;
         return true;
     }
@@ -1430,7 +1481,9 @@ void KrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
     m_nowMs += double(ms);
     // The scenes live in KWin's overlay item, above every window, a fullscreen one included.
     m_overlaysCovered = std::any_of(m_windows.begin(), m_windows.end(), [](const Tracked &t) { return t.window->isFullScreen() && !t.window->isMinimized(); });
-    for (auto *scene : {&m_bar, &m_map, &m_tileScene, &m_drawerTabs, &m_slot, &m_toast, &m_sheet, &m_marquee})
+    if (m_overlaysCovered && m_paletteOn) closePalette(); // it would sit hidden over a window that keeps the keyboard
+    updatePins();
+    for (auto *scene : {&m_bar, &m_map, &m_tileScene, &m_drawerTabs, &m_tabStrips, &m_slot, &m_toast, &m_sheet, &m_palette, &m_marquee})
         if (*scene) (*scene)->setVisible(!m_overlaysCovered);
     m_layerTarget = layerShown() ? 1 : 0;
     if (m_layerDim != m_layerTarget) {
@@ -1495,6 +1548,7 @@ void KrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
         updateMarquee(dt);
         updateToast();
         updateSheet(dt);
+        updatePalette(dt);
         const double areaProgress = std::clamp((m_nowMs - m_areaChangedMs) / krellis::Motion::layoutMs, 0.0, 1.0);
         if (!m_uiFrom.isEmpty()) {
             const double t = krellis::easeOutQuint(areaProgress);
@@ -1505,8 +1559,9 @@ void KrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
         updateTiles(dt);
         updateMap();
         updateDrawerTabs();
+        updateTabStrips();
         const bool tilesMoving = std::any_of(m_tiles.begin(), m_tiles.end(), [](const auto &t) { return std::abs(t.second.velocity) > 0.001 || std::abs(t.second.target - t.second.amount) > 0.0001; });
-        m_animating = tilesMoving || areaProgress < 1 || springing || (m_map && !m_map->rootItem()->property("settled").toBool()) || tweening || !m_flights.empty() || !m_popups.empty() || !m_closing.empty() || m_session || m_slot || m_marquee || m_nav.flying() || m_toastBusy || m_sheetBusy || m_layerDim != m_layerTarget || (!m_glide && layoutAwaitingLanding()) || !m_landings.empty();
+        m_animating = tilesMoving || areaProgress < 1 || springing || (m_map && !m_map->rootItem()->property("settled").toBool()) || tweening || !m_flights.empty() || !m_popups.empty() || !m_closing.empty() || m_session || m_slot || m_marquee || m_nav.flying() || m_toastBusy || m_sheetBusy || m_paletteBusy || m_layerDim != m_layerTarget || (!m_glide && layoutAwaitingLanding()) || !m_landings.empty();
     }
 }
 
@@ -1525,7 +1580,7 @@ void KrellisCanvas::prePaintWindow(RenderView *view, EffectWindow *w, WindowPreP
         if (const auto *t = trackedFor(w))
             if (const auto tile = m_tiles.find(t->panel); tile != m_tiles.end() && tile->second.amount > 0)
                 data.setTranslucent();
-    } else if (m_closing.count(w)) {
+    } else if (m_closing.count(w) || behindTab(w)) {
         data.setTransformed();
         data.setTranslucent();
     }
@@ -1534,7 +1589,9 @@ void KrellisCanvas::prePaintWindow(RenderView *view, EffectWindow *w, WindowPreP
 void KrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data)
 {
     double opacity = 1;
-    if (const auto drawn = visualRect(w, &opacity)) {
+    const auto drawn = visualRect(w, &opacity);
+    if (!drawn && behindTab(w)) return; // a tab behind another one: it holds the tile's size, not its place in the picture
+    if (drawn) {
         const TRect want = *drawn;
         if (auto *tracked = trackedFor(w)) tracked->lastDrawn = want;
         if (const auto *tracked = trackedFor(w))
@@ -1607,7 +1664,7 @@ bool KrellisCanvas::awaitingLanding(const Tracked &t) const
     const QRectF frame = w->frameGeometry();
     if (frame.width() <= 0 || frame.height() <= 0 || t.requested->width() <= 0) return false;
     if (const Entry *entry = m_rects.find(t.panel)) {
-        const TRect natural = panelAt(entry->rect, sizingCamera()), real = restRect(t.panel);
+        const TRect natural = belowTabs(t.panel, panelAt(entry->rect, sizingCamera())), real = restRect(t.panel);
         if (std::abs(natural.w - real.w) > 0.5 || std::abs(natural.h - real.h) > 0.5) return false;
     }
     return std::abs(frame.width() - t.requested->width()) > 1 || std::abs(frame.height() - t.requested->height()) > 1;
@@ -1621,10 +1678,14 @@ bool KrellisCanvas::layoutAwaitingLanding() const
 std::optional<TRect> KrellisCanvas::visualRect(EffectWindow *w, double *opacity) const
 {
     if (m_closing.count(w)) return std::nullopt;
+    if (m_session && m_session->active() && w == m_dragWindow && stowedFor(w)) { // a tab torn out: the one thing of its tile in sight
+        if (opacity) *opacity = 1;
+        return TRect{m_lifted.x + m_area.x(), m_lifted.y + m_area.y(), m_lifted.w, m_lifted.h};
+    }
     for (const auto &t : m_windows) {
         if (t.window != w) continue;
         if (w->isFullScreen()) return std::nullopt; // painted and hit-tested untransformed, as KWin places it
-        TRect rect = screenRect(t.panel);
+        TRect rect = shownRect(t.panel);
         double alpha = 1;
         if (m_session && m_session->active() && w == m_dragWindow)
             rect = {m_lifted.x + m_area.x(), m_lifted.y + m_area.y(), m_lifted.w, m_lifted.h};
@@ -1641,7 +1702,7 @@ std::optional<TRect> KrellisCanvas::visualRect(EffectWindow *w, double *opacity)
         const Entry *entry = m_rects.find(t.panel);
         // A client held at a size other than its tile (minimum or maximum rules) is meant to be scaled.
         const bool clamped = entry && [&] {
-            const TRect natural = panelAt(entry->rect, sizingCamera()), real = restRect(t.panel);
+            const TRect natural = belowTabs(t.panel, panelAt(entry->rect, sizingCamera())), real = restRect(t.panel);
             return std::abs(natural.w - real.w) > 0.5 || std::abs(natural.h - real.h) > 0.5;
         }();
         // Without a glide the new layout is final from the first frame, while clients still hold their old
@@ -1650,11 +1711,12 @@ std::optional<TRect> KrellisCanvas::visualRect(EffectWindow *w, double *opacity)
         // layout at once. Not during a live border drag: a slow client (Brave) held at its stale
         // size would trail the dragged edge, so neighbours follow it, slightly stretched, as before.
         bool lagging = false;
-        if (!m_glide && !flights && frame.width() > 0 && frame.height() > 0 && !m_resize && layoutAwaitingLanding()) {
+        const bool thumbnail = pinRect(t.panel).has_value(); // sized from the window itself, so nothing to fit
+        if (!m_glide && !flights && !thumbnail && frame.width() > 0 && frame.height() > 0 && !m_resize && layoutAwaitingLanding()) {
             rect = {frame.x(), frame.y(), frame.width(), frame.height()};
             lagging = true;
         }
-        if (!lagging && unzoomed && !clamped && !m_resize && !floatScreen(t.panel) && frame.width() > 0 && frame.height() > 0 && rect.w > 0 && rect.h > 0) {
+        if (!lagging && !thumbnail && unzoomed && !clamped && !m_resize && !floatScreen(t.panel) && frame.width() > 0 && frame.height() > 0 && rect.w > 0 && rect.h > 0) {
             const double sx = rect.w / frame.width(), sy = rect.h / frame.height();
             if (std::abs(sx - sy) > 0.01 * std::max(sx, sy)) {
                 const double u = std::min(sx, sy);
@@ -1726,6 +1788,7 @@ static constexpr auto GESTURE_MODS = Qt::ControlModifier | Qt::AltModifier;
 
 bool KrellisCanvas::handleKey(const KeyboardKeyEvent &e)
 {
+    if (m_paletteOn) return paletteKey(e);
     if (m_naming && m_bar && m_bar->rootItem()) {
         if (e.key == Qt::Key_Escape) {
             if (e.state == KeyboardKeyState::Pressed) { m_naming = false; m_nameError = false; updateBar(); }
@@ -1762,7 +1825,7 @@ bool KrellisCanvas::handleKey(const KeyboardKeyEvent &e)
 
 bool KrellisCanvas::handleButton(const PointerButtonEvent &e)
 {
-    if (handleIconButton(e) || handlePeekButton(e)) return true;
+    if (handleIconButton(e) || handlePeekButton(e) || tabButton(e)) return true;
     if (m_naming && barKey(e.position) == QLatin1String("name-edit") && m_bar) {
         auto event = e;
         m_bar->forwardPointerButtonEvent(&event);
@@ -1844,7 +1907,7 @@ bool KrellisCanvas::handleButton(const PointerButtonEvent &e)
 bool KrellisCanvas::handleMotion(const PointerMotionEvent &e)
 {
     updateDrawerHover(e);
-    if (handleIconMotion(e)) return true;
+    if (handleIconMotion(e) || tabMotion(e.position)) return true;
     if (m_naming && barKey(e.position) == QLatin1String("name-edit") && m_bar) {
         auto event = e;
         m_bar->forwardPointerMotionEvent(&event);
@@ -2126,16 +2189,17 @@ void KrellisCanvas::userMoveFinished(EffectWindow *w)
     QTimer::singleShot(0, this, [this] { applyRest(); });
 }
 
-void KrellisCanvas::startDrag(EffectWindow *w, QPointF pointer)
+void KrellisCanvas::startDrag(EffectWindow *w, QPointF pointer, const std::string &viewId)
 {
     m_windowPointer = pointer;
     const Tracked *t = trackedFor(w);
+    if (!t) t = stowedFor(w); // a tab in hand is not the one on show
     if (!t || m_session)
         return;
     forgetDrawer(t->panel); // grabbed: it is a plain float from here on
     refreshRects();
     const QPointF rel = pointer - m_area.topLeft();
-    m_session = std::make_unique<krellis::DragSession>(*this, t->panel, std::string(), krellis::Point{rel.x(), rel.y()});
+    m_session = std::make_unique<krellis::DragSession>(*this, t->panel, viewId, krellis::Point{rel.x(), rel.y()});
     m_dragWindow = w;
     m_dragStartGeometry = w->frameGeometry();
     schedule();
@@ -2184,6 +2248,7 @@ void KrellisCanvas::endDrag(bool commit)
     m_session.reset(); // from here the document layout is what is shown
     m_dragWindow = nullptr;
     m_dragFromKWin = false;
+    m_dragTabView.clear();
     if (!out.wasDrag) {
         schedule();
         return;
@@ -2596,6 +2661,15 @@ void KrellisCanvas::setDrawerOpen(const std::string &panel, bool open, bool pinn
     }
 }
 
+void KrellisCanvas::slideOutDrawer(const std::string &panel)
+{
+    const auto d = m_drawers.find(panel);
+    if (d == m_drawers.end() || d->second.open) return;
+    for (const auto &[other, o] : std::map<std::string, Drawer>(m_drawers))
+        if (o.open) setDrawerOpen(other, false);
+    setDrawerOpen(panel, true, true);
+}
+
 void KrellisCanvas::updateDrawerHover(const PointerMotionEvent &event)
 {
     if (m_drawers.empty() || m_session || m_resize || event.buttons != Qt::NoButton) return;
@@ -2720,6 +2794,8 @@ QString KrellisCanvas::dump()
         if (frameOnly(t.panel)) lines.back() += QStringLiteral(" ICON");
         if (floatScreen(t.panel))
             lines.back() += QStringLiteral(" FLOAT");
+        if (isPinned(t.panel))
+            lines.back() += pinRect(t.panel) ? QStringLiteral(" PIN-SHOWN") : QStringLiteral(" PIN");
         TRect fr;
         double op = 1;
         if (flightRect(t.window, t, fr, op))
@@ -2735,9 +2811,30 @@ QString KrellisCanvas::dump()
         lines << QStringLiteral("SCRATCH count %1 shown %2 active %3 enabled %4").arg(s.value("count").toInt()).arg(s.value("shown").toBool()).arg(s.value("active").toBool()).arg(s.value("enabled").toBool());
         lines << QStringLiteral("LAYER dim %1").arg(m_layerDim, 0, 'f', 2);
     }
+    for (const auto &t : m_stowed) {
+        const RectF f = t.window->frameGeometry();
+        lines << QStringLiteral("TAB %1 %2 '%3' stowed frame %4,%5 %6x%7").arg(QString::fromStdString(t.panel), QString::fromStdString(t.view), t.window->caption())
+                     .arg(f.x(), 0, 'f', 1).arg(f.y(), 0, 'f', 1).arg(f.width(), 0, 'f', 1).arg(f.height(), 0, 'f', 1);
+    }
+    for (const auto &st : m_strips) {
+        QStringList titles;
+        for (const auto &title : st.titles) titles << QString::fromStdString(title);
+        lines << QStringLiteral("STRIP %1 %2,%3 %4x%5 tab %6 shown '%7' tabs [%8]").arg(QString::fromStdString(st.panel))
+                     .arg(st.rect.x, 0, 'f', 1).arg(st.rect.y, 0, 'f', 1).arg(st.rect.w, 0, 'f', 1).arg(st.rect.h, 0, 'f', 1).arg(st.tabW, 0, 'f', 1)
+                     .arg(QString::fromStdString(st.selected), titles.join(QStringLiteral(" | ")));
+    }
     lines << QStringLiteral("HISTORY undo %1 redo %2").arg(m_history.size()).arg(m_history.redoSize());
     if (m_sheetWanted || m_sheet)
         lines << QStringLiteral("WHICHKEY %1 opacity %2").arg(m_sheetWanted ? "shown" : "hiding").arg(m_sheetOpacity, 0, 'f', 2);
+    if (m_paletteOn || m_palette) {
+        lines << QStringLiteral("PALETTE %1 query '%2' selected %3 of %4 opacity %5")
+                     .arg(m_paletteOn ? "shown" : "hiding", m_paletteQuery).arg(m_paletteRanked.empty() ? -1 : m_paletteSel).arg(m_paletteRanked.size()).arg(m_paletteOpacity, 0, 'f', 2);
+        const int end = std::min<int>(int(m_paletteRanked.size()), m_paletteFirst + PALETTE_ROWS);
+        for (int rank = m_paletteFirst; rank < end; ++rank) {
+            const auto &it = m_paletteItems[m_paletteRanked[size_t(rank)]];
+            lines << QStringLiteral("PROW %1%2 %3 | %4 | %5%6").arg(rank == m_paletteSel ? ">" : " ").arg(rank).arg(it.title, it.app, it.detail, it.view ? " | view" : "");
+        }
+    }
     if (!m_toastText.isEmpty()) {
         lines << QStringLiteral("TOAST %1 age %2 opacity %3").arg(m_toastText).arg(m_toastPending ? 0.0 : m_nowMs - m_toastStartMs, 0, 'f', 0)
                      .arg(m_toast ? m_toast->rootItem()->property("toastOpacity").toDouble() : 0.0, 0, 'f', 2);
@@ -2924,7 +3021,7 @@ void KrellisEffect::simText(const QString &text)
     handleKey(event);
 }
 
-KWIN_EFFECT_FACTORY_SUPPORTED(KrellisEffect, "metadata.json", return krellisBootAllowed();)
+KWIN_EFFECT_FACTORY_SUPPORTED(KrellisEffect, "metadata.json", return krellisKWinMatches() && krellisBootAllowed();)
 
 } // namespace KWin
 

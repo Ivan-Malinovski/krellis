@@ -179,6 +179,66 @@ LayoutDocument closeView(LayoutDocument doc, const std::string &viewId)
     return doc;
 }
 
+// Gives `view` a panel of its own after the one that holds it. `n` offsets a float so several split out of one don't stack.
+static LayoutDocument splitOut(LayoutDocument doc, const std::string &view, const std::string &hostId, int n)
+{
+    const auto where = locatePanel(doc, hostId);
+    doc = detachView(std::move(doc), view, true);
+    NodePtr alone = makePanel(uid("panel"), {view}, view);
+    switch (where.where) {
+    case PanelLocation::Where::Docked:
+        return insertPanel(std::move(doc), alone, DockTarget::beside(hostId, Edge::Right));
+    case PanelLocation::Where::Floating: {
+        Rect r = where.floatState.rect;
+        r.x += 0.03 * n;
+        r.y += 0.03 * n;
+        return floatPanel(std::move(doc), alone, r, where.floatState.layer);
+    }
+    case PanelLocation::Where::Hidden:
+        doc.hidden.push_back({alone, where.restore});
+        return doc;
+    case PanelLocation::Where::None:
+        break;
+    }
+    return doc;
+}
+
+LayoutDocument untabView(LayoutDocument doc, const std::string &viewId)
+{
+    const NodePtr host = panelOfView(doc, viewId);
+    if (!host || host->views.size() < 2)
+        return doc;
+    return splitOut(std::move(doc), viewId, host->id, 1);
+}
+
+LayoutDocument tabInto(LayoutDocument doc, const std::string &viewId, const std::string &panelId)
+{
+    const NodePtr from = panelOfView(doc, viewId);
+    if (!from || from->id == panelId || !locatePanel(doc, panelId))
+        return doc;
+    doc = detachView(std::move(doc), viewId, true);
+    return addTab(std::move(doc), panelId, viewId);
+}
+
+LayoutDocument untabAll(LayoutDocument doc)
+{
+    for (const auto &host : allPanels(doc)) {
+        if (host->views.size() < 2) continue;
+        const std::string keep = host->selected.empty() ? host->views.front() : host->selected;
+        std::string after = host->id;
+        int n = 0;
+        for (const auto &view : host->views) {
+            if (view == keep) continue;
+            const size_t before = allPanels(doc).size();
+            doc = splitOut(std::move(doc), view, after, ++n);
+            // A docked split goes in after the previous one, so the tabs keep their order along the row.
+            if (locatePanel(doc, host->id).where == PanelLocation::Where::Docked && allPanels(doc).size() > before)
+                if (const NodePtr made = panelOfView(doc, view)) after = made->id;
+        }
+    }
+    return doc;
+}
+
 static NodePtr occupiedPanelAt(const NodePtr &node, bool fromEnd)
 {
     if (node->kind == Node::Kind::Panel)

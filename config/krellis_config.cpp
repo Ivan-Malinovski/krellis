@@ -60,6 +60,8 @@ Settings load(const QString &file)
     s.mapPinned = c.value(QStringLiteral("mapPinned"), s.mapPinned).toBool();
     s.glide = c.value(QStringLiteral("glide"), s.glide).toBool();
     s.scratchpad = c.value(QStringLiteral("scratchpad"), s.scratchpad).toBool();
+    s.pin = c.value(QStringLiteral("pin"), s.pin).toBool();
+    s.tabs = c.value(QStringLiteral("tabs"), s.tabs).toBool();
     s.landMs = std::max(0.0, c.value(QStringLiteral("landMs"), s.landMs).toDouble());
     s.tileMinWidth = std::clamp(c.value(QStringLiteral("tileMinWidth"), s.tileMinWidth).toInt(), 1, 4000);
     s.tileMinHeight = std::clamp(c.value(QStringLiteral("tileMinHeight"), s.tileMinHeight).toInt(), 1, 4000);
@@ -85,6 +87,8 @@ bool save(const Settings &s, const QString &file)
     c.setValue(QStringLiteral("mapPinned"), s.mapPinned);
     c.setValue(QStringLiteral("glide"), s.glide);
     c.setValue(QStringLiteral("scratchpad"), s.scratchpad);
+    c.setValue(QStringLiteral("pin"), s.pin);
+    c.setValue(QStringLiteral("tabs"), s.tabs);
     c.setValue(QStringLiteral("landMs"), s.landMs);
     c.setValue(QStringLiteral("tileMinWidth"), s.tileMinWidth);
     c.setValue(QStringLiteral("tileMinHeight"), s.tileMinHeight);

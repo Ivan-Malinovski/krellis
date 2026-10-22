@@ -20,6 +20,9 @@ The aim is to stay mouse-first without giving up keyboard friendliness or floati
 - **Drag to re-dock.** Drop a window on another one to split it, on a screen edge to dock there, or on a seam between tiles. Shift-drag a title bar to float it.
 - **Floating windows.** Float any window, or switch to floating-first mode where new windows float and only edge and corner drops tile. Floats snap to screen edges and corners.
 - **Keyboard movement and focus.** Move the focused tile through the layout with Meta+arrows (or Meta+A/S/D/F), focus neighbours with Meta+Ctrl+arrows, resize with the arrow keys. A tile at the edge of a monitor moves on to the next monitor.
+- **Quick jump.** Meta+/ opens a palette: type part of a window title, app or saved view and go straight there.
+- **Pin** (opt-in, `pin=true`). Pin a tile and, while it is scrolled out of view, it follows you as a live thumbnail in the corner; click it to jump back.
+- **Tabbed tiles** (on by default, `tabs=false` turns them off). Several windows can share one tile with a tab strip along its top; drop a window on a tile's title bar (the top strip) to tab it, drag a tab, or the bare part of the strip, to pull a window out.
 - **Minimap.** Shows the whole canvas, tucks itself away at the screen edge, and lets you drag a square to zoom to those tiles.
 - **Saved views, undo and redo** for layout edits, and **session restore**: the layout comes back after a login, matched by app id and window role.
 - **Edge drawers and a scratchpad.** Stash windows in a drawer at a screen edge; mark windows as scratch windows that come and go together with Meta+G (the scratchpad is opt-in).
@@ -29,7 +32,7 @@ The aim is to stay mouse-first without giving up keyboard friendliness or floati
 
 ## Requirements
 
-- KDE Plasma **6.7** on Wayland. The effect uses KWin's private C++ API, so it is **locked to the KWin it was built against**. Rebuild after every KWin upgrade (`./install.sh` again). Only 6.7.x has been tried.
+- KDE Plasma **6.7** on Wayland. The effect uses KWin's private C++ API, so it is **locked to the KWin it was built against**. Rebuild after every KWin upgrade (`./install.sh` again, or let the [pacman hook](#after-a-kwin-upgrade) do it). Only 6.7.x has been tried.
 - A C++20 compiler, CMake 3.20+, and Ninja or Make.
 - Development packages for KWin and its dependencies: KWin, KDecoration3, Qt 6 (Gui, Widgets, Quick, DBus), KDE Frameworks 6 (CoreAddons, GlobalAccel, ColorScheme, Config, and for the settings module KCMUtils, I18n, Kirigami), extra-cmake-modules, and the Vulkan headers (KWin's CMake config asks for them).
 
@@ -53,7 +56,19 @@ Then switch it on in **System Settings → Window Management → Desktop Effects
 
 If an older Krellis was already running, log out and back in: KWin keeps a plugin file it has loaded for the rest of the session, so the new build does not load until then.
 
-`./install.sh --help` lists the options (`--prefix`, `--no-kcm`, `--enable`, `--uninstall`). Extra CMake arguments go in `CMAKE_ARGS`. KWin only looks for effects under the system Qt plugin path, so keep the default prefix unless you know your KWin searches elsewhere.
+`./install.sh --help` lists the options (`--prefix`, `--no-kcm`, `--enable`, `--check`, `--build-only`, `--install-only`, `--pacman-hook`, `--uninstall`). Extra CMake arguments go in `CMAKE_ARGS`. KWin only looks for effects under the system Qt plugin path, so keep the default prefix unless you know your KWin searches elsewhere.
+
+### After a KWin upgrade
+
+The plugin only loads into the exact KWin it was built against. After a Plasma update that changes KWin, Krellis does not load (it logs why and sends one notification) until you rebuild: run `./install.sh` again and log out and back in. `./install.sh --check` tells you whether the installed plugin matches the installed KWin.
+
+On Arch and CachyOS you can have pacman deal with it:
+
+```sh
+./install.sh --pacman-hook=rebuild   # or =warn to only print what to do
+```
+
+This installs `/etc/pacman.d/hooks/krellis-kwin.hook`. After a transaction that upgrades `kwin`, it rebuilds Krellis from this checkout as your user and installs it (`rebuild`), or just prints the rebuild command (`warn`). Keep the checkout where it is, or rerun the command after moving it. `./install.sh --no-pacman-hook` removes the hook. The hook has only been exercised against a staging directory, not through a real pacman upgrade.
 
 ### Uninstall
 
@@ -73,12 +88,17 @@ Krellis registers its shortcuts as KDE global shortcuts, so you can change any o
 | Meta+Ctrl + arrows | Focus the tile in that direction |
 | Meta+Ctrl+R | Resize with the arrow keys |
 | Meta + `[` / `]` | Previous / next panel |
+| Meta + `/` | Quick jump: search windows and saved views, Return to go there |
 | Meta+Alt + Up / Down | Overview / step out |
 | Meta+Alt + Left / Right | Back / forward through camera history |
 | Meta+Shift+Return | Maximize panel |
 | Meta+Shift+F | Float / tile panel |
 | Meta+Shift+X | Stash the window in an edge drawer |
 | Meta+Shift+T | Flip stacked / side by side |
+| Meta+Shift+P | Pin panel: show it in the corner while its tile is out of view (needs `pin` enabled) |
+| Meta+PageDown / Meta+PageUp | Next / previous tab in the tile (needs `tabs`, on by default) |
+| Meta+Ctrl+Shift + arrows | Group the focused window into the neighbouring tile as a tab (needs `tabs`, on by default) |
+| Meta+Shift+U | Split the shown tab out into its own tile (needs `tabs`, on by default) |
 | Meta+Shift+H | Hide panel to the dock |
 | Meta+Shift+D | Dock beside the stage |
 | Meta+Shift+W | Close panel |
@@ -119,6 +139,8 @@ Use the settings module (System Settings → Window Management → Krellis, or t
 | `mapPinned` | `false` | Keep the minimap out instead of sliding it off the edge |
 | `glide` | `false` | Spring camera and animated layout changes. Off, windows go straight to their new rectangles and play a short move-and-scale (`landMs`, default 200 ms) |
 | `scratchpad` | `false` | The scratch layer and its shortcuts |
+| `pin` | `false` | Pin shortcut (Meta+Shift+P) and the corner thumbnails |
+| `tabs` | `true` | Tabbed tiles: tab strips, the tab shortcuts, and dropping a window on a tile's title bar tabs it (the middle of a tile does not) |
 | `followTheme` | `true` | Overlays use the Plasma colour scheme and accent |
 | `toasts` | `true` | Brief labels on toggles, undo and redo |
 | `flyTo` | `false` | Long camera jumps zoom out, pan and zoom in (needs `glide`) |
@@ -132,7 +154,7 @@ An effect that crashes takes the compositor down with it, and every Wayland app 
 
 - **Meta+Alt+Escape** turns it off at any time and puts windows back at their normal geometry.
 - A crash-loop breaker refuses to load the effect after it has taken KWin down twice in a row soon after loading, and sends a notification, so you can still log in.
-- The plugin is tied to the exact KWin it was built against. After a Plasma update, reinstall before logging in again.
+- The plugin is tied to the exact KWin it was built against. If KWin changed, it refuses to load rather than risk the compositor, and says so in the journal and in a notification. Reinstall (see [After a KWin upgrade](#after-a-kwin-upgrade)).
 
 It has been exercised in a nested KWin and on one real desktop. Hardware input, fractional scaling and unusual monitor layouts have had little testing.
 
@@ -145,7 +167,7 @@ cmake -S . -B build-core -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build-core && ctest --test-dir build-core --output-on-failure
 ```
 
-The effect and the settings module need the KWin development files (`-DKRELLIS_BUILD_EFFECT=ON`). Scenario scripts in `scenarios/` drive the effect inside a nested KWin that never touches your session; `tools/nested.sh` runs one. [`AGENTS.md`](AGENTS.md) describes the architecture, the harness, and the many gotchas.
+The effect and the settings module need the KWin development files (`-DKRELLIS_BUILD_EFFECT=ON`). Scenario scripts in `scenarios/` drive the effect inside a nested KWin that never touches your session; `tools/nested.sh` runs one, and `tools/scenarios.sh [name...]` runs several (or all of them) in parallel. [`AGENTS.md`](AGENTS.md) describes the architecture, the harness, and the many gotchas.
 
 ## Credits
 

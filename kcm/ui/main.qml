@@ -134,6 +134,38 @@ KCM.SimpleKCM {
                 text: i18n("Marked windows float over the canvas and come and go together. Meta+Shift+G marks the active window; Meta+G is also KWin's Grid View, so free it in Shortcuts first. Off, the shortcuts are released and the minimap has no scratchpad row.")
             }
 
+            QQC2.CheckBox {
+                Kirigami.FormData.label: i18n("Pin:")
+                text: i18n("Enable (Meta+Shift+P pins the active tile)")
+                checked: kcm.pin
+                onToggled: kcm.pin = checked
+            }
+            QQC2.Label {
+                Layout.fillWidth: true
+                Layout.preferredWidth: Kirigami.Units.gridUnit * 18
+                Layout.maximumWidth: Kirigami.Units.gridUnit * 24
+                wrapMode: Text.WordWrap
+                opacity: 0.7
+                font: Kirigami.Theme.smallFont
+                text: i18n("A pinned tile keeps its place in the layout, and while it is scrolled out of view it shows as a live thumbnail in the bottom-left corner; click it to go back. Off, the shortcut is released and pins are dropped.")
+            }
+
+            QQC2.CheckBox {
+                Kirigami.FormData.label: i18n("Tabs:")
+                text: i18n("Enable tabbed tiles")
+                checked: kcm.tabs
+                onToggled: kcm.tabs = checked
+            }
+            QQC2.Label {
+                Layout.fillWidth: true
+                Layout.preferredWidth: Kirigami.Units.gridUnit * 18
+                Layout.maximumWidth: Kirigami.Units.gridUnit * 24
+                wrapMode: Text.WordWrap
+                opacity: 0.7
+                font: Kirigami.Theme.smallFont
+                text: i18n("Several windows can share one tile and show as tabs along its top. Drop a window on a tile's title bar to add it as a tab; drag a tab, or the bare strip, out to split it off again. Switched off, tabbed tiles are split back into separate tiles.")
+            }
+
             Kirigami.Separator { Kirigami.FormData.isSection: true; Kirigami.FormData.label: i18n("Motion") }
 
             QQC2.CheckBox {

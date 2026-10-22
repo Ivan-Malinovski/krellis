@@ -40,6 +40,8 @@ class KrellisKcm : public KQuickConfigModule
     Q_PROPERTY(bool map READ map WRITE setMap NOTIFY settingsChanged)
     Q_PROPERTY(bool mapPinned READ mapPinned WRITE setMapPinned NOTIFY settingsChanged)
     Q_PROPERTY(bool scratchpad READ scratchpad WRITE setScratchpad NOTIFY settingsChanged)
+    Q_PROPERTY(bool pin READ pin WRITE setPin NOTIFY settingsChanged)
+    Q_PROPERTY(bool tabs READ tabs WRITE setTabs NOTIFY settingsChanged)
     Q_PROPERTY(bool glide READ glide WRITE setGlide NOTIFY settingsChanged)
     Q_PROPERTY(int landMs READ landMs WRITE setLandMs NOTIFY settingsChanged)
     Q_PROPERTY(int tileMinWidth READ tileMinWidth WRITE setTileMinWidth NOTIFY settingsChanged)
@@ -65,6 +67,8 @@ public:
     bool map() const { return m_current.map; }
     bool mapPinned() const { return m_current.mapPinned; }
     bool scratchpad() const { return m_current.scratchpad; }
+    bool pin() const { return m_current.pin; }
+    bool tabs() const { return m_current.tabs; }
     bool glide() const { return m_current.glide; }
     int landMs() const { return int(m_current.landMs); }
     int tileMinWidth() const { return m_current.tileMinWidth; }
@@ -82,6 +86,8 @@ public:
     void setMap(bool v) { edit([&] { m_current.map = v; }); }
     void setMapPinned(bool v) { edit([&] { m_current.mapPinned = v; }); }
     void setScratchpad(bool v) { edit([&] { m_current.scratchpad = v; }); }
+    void setPin(bool v) { edit([&] { m_current.pin = v; }); }
+    void setTabs(bool v) { edit([&] { m_current.tabs = v; }); }
     void setGlide(bool v) { edit([&] { m_current.glide = v; }); }
     void setLandMs(int v) { edit([&] { m_current.landMs = v; }); }
     void setTileMinWidth(int v) { edit([&] { m_current.tileMinWidth = v; }); }

@@ -10,6 +10,7 @@ namespace L = krellis::layout;
 
 struct DHost : DragHost {
     LayoutDocument document;
+    bool bodyTabsOn = true;
     RectMap rects;
     int tweens = 0;
     Point vp{1000, 600};
@@ -18,6 +19,7 @@ struct DHost : DragHost {
     Point viewport() const override { return vp; }
     double inset() const override { return 8; }
     double tabbarHeight(const Node &) const override { return 30; }
+    bool bodyTabs() const override { return bodyTabsOn; }
     int tabIndexAt(const Node &p, double) const override { return int(p.views.size()); }
     Rect toScreen(const Rect &w) const override { return {w.x * vp.x, w.y * vp.y, w.w * vp.x, w.h * vp.y}; }
     Point fromScreen(Point s) const override { return {s.x / vp.x, s.y / vp.y}; }
@@ -93,6 +95,31 @@ private slots:
         QVERIFY(d.layoutTargets().count(DROP_SLOT));
         QCOMPARE(d.dropLabel(), std::string("Add as tab"));
         QCOMPARE(h.tweens, 1);
+    }
+    void onlyTheTitleBandTabsWhenTheBodyDoesNot()
+    {
+        DHost h;
+        h.bodyTabsOn = false;
+        h.load(three());
+        DragSession d(h, "A", "", {100, 300});
+        QVERIFY(d.move({500, 300}, 0)); // centre of B: no longer a tab target
+        QVERIFY(!d.candidate() || d.candidate()->kind != DropTarget::Kind::Tab);
+        QVERIFY(d.move({500, 20}, 10)); // the title band of B (its top 30 px)
+        QVERIFY(d.candidate());
+        QCOMPARE(int(d.candidate()->kind), int(DropTarget::Kind::Tab));
+        QCOMPARE(d.candidate()->panel, std::string("B"));
+    }
+    void splitAboveSitsRightUnderTheTitleBand()
+    {
+        DHost h;
+        h.bodyTabsOn = false;
+        h.load(three());
+        DragSession d(h, "A", "", {100, 300});
+        QVERIFY(d.move({500, 60}, 0)); // below B's title band (30 px), inside its top edge zone
+        QVERIFY(d.candidate());
+        QCOMPARE(int(d.candidate()->kind), int(DropTarget::Kind::Dock));
+        QVERIFY(d.move({500, 20}, 10)); // the band itself
+        QCOMPARE(int(d.candidate()->kind), int(DropTarget::Kind::Tab));
     }
     void edgeBandDocksBesideAndCommitMovesPanel()
     {

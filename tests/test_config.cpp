@@ -37,11 +37,13 @@ private Q_SLOTS:
         QTemporaryDir dir;
         const QString file = dir.filePath("krellisrc");
         Settings s;
-        s.closeFocus = false; s.floatFirst = true; s.spawnTarget = SpawnTarget::Focused; s.peek = 12; s.map = false; s.mapPinned = true; s.glide = true; s.landMs = 90; s.iconBelow = 40; s.tileMinWidth = 320; s.tileMinHeight = 200; s.scratchpad = true;
+        s.closeFocus = false; s.floatFirst = true; s.spawnTarget = SpawnTarget::Focused; s.peek = 12; s.map = false; s.mapPinned = true; s.glide = true; s.landMs = 90; s.iconBelow = 40; s.tileMinWidth = 320; s.tileMinHeight = 200; s.scratchpad = true; s.pin = true; s.tabs = false;
         s.followTheme = false; s.toasts = false; s.flyTo = true; s.whichKey = false; s.whichKeyDelayMs = 750;
         QVERIFY(save(s, file));
         QCOMPARE(load(file), s);
         QVERIFY(!Settings{}.scratchpad);
+        QVERIFY(!Settings{}.pin);
+        QVERIFY(Settings{}.tabs);
         QVERIFY(Settings{}.map);
     }
     void polishSettingsDefaultsAndClamps()

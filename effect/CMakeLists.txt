@@ -21,9 +21,11 @@ if(KRELLIS_BUILD_KCM)
 endif()
 configure_file(metadata.json.in ${CMAKE_CURRENT_BINARY_DIR}/metadata.json @ONLY)
 configure_file(krellis.qrc.in ${CMAKE_CURRENT_BINARY_DIR}/${KRELLIS_ID}.qrc @ONLY)
-add_library(krellis MODULE native_resize.cpp krellis_effect.cpp multicanvas.cpp surface_input.cpp view_rules.cpp persistence.cpp session_store.cpp theme.cpp boot_guard.cpp ${CMAKE_CURRENT_BINARY_DIR}/${KRELLIS_ID}.qrc)
+add_library(krellis MODULE native_resize.cpp krellis_effect.cpp multicanvas.cpp surface_input.cpp view_rules.cpp persistence.cpp palette.cpp pin.cpp tabs.cpp session_store.cpp theme.cpp boot_guard.cpp ${CMAKE_CURRENT_BINARY_DIR}/${KRELLIS_ID}.qrc)
 target_include_directories(krellis PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_compile_definitions(krellis PRIVATE KRELLIS_ID="${KRELLIS_ID}")
+# The plugin only loads into the KWin it was built against (see core/kwin_match.h); the source directory is named in
+# the notification that tells the user to rebuild.
+target_compile_definitions(krellis PRIVATE KRELLIS_ID="${KRELLIS_ID}" KRELLIS_KWIN_VERSION="${KWin_VERSION}" KRELLIS_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 target_link_libraries(krellis PRIVATE krellis_core krellis_config KWin::kwin KDecoration3::KDecoration KF6::CoreAddons KF6::GlobalAccel KF6::ColorScheme KF6::ConfigCore KF6::ConfigGui Qt6::DBus Qt6::Quick)
 set_target_properties(krellis PROPERTIES PREFIX "" OUTPUT_NAME ${KRELLIS_ID})
 # Stage a plugin root the nested harness can point QT_PLUGIN_PATH at.

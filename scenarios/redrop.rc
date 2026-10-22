@@ -1,0 +1,8 @@
+# redrop drops a window in the middle of a tile, which tabs it when tabs are on; it tests column weights, not tabs.
+[General]
+glide=true
+map=false
+followTheme=false
+toasts=false
+whichKey=false
+tabs=false

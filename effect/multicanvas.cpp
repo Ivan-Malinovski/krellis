@@ -196,6 +196,8 @@ void KrellisEffect::syncOutputs()
         canvas->m_spawnTarget = m_spawnTarget;
         canvas->m_peekPx = m_peekPx;
         canvas->m_scratchpad = m_scratchpad;
+        canvas->setPinOn(m_pinOn);
+        canvas->setTabsOn(m_tabsOn);
         canvas->m_glide = m_glide;
         canvas->m_landMs = m_landMs;
         canvas->m_iconBelow = m_iconBelow;
@@ -250,7 +252,8 @@ void KrellisEffect::syncOutputs()
         for (const auto &c : m_canvases)
             if (outputs.contains(c->m_output)) { target = c.get(); break; }
         if (!target) { ++it; continue; } // Preserve documents until an output is available.
-        const auto windows = removed->m_windows;
+        auto windows = removed->m_windows;
+        windows.insert(windows.end(), removed->m_stowed.begin(), removed->m_stowed.end()); // tabs part company here
         removed->m_session.reset();
         removed->m_dragWindow = nullptr;
         for (const auto &t : windows)
@@ -263,7 +266,7 @@ void KrellisEffect::syncOutputs()
 KrellisCanvas *KrellisEffect::owner(EffectWindow *w) const
 {
     for (const auto &canvas : m_canvases)
-        if (canvas->trackedFor(w) || canvas->m_closing.count(w))
+        if (canvas->trackedFor(w) || canvas->stowedFor(w) || canvas->m_closing.count(w))
             return canvas.get();
     if (w && w->isPopupWindow()) {
         auto *parent = w->transientFor();
@@ -292,7 +295,9 @@ KrellisCanvas *KrellisEffect::current() const
 
 void KrellisCanvas::detachWindow(EffectWindow *w)
 {
-    if (auto *tracked = trackedFor(w)) {
+    auto *tracked = trackedFor(w);
+    if (!tracked) tracked = stowedFor(w);
+    if (tracked) {
         if (m_resize) finishResize(false);
         const std::string view = tracked->view;
         if (m_dragWindow == w) {
@@ -303,6 +308,9 @@ void KrellisCanvas::detachWindow(EffectWindow *w)
         m_flights.erase(w);
         m_doc = krellis::closeView(m_doc, view);
         std::erase_if(m_windows, [w](const auto &t) { return t.window == w; });
+        std::erase_if(m_stowed, [w](const auto &t) { return t.window == w; });
+        m_dragTabView.clear();
+        m_tabPress.reset();
         relayout(true);
         updateDock();
     }
@@ -311,10 +319,12 @@ void KrellisCanvas::detachWindow(EffectWindow *w)
 void KrellisEffect::transfer(EffectWindow *w, KrellisCanvas *target)
 {
     auto *source = owner(w);
-    if (!source || source == target || !source->trackedFor(w)) return;
+    if (!source || source == target) return;
+    auto *tracked = source->trackedFor(w);
+    if (!tracked) tracked = source->stowedFor(w);
+    if (!tracked) return;
     if (source->m_resize) source->finishResize(false);
     if (target->m_resize) target->finishResize(false);
-    auto *tracked = source->trackedFor(w);
     TRect from = source->screenRect(tracked->panel);
     double opacity = 1;
     source->flightRect(w, *tracked, from, opacity);
@@ -374,6 +384,8 @@ bool KrellisEffect::handleButton(const PointerButtonEvent &e)
             return surfaceButton(e);
         return false; // KWin's interactive-move filter follows Effects in the chain.
     }
+    if (paletteButton(e)) return true;
+    if (pinButton(e)) return true;
     if (e.state == PointerButtonState::Pressed) scratchClick(e.position);
     if (m_clientGrab && !m_pointerCanvas && !m_pinchCanvas) return surfaceButton(e);
     auto *canvas = m_pointerCanvas ? m_pointerCanvas : canvasAt(e.position);
@@ -392,6 +404,122 @@ bool KrellisEffect::handleButton(const PointerButtonEvent &e)
     }
     return handled || surfaceButton(e);
 }
+// While the palette is open every click belongs to it: a row jumps, the card itself is inert, anywhere else closes it.
+// The release of a click it took is swallowed too, so it cannot land on the window underneath.
+bool KrellisEffect::paletteButton(const PointerButtonEvent &e)
+{
+    if (e.state == PointerButtonState::Released) {
+        const bool swallow = m_swallowRelease;
+        m_swallowRelease = false;
+        return swallow;
+    }
+    auto *palette = paletteCanvas();
+    if (!palette) return false;
+    m_swallowRelease = true;
+    leaveSurface();
+    const QString hit = palette->paletteHit(e.position);
+    if (hit.startsWith(QLatin1String("row:")))
+        palette->paletteGo(palette->m_paletteFirst + hit.mid(4).toInt());
+    else if (hit.isEmpty())
+        palette->closePalette();
+    return true;
+}
+KrellisCanvas *KrellisEffect::paletteCanvas() const
+{
+    for (const auto &canvas : m_canvases)
+        if (canvas->paletteOpen()) return canvas.get();
+    return nullptr;
+}
+
+// Everything the palette can jump to, most recently used first, with the window you are in last so that opening the
+// palette and pressing Return goes back to the previous one. Saved views of every output follow the windows.
+void KrellisEffect::togglePalette()
+{
+    markSessionInteraction();
+    if (auto *open = paletteCanvas()) {
+        open->closePalette();
+        return;
+    }
+    auto *canvas = current();
+    if (!canvas || canvas->m_overlaysCovered || canvas->m_naming || m_resizeMode) return;
+    for (const auto &c : m_canvases)
+        if (c->m_drag != KrellisCanvas::Drag::None || c->m_session || c->m_nav.gestureActive()) return;
+    const bool several = m_canvases.size() > 1;
+    std::vector<KrellisCanvas::PaletteItem> items;
+    EffectWindow *active = effects->activeWindow();
+    auto add = [&](EffectWindow *w) {
+        auto *home = owner(w);
+        if (!home || w->isDeleted()) return;
+        const auto *tracked = home->trackedFor(w);
+        if (!tracked) tracked = home->stowedFor(w); // a tab behind another one
+        if (!tracked) return;
+        const std::string panel = tracked->panel;
+        QStringList detail;
+        if (w->isMinimized() && !home->scratchWindow(w)) detail << QStringLiteral("hidden");
+        if (home->scratchWindow(w)) detail << QStringLiteral("scratchpad");
+        else if (home->m_drawers.count(panel)) detail << QStringLiteral("drawer");
+        else if (home->floatScreen(panel)) detail << QStringLiteral("floating");
+        if (several) detail << home->m_output->name();
+        QString app = KrellisCanvas::appId(w);
+        app = app.mid(app.lastIndexOf(QLatin1Char('.')) + 1);
+        KrellisCanvas::PaletteItem item{w->caption(), app, detail.join(QStringLiteral(" · ")), false, {}};
+        item.go = [this, w = QPointer<EffectWindow>(w), home = QPointer<KrellisCanvas>(home)] {
+            if (!w || !home) return;
+            markSessionInteraction();
+            m_selectedOutput = home->m_output;
+            if (home->scratchWindow(w)) {
+                m_scratchLast = w;
+                showScratch(scratchWindows());
+            }
+            home->jumpTo(w);
+        };
+        items.push_back(std::move(item));
+    };
+    const auto stack = effects->stackingOrder();
+    for (auto it = stack.rbegin(); it != stack.rend(); ++it)
+        if (*it != active) add(*it);
+    if (active) add(active);
+    for (const auto &c : m_canvases)
+        for (const auto &framing : c->m_nav.framings()) {
+            KrellisCanvas::PaletteItem item{QString::fromStdString(framing.name), {}, several ? c->m_output->name() : QString(), true, {}};
+            item.go = [this, home = QPointer<KrellisCanvas>(c.get()), id = framing.id] {
+                if (!home) return;
+                markSessionInteraction();
+                m_selectedOutput = home->m_output;
+                home->m_nav.goFraming(id);
+                home->applyRest();
+            };
+            items.push_back(std::move(item));
+        }
+    canvas->openPalette(std::move(items));
+}
+// A pinned window's thumbnail is a button: a click reveals the tile it stands in for, and neither press nor release
+// reaches any window.
+EffectWindow *KrellisEffect::pinUnder(QPointF p) const
+{
+    if (m_clientGrab || m_pointerCanvas) return nullptr;
+    auto *canvas = canvasAt(p);
+    return canvas ? canvas->pinAt(p) : nullptr;
+}
+bool KrellisEffect::pinButton(const PointerButtonEvent &e)
+{
+    if (e.state == PointerButtonState::Released) {
+        const bool swallow = m_swallowRelease;
+        m_swallowRelease = false;
+        return swallow;
+    }
+    EffectWindow *w = pinUnder(e.position);
+    if (!w) return false;
+    m_swallowRelease = true;
+    leaveSurface();
+    if (e.button == Qt::LeftButton) {
+        markSessionInteraction();
+        auto *home = owner(w);
+        m_selectedOutput = home->m_output;
+        home->jumpTo(w);
+    }
+    return true;
+}
 bool KrellisEffect::handleMotion(const PointerMotionEvent &e)
 {
     for (const auto &canvas : m_canvases) canvas->m_shiftHeld = e.modifiers & Qt::ShiftModifier;
@@ -400,9 +528,19 @@ bool KrellisEffect::handleMotion(const PointerMotionEvent &e)
             if (auto *canvas = owner(active)) canvas->resizeAt(active, e.position);
         return false; // KWin still owns the native interactive grab.
     }
+    if (auto *palette = paletteCanvas()) {
+        leaveSurface();
+        const QString hit = palette->paletteHit(e.position);
+        if (hit.startsWith(QLatin1String("row:"))) palette->paletteHover(hit.mid(4).toInt());
+        return true;
+    }
     if (m_pointerCanvas) {
         leaveSurface();
         return m_pointerCanvas->handleMotion(e);
+    }
+    if (!m_clientGrab && pinUnder(e.position)) { // a thumbnail is a button, not a window: nothing underneath should see the pointer
+        leaveSurface();
+        return true;
     }
     if (m_clientGrab) return surfaceMotion(e);
     bool handled = false;
@@ -413,6 +551,11 @@ bool KrellisEffect::handleAxis(const PointerAxisEvent &e)
 {
     if (auto *active = effects->activeWindow(); active && (active->isUserMove() || active->isUserResize()))
         return false; // KWin's interactive-move filter follows Effects in the chain.
+    if (auto *palette = paletteCanvas()) {
+        if (e.orientation == Qt::Vertical) palette->paletteScroll(e.delta, e.source == PointerAxisSource::Wheel);
+        return true;
+    }
+    if (pinUnder(e.position)) return true;
     auto *canvas = canvasAt(e.position);
     // Scrolling over a server-side title bar zooms without any key held.
     bool titleBar = false;
@@ -512,7 +655,7 @@ bool KrellisEffect::handleKey(const KeyboardKeyEvent &e)
     if (e.state == KeyboardKeyState::Pressed) markSessionInteraction();
     if (m_resizeMode) return handleResizeKey(e);
     KrellisCanvas *editing = nullptr;
-    for (const auto &canvas : m_canvases) if (canvas->m_naming) { editing = canvas.get(); break; }
+    for (const auto &canvas : m_canvases) if (canvas->capturesKeys()) { editing = canvas.get(); break; }
     if (e.state == KeyboardKeyState::Released && m_inertKeys.erase(e.key)) {
         if (editing) editing->handleKey(e);
         return true;
@@ -606,6 +749,7 @@ void KrellisEffect::previousPanel() { markSessionInteraction(); if (auto *canvas
 void KrellisEffect::cyclePanel(int step) { markSessionInteraction(); if (auto *canvas = current()) canvas->cyclePanel(step); }
 void KrellisEffect::toggleMaximizeActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleMaximizeActive(); }
 void KrellisEffect::toggleFloatActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleFloatActive(); }
+void KrellisEffect::pinActive() { if (!m_pinOn) return; markSessionInteraction(); if (auto *canvas = current()) canvas->togglePinActive(); }
 void KrellisEffect::stashActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->stashActive(); }
 void KrellisEffect::flipActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->flipActive(); }
 void KrellisEffect::toggleHideActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleHideActive(); }
@@ -749,6 +893,12 @@ void KrellisEffect::focusDirection(const QString &direction)
     markSessionInteraction();
     if (const auto dir = parseDirection(direction)) if (auto *canvas = current()) canvas->focusDirection(*dir);
 }
+void KrellisEffect::groupDirection(const QString &direction)
+{
+    markSessionInteraction();
+    const auto dir = parseDirection(direction);
+    if (auto *canvas = dir ? current() : nullptr) canvas->groupWithNeighbour(*dir);
+}
 void KrellisEffect::moveDirection(const QString &direction)
 {
     markSessionInteraction();
@@ -881,6 +1031,10 @@ void KrellisEffect::applySettings(const krellis::config::Settings &settings)
     }
     m_scratchpad = settings.scratchpad;
     syncScratchShortcuts();
+    m_pinOn = settings.pin;
+    syncPinShortcut();
+    m_tabsOn = settings.tabs;
+    syncTabShortcuts();
     for (const auto &canvas : m_canvases) {
         canvas->m_closeFocus = m_closeFocus;
         canvas->m_floatFirst = m_floatFirst;
@@ -889,6 +1043,8 @@ void KrellisEffect::applySettings(const krellis::config::Settings &settings)
         canvas->m_mapPinned = m_mapPinned;
         canvas->m_mapOn = m_showMap;
         canvas->m_scratchpad = m_scratchpad;
+        canvas->setPinOn(m_pinOn);
+        canvas->setTabsOn(m_tabsOn);
         canvas->m_glide = m_glide;
         canvas->m_landMs = m_landMs;
         canvas->m_iconBelow = m_iconBelow;

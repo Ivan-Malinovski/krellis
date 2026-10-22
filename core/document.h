@@ -47,6 +47,13 @@ LayoutDocument selectView(LayoutDocument doc, const std::string &viewId);
 LayoutDocument addTab(LayoutDocument doc, const std::string &panelId, const std::string &viewId,
                       std::optional<int> index = std::nullopt, bool select = true);
 LayoutDocument reorderTabs(LayoutDocument doc, const std::string &panelId, const std::vector<std::string> &order);
+/// Splits every panel that holds several views into one panel per view, each view's own panel taking the place after the
+/// one it came from: docked beside it, floating just offset from it, hidden next to it. The selected view stays put.
+LayoutDocument untabAll(LayoutDocument doc);
+/// Splits one view out of a multi-view panel into a panel of its own beside it (as `untabAll` does for each); no-op otherwise.
+LayoutDocument untabView(LayoutDocument doc, const std::string &viewId);
+/// Moves a view out of its panel (which closes if it was the last view) into another panel as the selected tab.
+LayoutDocument tabInto(LayoutDocument doc, const std::string &viewId, const std::string &panelId);
 
 struct DockTarget {
     bool into = false;

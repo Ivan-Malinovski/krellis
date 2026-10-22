@@ -229,6 +229,53 @@ private slots:
         QCOMPARE(bestFit(Rect{0, 0, 2.0 / 3, 1}, e), rangeId("r", {"a", "b"}));
         QCOMPARE(frameLeaves(root, {"b", "c"}), rangeId("r", {"b", "c"}));
     }
+    void untabAllSplitsEveryTabbedPanel()
+    {
+        auto root = L::row({L::panel({L::view("t", "a"), L::view("t", "b"), L::view("t", "c")}, "one"), L::panel({L::view("t", "d")}, "two")});
+        auto doc = createDocument(&root);
+        doc = selectView(doc, "b");
+        doc = untabAll(doc);
+        QCOMPARE(panelOfView(doc, "b")->id, std::string("one"));
+        QCOMPARE(panelOfView(doc, "b")->views, (V{"b"}));
+        for (const char *v : {"a", "c", "d"})
+            QCOMPARE(panelOfView(doc, v)->views.size(), size_t(1));
+        QVERIFY(panelOfView(doc, "a")->id != panelOfView(doc, "c")->id);
+        auto seen = viewIds(doc);
+        std::sort(seen.begin(), seen.end());
+        QCOMPARE(seen, (V{"a", "b", "c", "d"}));
+        QCOMPARE(untabAll(doc).root->kind, doc.root->kind); // nothing left to split
+    }
+    void untabAllKeepsFloatsAndHiddenPanels()
+    {
+        auto root = L::row({L::panel({L::view("t", "a")}, "one"), L::panel({L::view("t", "x"), L::view("t", "y")}, "two")});
+        auto doc = createDocument(&root);
+        doc.views["f"] = {"t", "f", {}};
+        doc.views["g"] = {"t", "g", {}};
+        doc = floatPanel(doc, makePanel("fl", {"f", "g"}, "f"), {0.2, 0.2, 0.4, 0.4}, FloatingLayer::Overlay);
+        doc = hidePanel(doc, "two");
+        doc = untabAll(doc);
+        for (const auto &p : allPanels(doc))
+            QCOMPARE(p->views.size(), size_t(1));
+        QCOMPARE(doc.floating.size(), size_t(2));
+        QCOMPARE(doc.hidden.size(), size_t(2));
+    }
+    void untabViewSplitsOneAndTabIntoMergesBack()
+    {
+        auto root = L::row({L::panel({L::view("t", "a"), L::view("t", "b"), L::view("t", "c")}, "one"), L::panel({L::view("t", "d")}, "two")});
+        auto doc = createDocument(&root);
+        doc = untabView(doc, "b");
+        QCOMPARE(panelOfView(doc, "b")->views, (V{"b"}));
+        QCOMPARE(panelOfView(doc, "a")->views, (V{"a", "c"}));
+        QCOMPARE(untabView(doc, "b").root->kind, doc.root->kind); // already alone: nothing to split
+        QCOMPARE(allPanels(doc).size(), size_t(3));
+        // d joins the group as its selected tab, and its old tile closes
+        doc = tabInto(doc, "d", "one");
+        QCOMPARE(panelOfView(doc, "d")->id, std::string("one"));
+        QCOMPARE(panelOfView(doc, "d")->selected, std::string("d"));
+        QCOMPARE(allPanels(doc).size(), size_t(2));
+        QVERIFY(!locatePanel(doc, "two"));
+        QCOMPARE(tabInto(doc, "a", "one").root->kind, doc.root->kind); // into its own panel: nothing
+    }
     void maximizeRestoresExactPrior()
     {
         auto root = makeSplit("r", Axis::X, {P("a", {"1"}), P("b", {"2"}), P("c", {"3"})});

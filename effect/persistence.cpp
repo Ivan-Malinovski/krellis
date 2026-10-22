@@ -78,11 +78,15 @@ bool KrellisEffect::writeSession()
         if (!canvas->m_output) continue;
         SavedCanvas saved;
         saved.output = outputKey(canvas->m_output).toStdString();
-        saved.document = canvas->m_doc;
+        // Tabs are not saved: each window comes back in a tile of its own (the format has one view per panel).
+        saved.document = untabAll(canvas->m_doc);
         saved.document.navigation = canvas->m_nav.serialize();
-        for (const auto &t : canvas->m_windows) {
+        for (const auto *list : {&canvas->m_windows, &canvas->m_stowed})
+        for (const auto &t : *list) {
             if (!t.window->window()) continue;
-            saved.windows[t.panel] = {KrellisCanvas::appId(t.window).toStdString(), t.window->window()->windowRole().toStdString()};
+            const NodePtr panel = panelOfView(saved.document, t.view);
+            if (!panel) continue;
+            saved.windows[panel->id] = {KrellisCanvas::appId(t.window).toStdString(), t.window->window()->windowRole().toStdString()};
             ++windows;
         }
         snapshot.push_back(std::move(saved));
