@@ -62,6 +62,11 @@ std::optional<KrellisEffect::SurfaceHit> KrellisEffect::surfaceHit(QPointF point
         auto *w = *it;
         if (w->isDeleted() || w->isMinimized() || w->isHidden() || !w->isOnCurrentDesktop() || !w->isOnCurrentActivity()) continue;
         if (auto hit = hitWindow(w, false)) return hit;
+        // A float's resize band belongs to it even where another window lies underneath; a docked tile's band
+        // is only offered below, when no body is under the pointer (it would overlap its neighbours).
+        if (auto *canvas = owner(w))
+            if (auto *tracked = canvas->trackedFor(w); tracked && canvas->floatScreen(tracked->panel))
+                if (auto hit = hitWindow(w, false, true)) return hit;
         // Native shell UI above a canvas keeps KWin's normal routing.
         if (!owner(w) && w->frameGeometry().contains(point) && !w->isDesktop()) return std::nullopt;
     }
