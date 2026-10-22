@@ -4,10 +4,10 @@ set -euo pipefail
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-project=/home/ivan/dev/kwin-trellis
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+project=/home/ivan/dev/krellis
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 trap 'for process in ${clients:-}; do kill "$process" 2>/dev/null || true; done' EXIT
-test -s "$XDG_STATE_HOME/kwin-trellis/session.json"
+test -s "$XDG_STATE_HOME/krellis/session.json"
 c++ -fPIC "$project/scenarios/input-client.cpp" -o "$NEST_WORK/input-client" $(pkg-config --cflags --libs Qt6Widgets)
 clients=
 # Reversed arrivals deliberately give every unique window a different local ID.
@@ -33,7 +33,7 @@ call toggleHide 0; sleep 0.8
 # model's safe floating fallback rather than guessing that neighbour.
 call dump | tee "$NEST_OUT/unhidden.txt" | grep "app 'persist-gamma'.* FLOAT"
 call saveSession | grep true
-python3 - "$XDG_STATE_HOME/kwin-trellis/session.json" <<'PY'
+python3 - "$XDG_STATE_HOME/krellis/session.json" <<'PY'
 import json,sys
 c=json.load(open(sys.argv[1]))['canvases'][0]
 assert len(c['windows'])==5 and len(c['hidden'])==0

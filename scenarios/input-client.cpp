@@ -40,7 +40,7 @@ public:
 };
 int main(int argc, char **argv) {
     QApplication app(argc, argv);
-    app.setDesktopFileName(argc > 1 ? QString::fromUtf8(argv[1]) : QStringLiteral("trellis-input-fixture"));
+    app.setDesktopFileName(argc > 1 ? QString::fromUtf8(argv[1]) : QStringLiteral("krellis-input-fixture"));
     Client client;
     client.setMinimumSize(app.arguments().contains("--small-min") ? QSize(1, 1) : QSize(640, 400));
     client.resize(640, 480);

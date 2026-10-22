@@ -12,10 +12,10 @@
 #include <map>
 #include <optional>
 
-namespace trellis {
+namespace krellis {
 
-inline const std::string DROP_SLOT = "__trellis-drop-slot";
-inline const std::string SOURCE_SLOT = "__trellis-source-slot";
+inline const std::string DROP_SLOT = "__krellis-drop-slot";
+inline const std::string SOURCE_SLOT = "__krellis-source-slot";
 
 enum class Region { Stage, Side, Floating };
 
@@ -173,4 +173,4 @@ private:
     double m_now = 0;
 };
 
-} // namespace trellis
+} // namespace krellis

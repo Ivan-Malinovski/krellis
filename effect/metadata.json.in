@@ -1,10 +1,10 @@
 {
     "KPlugin": {
-        "Id": "@TRELLIS_ID@",
-        "Name": "Trellis",
+        "Id": "@KRELLIS_ID@",
+        "Name": "Krellis",
         "Description": "Infinite-canvas tiling desktop: a camera over a tiled layout, with spring motion",
         "Category": "Window Management",
         "EnabledByDefault": false,
         "License": "GPL"
-    }@TRELLIS_CONFIG_MODULE@
+    }@KRELLIS_CONFIG_MODULE@
 }

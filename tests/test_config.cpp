@@ -1,20 +1,43 @@
+#include <QDir>
+#include <QFile>
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QtTest>
-#include "trellis_config.h"
+#include "krellis_config.h"
 
-using namespace trellis::config;
+using namespace krellis::config;
 
 class TestConfig : public QObject
 {
     Q_OBJECT
 private Q_SLOTS:
+    void oldTrellisFilesAreCarriedOverOnce()
+    {
+        QTemporaryDir home;
+        QVERIFY(home.isValid());
+        qputenv("XDG_CONFIG_HOME", (home.path() + "/config").toUtf8());
+        qputenv("XDG_STATE_HOME", (home.path() + "/state").toUtf8());
+        QVERIFY(QDir().mkpath(home.path() + "/config"));
+        QVERIFY(QDir().mkpath(home.path() + "/state/kwin-trellis"));
+        for (const QString &old : {home.path() + "/config/trellisrc", home.path() + "/state/kwin-trellis/session.json",
+                                   home.path() + "/state/kwin-trellis/boot.json"}) {
+            QFile f(old);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("[General]\nglide=false\n");
+        }
+        QCOMPARE(defaultPath(), home.path() + "/config/krellisrc");
+        QVERIFY(!load(defaultPath()).glide);                                   // the old setting came along
+        QVERIFY(QFile::exists(home.path() + "/config/trellisrc"));             // and the old file is untouched
+        QCOMPARE(stateFile("session.json"), home.path() + "/state/krellis/session.json");
+        QVERIFY(QFile::exists(home.path() + "/state/krellis/session.json"));
+        QVERIFY(!QFile::exists(home.path() + "/state/krellis/boot.json"));     // old crash strikes stay behind
+    }
     void settingsRoundTrip()
     {
         QTemporaryDir dir;
-        const QString file = dir.filePath("trellisrc");
+        const QString file = dir.filePath("krellisrc");
         Settings s;
-        s.floatFirst = true; s.spawnTarget = SpawnTarget::Focused; s.peek = 12; s.map = false; s.mapPinned = true; s.glide = true; s.landMs = 90; s.iconBelow = 40; s.tileMinWidth = 320; s.tileMinHeight = 200; s.scratchpad = true;
+        s.closeFocus = false; s.floatFirst = true; s.spawnTarget = SpawnTarget::Focused; s.peek = 12; s.map = false; s.mapPinned = true; s.glide = true; s.landMs = 90; s.iconBelow = 40; s.tileMinWidth = 320; s.tileMinHeight = 200; s.scratchpad = true;
         s.followTheme = false; s.toasts = false; s.flyTo = true; s.whichKey = false; s.whichKeyDelayMs = 750;
         QVERIFY(save(s, file));
         QCOMPARE(load(file), s);
@@ -28,7 +51,7 @@ private Q_SLOTS:
         QVERIFY(!d.flyTo);
         QCOMPARE(d.whichKeyDelayMs, 400);
         QTemporaryDir dir;
-        const QString file = dir.filePath("trellisrc");
+        const QString file = dir.filePath("krellisrc");
         QVERIFY(saveValue("whichKeyDelayMs", 5, file));
         QCOMPARE(load(file).whichKeyDelayMs, 100);
         QVERIFY(saveValue("whichKeyDelayMs", 99999, file));
@@ -39,7 +62,7 @@ private Q_SLOTS:
     void spawnTargetValuesAndLegacyKey()
     {
         QTemporaryDir dir;
-        const QString file = dir.filePath("trellisrc");
+        const QString file = dir.filePath("krellisrc");
         for (auto t : {SpawnTarget::Pointer, SpawnTarget::Focused, SpawnTarget::End}) {
             Settings s;
             s.spawnTarget = t;
@@ -69,7 +92,7 @@ private Q_SLOTS:
     {
         // A live toggle must land where load() looks; it used to go to [%General] and never came back.
         QTemporaryDir dir;
-        const QString file = dir.filePath("trellisrc");
+        const QString file = dir.filePath("krellisrc");
         QVERIFY(saveValue("floatFirst", true, file));
         QVERIFY(load(file).floatFirst);
         QVERIFY(saveValue("mapPinned", true, file));
@@ -79,7 +102,7 @@ private Q_SLOTS:
     void saveKeepsRulesAndUnknownKeys()
     {
         QTemporaryDir dir;
-        const QString file = dir.filePath("trellisrc");
+        const QString file = dir.filePath("krellisrc");
         AppRule r; r.app = "konsole"; r.placement = "stage";
         QVERIFY(saveRules({r}, file));
         { QSettings c(file, QSettings::IniFormat); c.setValue("future", 7); }
@@ -90,7 +113,7 @@ private Q_SLOTS:
     void rulesRoundTripAndReplace()
     {
         QTemporaryDir dir;
-        const QString file = dir.filePath("trellisrc");
+        const QString file = dir.filePath("krellisrc");
         AppRule a; a.app = "org.kde.dolphin"; a.placement = "floating"; a.scaling = "inert"; a.minWidth = 300; a.minHeight = 200;
         a.allowStage = false; a.singleton = true; a.closable = false; a.scratchpad = true;
         AppRule b; b.app = "mpv";
@@ -104,18 +127,18 @@ private Q_SLOTS:
     void rulesUseTheLoadersSyntax()
     {
         QTemporaryDir dir;
-        const QString file = dir.filePath("trellisrc");
-        AppRule r; r.app = "trellis-stage"; r.placement = "stage";
+        const QString file = dir.filePath("krellisrc");
+        AppRule r; r.app = "krellis-stage"; r.placement = "stage";
         QVERIFY(saveRules({r}, file));
         QFile f(file); QVERIFY(f.open(QIODevice::ReadOnly));
         const QByteArray text = f.readAll();
         QVERIFY2(text.contains("[ViewRules]"), text.constData());
-        QVERIFY2(text.contains("trellis-stage\\placement=stage"), text.constData());
+        QVERIFY2(text.contains("krellis-stage\\placement=stage"), text.constData());
     }
     void appIdWithSeparatorsStaysOneGroup()
     {
         QTemporaryDir dir;
-        const QString file = dir.filePath("trellisrc");
+        const QString file = dir.filePath("krellisrc");
         AppRule r; r.app = "a/b\\c"; 
         QVERIFY(saveRules({r}, file));
         const auto back = loadRules(file);

@@ -2,7 +2,7 @@
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 order() { call dump | awk '/^ORDER/ { $1=""; print; exit }' | xargs; }
 rc=0
 check() { [ "$(order)" = "$2" ] && echo "ok $1: $(order)" || { echo "FAIL $1: got '$(order)' want '$2'"; rc=1; }; }

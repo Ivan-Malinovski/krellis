@@ -1,10 +1,10 @@
 {
     "KPlugin": {
-        "Description": "Layout, motion and per-application rules for the Trellis tiled canvas",
+        "Description": "Layout, motion and per-application rules for the Krellis tiled canvas",
         "Icon": "preferences-system-windows-actions",
-        "Name": "Trellis"
+        "Name": "Krellis"
     },
-    "X-KDE-Keywords": "trellis,tiling,canvas,windows,layout,minimap",
+    "X-KDE-Keywords": "krellis,tiling,canvas,windows,layout,minimap",
     "X-KDE-ServiceTypes": [
         "KCModule"
     ],

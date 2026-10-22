@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Drag windows with real fake-input pointer events while the paint probe watches presented frames for black flashes.
 set -euo pipefail
-[[ "$NEST_SOCKET" == trellis-test-* ]]
+[[ "$NEST_SOCKET" == krellis-test-* ]]
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-project=/home/ivan/dev/kwin-trellis
+project=/home/ivan/dev/krellis
 trap 'for process in ${clients:-}; do kill "$process" 2>/dev/null || true; done' EXIT
-cat >"$XDG_CONFIG_HOME/trellisrc" <<'RULES'
+cat >"$XDG_CONFIG_HOME/krellisrc" <<'RULES'
 [ViewRules]
 decor-alpha\minWidth=900
 decor-alpha\minHeight=1000
@@ -16,7 +16,7 @@ decor-beta\minHeight=1000
 decor-gamma\minWidth=900
 decor-gamma\minHeight=1000
 RULES
-qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect.reloadRules
+qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect.reloadRules
 c++ -std=c++20 -fPIC "$project/scenarios/pointer-driver.cpp" -o "$NEST_WORK/pointer-driver" $(pkg-config --cflags --libs KWaylandClient wayland-client)
 c++ -fPIC "$project/scenarios/damage-client.cpp" -o "$NEST_WORK/damage-client" $(pkg-config --cflags --libs Qt6Widgets)
 clients=
@@ -30,9 +30,9 @@ python3 - "$NEST_WORK" "$NEST_OUT" <<'PY'
 import json,pathlib,re,subprocess,time,sys
 work,out=map(pathlib.Path,sys.argv[1:])
 def call(method,*args):
-    return subprocess.check_output(['qdbus6','org.kde.KWin','/Trellis','org.kde.kwin.KWin.TrellisEffect.'+method,*map(str,args)],text=True).strip()
+    return subprocess.check_output(['qdbus6','org.kde.KWin','/Krellis','org.kde.kwin.KWin.KrellisEffect.'+method,*map(str,args)],text=True).strip()
 def probe(method,*args):
-    return subprocess.check_output(['qdbus6','org.kde.KWin','/TrellisPaintProbe','org.kde.kwin.TrellisPaintProbe.'+method,*map(str,args)],text=True).strip()
+    return subprocess.check_output(['qdbus6','org.kde.KWin','/KrellisPaintProbe','org.kde.kwin.KrellisPaintProbe.'+method,*map(str,args)],text=True).strip()
 def title(name):
     line=next(l for l in call('dump').splitlines() if "'decor-"+name+"' screen " in l)
     r=lambda k: tuple(map(float,re.search(k+r' ([-\d.]+),([-\d.]+) ([-\d.]+)x([-\d.]+)',line).groups()))
@@ -59,7 +59,7 @@ try:
             for i in range(40):  # wander across the canvas, ~60 fps
                 event(f'move {x+i*14%420-100} {y+(i*9)%200-60}');time.sleep(.016)
             time.sleep(.3)
-            subprocess.call([str(pathlib.Path('/home/ivan/dev/kwin-trellis/tools/shot')),'mid-'+phase+'-'+n])
+            subprocess.call([str(pathlib.Path('/home/ivan/dev/krellis/tools/shot')),'mid-'+phase+'-'+n])
             event('up');time.sleep(.8)
         results[phase]=json.loads(probe('blackStats'))
     (out/'black.json').write_text(json.dumps(results,indent=1))

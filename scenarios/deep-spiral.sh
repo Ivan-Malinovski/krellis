@@ -11,7 +11,7 @@ sleep 2
 EXPECT=${EXPECT:-deep} python3 - <<'PY'
 import os, re, subprocess, sys, time
 def call(*a):
-    return subprocess.run(["qdbus6", "org.kde.KWin", "/Trellis", "org.kde.kwin.KWin.TrellisEffect." + a[0], *map(str, a[1:])],
+    return subprocess.run(["qdbus6", "org.kde.KWin", "/Krellis", "org.kde.kwin.KWin.KrellisEffect." + a[0], *map(str, a[1:])],
                           capture_output=True, text=True).stdout
 def panels():
     out = []

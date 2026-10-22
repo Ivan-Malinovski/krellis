@@ -4,7 +4,7 @@
 #include <cmath>
 #include <set>
 
-namespace trellis {
+namespace krellis {
 
 NodePtr makePanel(std::string id, std::vector<std::string> views, std::string selected)
 {
@@ -452,4 +452,4 @@ NodePtr resizeBoundary(const NodePtr &split, int index, double position, const s
     return withSplit(*split, split->children, normalized);
 }
 
-} // namespace trellis
+} // namespace krellis

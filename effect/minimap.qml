@@ -62,7 +62,7 @@ Item {
         ["Shift + drag a title bar", "Float it (inverts the mode)"],
         ["Meta+Alt+F", "Floating / tiling mode"],
         ["Meta+Alt+B / M / S", "Bar / map / save view"],
-        ["Meta+Alt+Escape", "Turn Trellis off"]
+        ["Meta+Alt+Escape", "Turn Krellis off"]
     ]
     readonly property real helpH: 30 + help.length * 15 + 8
     readonly property real cardH: mapH + 24 + 26 + (scratchEnabled ? 24 : 0)
@@ -111,7 +111,7 @@ Item {
         opacity: root.helpOpen ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: 120 } }
         property string hitKey: "map:help"
-        Text { x: 12; y: 9; text: "Trellis shortcuts"; color: theme.textSoft; font.pixelSize: 12; font.bold: true }
+        Text { x: 12; y: 9; text: "Krellis shortcuts"; color: theme.textSoft; font.pixelSize: 12; font.bold: true }
         Column {
             x: 12; y: 30
             spacing: 0

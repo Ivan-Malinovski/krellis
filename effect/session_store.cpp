@@ -5,7 +5,7 @@
 #include <QJsonParseError>
 #include <cmath>
 #include <set>
-namespace trellis {
+namespace krellis {
 namespace {
 QString str(const std::string &s) { return QString::fromStdString(s); }
 QJsonArray rect(Rect r) { return {r.x,r.y,r.w,r.h}; }

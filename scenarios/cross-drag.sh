@@ -2,12 +2,12 @@
 # Run with NEST_OUTPUTS=2. A real title-bar drag that crosses to the other output must hand the live drag
 # to that output's canvas (drop slot, reflow preview), and a drop there must commit.
 set -euo pipefail
-[[ "$NEST_SOCKET" == trellis-test-* ]]
+[[ "$NEST_SOCKET" == krellis-test-* ]]
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-project=/home/ivan/dev/kwin-trellis
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+project=/home/ivan/dev/krellis
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 trap 'for process in ${clients:-}; do kill "$process" 2>/dev/null || true; done; kill ${driver:-} 2>/dev/null || true' EXIT
 test "$NEST_OUTPUTS" -eq 2
 c++ -std=c++20 -fPIC "$project/scenarios/pointer-driver.cpp" -o "$NEST_WORK/pointer-driver" $(pkg-config --cflags --libs KWaylandClient wayland-client)

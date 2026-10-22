@@ -4,8 +4,8 @@
 
 #include <QtTest>
 
-using namespace trellis;
-namespace L = trellis::layout;
+using namespace krellis;
+namespace L = krellis::layout;
 
 struct Host : NavigationHost {
     LayoutDocument document;

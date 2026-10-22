@@ -14,9 +14,9 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     const std::string socket = qEnvironmentVariable("NEST_SOCKET").toStdString();
     const auto work = qEnvironmentVariable("NEST_WORK");
-    if (!socket.starts_with("trellis-test-") || qEnvironmentVariable("WAYLAND_DISPLAY").toStdString() != socket
+    if (!socket.starts_with("krellis-test-") || qEnvironmentVariable("WAYLAND_DISPLAY").toStdString() != socket
         || work.isEmpty() || qEnvironmentVariable("XDG_CONFIG_HOME") != work + "/config") {
-        std::cerr << "Pointer fixture requires an isolated trellis-test-* compositor\n";
+        std::cerr << "Pointer fixture requires an isolated krellis-test-* compositor\n";
         return 1;
     }
     auto *display = wl_display_connect(socket.c_str());
@@ -28,7 +28,7 @@ int main(int argc, char **argv)
     registry.create(display);
     registry.setup();
     if (wl_display_roundtrip(display) < 0 || !pointer || !pointer->isValid()) return 3;
-    pointer->authenticate(QStringLiteral("Trellis nested regression"), QStringLiteral("Decoration input test in isolated compositor"));
+    pointer->authenticate(QStringLiteral("Krellis nested regression"), QStringLiteral("Decoration input test in isolated compositor"));
     if (wl_display_roundtrip(display) < 0) return 4;
     std::cout << "READY" << std::endl;
     std::string line;

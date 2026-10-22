@@ -3,7 +3,7 @@
 #include <map>
 #include <set>
 
-namespace trellis {
+namespace krellis {
 namespace layout {
 
 LayoutSpec view(std::string type, std::string id, std::string title)
@@ -95,7 +95,7 @@ LayoutDocument createDocument(const LayoutSpec *root, const std::vector<FloatSpe
     auto addView = [&](const LayoutSpec &s) {
         const std::string id = s.id.empty() ? nextId(s.type) : s.id;
         if (doc.views.count(id))
-            throw std::runtime_error("Trellis: duplicate view id \"" + id + "\"");
+            throw std::runtime_error("Krellis: duplicate view id \"" + id + "\"");
         ViewRecord rec;
         rec.type = s.type;
         rec.title = s.title;
@@ -119,10 +119,10 @@ LayoutDocument createDocument(const LayoutSpec *root, const std::vector<FloatSpe
             return makePanelFrom(s);
         case LayoutSpec::Kind::Stage: {
             if (stages++)
-                throw std::runtime_error("Trellis: a layout may contain one stage");
+                throw std::runtime_error("Krellis: a layout may contain one stage");
             NodePtr child = s.child ? build(*s.child) : nullptr;
             if (child && child->kind == Node::Kind::Stage)
-                throw std::runtime_error("Trellis: a stage cannot contain a stage");
+                throw std::runtime_error("Krellis: a stage cannot contain a stage");
             return makeStage(s.id.empty() ? "stage" : s.id, child);
         }
         case LayoutSpec::Kind::Split: {
@@ -143,4 +143,4 @@ LayoutDocument createDocument(const LayoutSpec *root, const std::vector<FloatSpe
     return doc;
 }
 
-} // namespace trellis
+} // namespace krellis

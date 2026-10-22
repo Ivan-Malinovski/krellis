@@ -6,7 +6,7 @@
 #include <functional>
 #include <memory>
 
-namespace trellis {
+namespace krellis {
 
 struct BoundaryDrag {
     Axis axis = Axis::X;
@@ -24,4 +24,4 @@ struct BoundaryDragResult {
 BoundaryDragResult dragBoundary(const NodePtr &root, const LayoutMetrics &metrics, const std::string &splitId,
                                 int index);
 
-} // namespace trellis
+} // namespace krellis

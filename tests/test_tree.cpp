@@ -2,7 +2,7 @@
 
 #include <QtTest>
 
-using namespace trellis;
+using namespace krellis;
 
 static NodePtr P(const char *id) { return makePanel(id, {std::string(id) + "-v"}); }
 

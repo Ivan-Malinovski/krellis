@@ -8,7 +8,7 @@
 #include <optional>
 #include <string>
 
-namespace trellis {
+namespace krellis {
 
 /// Whether two documents lay out the same: same tree, same floats (panel, rect, layer, z), same hidden panels.
 inline bool sameLayout(const LayoutDocument &a, const LayoutDocument &b)
@@ -99,4 +99,4 @@ private:
     std::int64_t m_lastMs = 0;
 };
 
-} // namespace trellis
+} // namespace krellis

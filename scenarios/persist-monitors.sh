@@ -4,8 +4,8 @@ set -euo pipefail
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-project=/home/ivan/dev/kwin-trellis
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+project=/home/ivan/dev/krellis
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 trap 'for process in ${clients:-}; do kill "$process" 2>/dev/null || true; done' EXIT
 test "$NEST_OUTPUTS" -eq 2
 restoring=false
@@ -66,7 +66,7 @@ for output in 0 1; do
     test "$(grep -c ' screen ' "$NEST_OUT/output-$output.txt")" -eq 3
 done
 call saveSession | grep true
-cp "$XDG_STATE_HOME/kwin-trellis/session.json" "$NEST_OUT/session.json"
+cp "$XDG_STATE_HOME/krellis/session.json" "$NEST_OUT/session.json"
 
 python3 - "$NEST_OUT/session.json" "${NEST_SESSION_FILE:-}" <<'PY'
 import json, math, sys
@@ -117,7 +117,7 @@ if "$restoring"; then
     call dumpOutput 1 | tee "$NEST_OUT/unhidden.txt" | grep "app 'persist-monitor-zeta'"
     ! call dumpOutput 1 | grep "app 'persist-monitor-zeta'.* FLOAT"
     call saveSession | grep true
-    python3 - "$XDG_STATE_HOME/kwin-trellis/session.json" <<'PY'
+    python3 - "$XDG_STATE_HOME/krellis/session.json" <<'PY'
 import json, sys
 canvases = json.load(open(sys.argv[1]))['canvases']
 assert all(not c['hidden'] for c in canvases)

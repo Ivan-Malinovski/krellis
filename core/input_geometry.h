@@ -2,7 +2,7 @@
 #include "spatial.h"
 #include <optional>
 
-namespace trellis {
+namespace krellis {
 // Map between rectangles with independent x/y scale. Empty rectangles cannot
 // define an inverse; callers must refuse input rather than divide by zero.
 inline std::optional<Point> mapPoint(Point p, const Rect &from, const Rect &to)

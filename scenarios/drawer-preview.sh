@@ -5,7 +5,7 @@
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 check() { if [ "$2" = "$3" ]; then echo "PASS $1"; else echo "FAIL $1: got '$2' want '$3'"; fi; }
 for n in A B C D; do
   alacritty --title "win-$n" -e sh -c "echo $n; sleep 600" >/dev/null 2>&1 &
@@ -20,7 +20,7 @@ call simNativeResizeMove -900 0 >/dev/null; sleep 0.8
 call dump | grep '^SQUEEZE'
 check "preview once squeezed under the threshold" "$(call dump | grep -c '^SQUEEZE')" 1
 check "it is on the left edge" "$(call dump | grep -c '^SQUEEZE edge 0 ')" 1
-/home/ivan/dev/kwin-trellis/tools/shot squeeze-preview >/dev/null
+/home/ivan/dev/krellis/tools/shot squeeze-preview >/dev/null
 call simNativeResizeMove -100 0 >/dev/null; sleep 1.2
 check "preview goes when the tile is widened again" "$(call dump | grep -c '^SQUEEZE')" 0
 call simNativeResizeMove -900 0 >/dev/null; sleep 0.5
@@ -42,7 +42,7 @@ call dump | grep -E "^DRAWER"
 check "clicking it opens the drawer" "$(call dump | grep '^DRAWER' | grep -c ' open ')" 1
 call simMotion $((cx - 5)) $((cy - 3)) >/dev/null; sleep 1.0
 check "it stays open with the pointer on the map" "$(call dump | grep '^DRAWER' | grep -c ' open ')" 1
-/home/ivan/dev/kwin-trellis/tools/shot map-opened-drawer >/dev/null
+/home/ivan/dev/krellis/tools/shot map-opened-drawer >/dev/null
 call simMotion 5 400 >/dev/null; sleep 0.8
 call simMotion 700 300 >/dev/null; sleep 1.2
 check "after visiting it and leaving, it closes" "$(call dump | grep '^DRAWER' | grep -c ' closed ')" 1

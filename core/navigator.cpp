@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace trellis {
+namespace krellis {
 
 constexpr int MAX_HISTORY = 100;
 constexpr double WHEEL_QUIET_MS = 180; // a pause this long ends a scroll gesture
@@ -706,4 +706,4 @@ void Navigator::removeFraming(const std::string &id)
     m_host.changed();
 }
 
-} // namespace trellis
+} // namespace krellis

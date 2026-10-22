@@ -3,8 +3,8 @@ set -euo pipefail
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-project=/home/ivan/dev/kwin-trellis
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+project=/home/ivan/dev/krellis
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 trap 'for process in ${clients:-}; do kill "$process" 2>/dev/null || true; done' EXIT
 c++ -fPIC "$project/scenarios/input-client.cpp" -o "$NEST_WORK/input-client" $(pkg-config --cflags --libs Qt6Widgets)
 clients=
@@ -24,7 +24,7 @@ for x in $(seq 12 6 1000); do
 done
 call simText 'Persistent desk'; call simKey 16777220 true; call simKey 16777220 false
 call saveSession | grep true
-cp "$XDG_STATE_HOME/kwin-trellis/session.json" "$NEST_OUT/session.json"
+cp "$XDG_STATE_HOME/krellis/session.json" "$NEST_OUT/session.json"
 python3 - "$NEST_OUT/session.json" <<'PY'
 import json,sys
 s=open(sys.argv[1]).read(); d=json.loads(s)

@@ -2,7 +2,7 @@
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 for n in A B C; do
   alacritty --title "win-$n" -e sh -c "echo $n; sleep 600" >/dev/null 2>&1 &
   sleep 2
@@ -13,7 +13,7 @@ echo "--- next"; call nextPanel; sleep 1.2; call dump | head -3
 echo "--- next"; call nextPanel; sleep 1.2; call dump | head -3
 echo "--- previous"; call previousPanel; sleep 1.2; call dump | head -3
 echo "--- maximize active"; call toggleMaximizeActive; sleep 1.2; call dump | head -3
-/home/ivan/dev/kwin-trellis/tools/shot keys-max >/dev/null
+/home/ivan/dev/krellis/tools/shot keys-max >/dev/null
 call toggleMaximizeActive; sleep 1
 echo "--- float active"; call toggleFloatActive; sleep 1.2; call dump | head -5
 call toggleFloatActive; sleep 1

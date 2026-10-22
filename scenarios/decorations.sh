@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Real Wayland fake-input events, not /Trellis simButton: exercise native routing too.
+# Real Wayland fake-input events, not /Krellis simButton: exercise native routing too.
 set -euo pipefail
-[[ "$NEST_SOCKET" == trellis-test-* ]]
+[[ "$NEST_SOCKET" == krellis-test-* ]]
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-project=/home/ivan/dev/kwin-trellis
+project=/home/ivan/dev/krellis
 trap 'for process in ${clients:-}; do kill "$process" 2>/dev/null || true; done' EXIT
-cat >"$XDG_CONFIG_HOME/trellisrc" <<'RULES'
+cat >"$XDG_CONFIG_HOME/krellisrc" <<'RULES'
 [ViewRules]
 decor-alpha\minWidth=900
 decor-alpha\minHeight=1000
@@ -16,7 +16,7 @@ decor-beta\minHeight=1000
 decor-gamma\minWidth=900
 decor-gamma\minHeight=1000
 RULES
-qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect.reloadRules
+qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect.reloadRules
 c++ -std=c++20 -fPIC "$project/scenarios/pointer-driver.cpp" -o "$NEST_WORK/pointer-driver" $(pkg-config --cflags --libs KWaylandClient wayland-client)
 c++ -fPIC "$project/scenarios/damage-client.cpp" -o "$NEST_WORK/damage-client" $(pkg-config --cflags --libs Qt6Widgets)
 clients=
@@ -30,7 +30,7 @@ python3 - "$NEST_WORK" "$NEST_OUT" <<'PY'
 import json,os,pathlib,re,subprocess,time,sys
 work,out=map(pathlib.Path,sys.argv[1:])
 def call(method,*args):
-    return subprocess.check_output(['qdbus6','org.kde.KWin','/Trellis','org.kde.kwin.KWin.TrellisEffect.'+method,*map(str,args)],text=True).strip()
+    return subprocess.check_output(['qdbus6','org.kde.KWin','/Krellis','org.kde.kwin.KWin.KrellisEffect.'+method,*map(str,args)],text=True).strip()
 def dump(label):
     s=call('dump'); (out/(label+'.txt')).write_text(s); return s
 def geometry(name):
@@ -43,7 +43,7 @@ def point(name,title=True):
 def native(label):
     js=work/(label+'.js')
     js.write_text("console.warn('DECOR_"+label+" '+JSON.stringify(workspace.windowList().filter(w=>w.caption.startsWith('decor-')).map(w=>({name:w.caption,active:w.active,move:w.move,resize:w.resize}))));")
-    i=subprocess.check_output(['qdbus6','org.kde.KWin','/Scripting','org.kde.kwin.Scripting.loadScript',str(js),'trellis-decor-'+label],text=True).strip()
+    i=subprocess.check_output(['qdbus6','org.kde.KWin','/Scripting','org.kde.kwin.Scripting.loadScript',str(js),'krellis-decor-'+label],text=True).strip()
     subprocess.check_call(['qdbus6','org.kde.KWin','/Scripting/Script'+i,'org.kde.kwin.Script.run'],stdout=subprocess.DEVNULL)
     for _ in range(30):
         marker='DECOR_'+label+' '
@@ -60,7 +60,7 @@ def event(s):
 try:
     call('overview');time.sleep(.8)
     def probe(method,*args):
-        return subprocess.check_output(['qdbus6','org.kde.KWin','/TrellisPaintProbe','org.kde.kwin.TrellisPaintProbe.'+method,*map(str,args)],text=True).strip()
+        return subprocess.check_output(['qdbus6','org.kde.KWin','/KrellisPaintProbe','org.kde.kwin.KrellisPaintProbe.'+method,*map(str,args)],text=True).strip()
     def idle_damage(label):
         points=[]
         for name,color in [('alpha','#d23c41'),('beta','#35bd69'),('gamma','#3699de')]:
@@ -75,7 +75,7 @@ try:
         stats=json.loads(probe('stats'));(out/(label+'.json')).write_text(json.dumps(stats))
         assert stats['frames']>=6,stats
         if any(p['bad'] for p in stats['points']):
-            subprocess.check_call(['/home/ivan/dev/kwin-trellis/tools/shot',label+'-failed'])
+            subprocess.check_call(['/home/ivan/dev/krellis/tools/shot',label+'-failed'])
         assert all(p['bad']==0 for p in stats['points']),stats
         assert all(p['seen']==3 for p in stats['points'][1::2]),stats
         assert probe('configure','[]')=='false'
@@ -124,7 +124,7 @@ try:
     # Keep blinking partial surface damage alive while capturing several settled frames.
     for i in range(3):
         time.sleep(.17)
-        subprocess.check_call([str(pathlib.Path('/home/ivan/dev/kwin-trellis/tools/shot')), 'idle-'+str(i)])
+        subprocess.check_call([str(pathlib.Path('/home/ivan/dev/krellis/tools/shot')), 'idle-'+str(i)])
     print('PASS real title-bar move, scaled translated targets, consecutive grabs, releases, visible-client delivery floating title and true corner resize')
 finally:
     if pointer.poll() is None:

@@ -6,7 +6,7 @@
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 sheet() { call dump | sed -n 's/^WHICHKEY \([a-z]*\) .*/\1/p' | head -1; }
 check() { if [ "$2" = "$3" ]; then echo "PASS $1"; else echo "FAIL $1: got '$2' want '$3'"; fi; }
 META=16777250; ALT=16777251; SHIFT=16777248; KEY_A=65
@@ -26,7 +26,7 @@ press $META; press $ALT; sleep 0.2
 check "not yet before the delay" "$(sheet)" ""
 sleep 0.5
 check "shown after the delay" "$(sheet)" shown
-/home/ivan/dev/kwin-trellis/tools/shot whichkey >/dev/null
+/home/ivan/dev/krellis/tools/shot whichkey >/dev/null
 call dump | grep WHICHKEY
 press $KEY_A; sleep 0.5
 check "a key hides it" "$(sheet)" ""
@@ -51,7 +51,7 @@ call simButton 400 400 true 0 >/dev/null; call simButton 400 400 false 0 >/dev/n
 check "a button press hides it" "$(sheet)" ""
 release $ALT; release $META
 echo "--- whichKey=false"
-printf '[General]\nglide=true\nmap=false\nfollowTheme=false\ntoasts=false\nwhichKey=false\n' >"$NEST_WORK/config/trellisrc"
+printf '[General]\nglide=true\nmap=false\nfollowTheme=false\ntoasts=false\nwhichKey=false\n' >"$NEST_WORK/config/krellisrc"
 call reloadSettings
 press $META; press $ALT; sleep 0.8
 check "disabled shows nothing" "$(sheet)" ""

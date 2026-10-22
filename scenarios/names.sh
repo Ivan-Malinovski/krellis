@@ -3,7 +3,7 @@ set -euo pipefail
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 trap 'pkill -P "$$" -x alacritty || true' EXIT
 for n in A B; do alacritty --title "name-$n" -e sleep 600 >/dev/null 2>&1 & sleep 0.5; done
 sleep 1
@@ -30,5 +30,5 @@ call simKey 16777219 true; call simKey 16777219 false; call simText 'd'
 call simKey 16777220 true; call simKey 16777220 false; sleep 0.5
 call dump | tee "$NEST_OUT/saved.txt" | grep "^FRAMING .* 'Reading Øresund'$"
 call dump | grep '^NAMING 0 error 0$'
-/home/ivan/dev/kwin-trellis/tools/shot named-view
+/home/ivan/dev/krellis/tools/shot named-view
 echo 'PASS named framing, Unicode, text editing, blank rejection and cancellation'

@@ -4,7 +4,7 @@
 #include <QtTest>
 #include <map>
 
-using namespace trellis;
+using namespace krellis;
 using Px = std::vector<double>;
 
 static NodePtr panel(const char *id) { return makePanel(id, {id}); }

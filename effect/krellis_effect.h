@@ -11,7 +11,7 @@
 #include "document.h"
 #include "view_rules.h"
 #include "session_store.h"
-#include "trellis_config.h"
+#include "krellis_config.h"
 #include "keynav.h"
 #include "theme.h"
 #include "chord_hint.h"
@@ -33,16 +33,16 @@
 
 namespace KWin {
 
-using TRect = trellis::Rect;
+using TRect = krellis::Rect;
 
-class TrellisEffect;
+class KrellisEffect;
 class Window;
 
 // Routes pointer/gesture input to the effect before windows see it.
-class TrellisInput : public InputEventFilter
+class KrellisInput : public InputEventFilter
 {
 public:
-    explicit TrellisInput(TrellisEffect *effect);
+    explicit KrellisInput(KrellisEffect *effect);
     bool pointerMotion(PointerMotionEvent *e) override;
     bool pointerButton(PointerButtonEvent *e) override;
     bool pointerAxis(PointerAxisEvent *e) override;
@@ -53,15 +53,15 @@ public:
     bool pinchGestureCancelled(PointerPinchGestureCancelEvent *e) override;
 
 private:
-    TrellisEffect *m_effect;
+    KrellisEffect *m_effect;
 };
 
-class TrellisCanvas : public QObject, public trellis::NavigationHost, public trellis::DragHost
+class KrellisCanvas : public QObject, public krellis::NavigationHost, public krellis::DragHost
 {
     Q_OBJECT
 public:
-    explicit TrellisCanvas(LogicalOutput *output);
-    ~TrellisCanvas() override;
+    explicit KrellisCanvas(LogicalOutput *output);
+    ~KrellisCanvas() override;
 
     void prePaintScreen(ScreenPrePaintData &data);
     void postPaintScreen();
@@ -69,37 +69,37 @@ public:
     void paintWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data);
 
     // NavigationHost
-    const trellis::LayoutDocument &doc() const override { return m_doc; }
-    trellis::NavMode mode() const override { return trellis::NavMode::Free; }
-    trellis::Point viewport() const override;
-    trellis::FloatMargin floatMargin() const override { return m_doc.floatMargin; }
+    const krellis::LayoutDocument &doc() const override { return m_doc; }
+    krellis::NavMode mode() const override { return krellis::NavMode::Free; }
+    krellis::Point viewport() const override;
+    krellis::FloatMargin floatMargin() const override { return m_doc.floatMargin; }
     double peekPadding() const override { return m_peekPx; }
-    trellis::LayoutMetrics layoutMetrics() const override;
+    krellis::LayoutMetrics layoutMetrics() const override;
     void schedule() override;
     void changed() override { if (m_changed) m_changed(); }
 
     // DragHost (screen space is relative to the work area's top-left)
     double inset() const override;
-    double tabbarHeight(const trellis::Node &) const override { return 0; }
-    int tabIndexAt(const trellis::Node &panel, double) const override { return int(panel.views.size()); }
-    trellis::Rect toScreen(const trellis::Rect &world) const override;
-    trellis::Point fromScreen(trellis::Point screen) const override;
-    trellis::Rect panelScreen(const trellis::Rect &world) const override;
-    std::optional<trellis::Rect> fromScreenRect(const std::optional<trellis::Rect> &screen) const override;
-    std::optional<trellis::Rect> floatWorld(const std::string &) const override { return std::nullopt; }
-    std::optional<trellis::FloatingLayer> floatingLayer() const override { return trellis::FloatingLayer::Overlay; }
-    trellis::Point minSize(const std::vector<std::string> &views) const override;
-    trellis::Point clientMinimum(EffectWindow *w) const; // the rule's minimum, raised to what the client itself will not go under
-    bool allowed(const std::vector<std::string> &views, trellis::Region region) const override;
+    double tabbarHeight(const krellis::Node &) const override { return 0; }
+    int tabIndexAt(const krellis::Node &panel, double) const override { return int(panel.views.size()); }
+    krellis::Rect toScreen(const krellis::Rect &world) const override;
+    krellis::Point fromScreen(krellis::Point screen) const override;
+    krellis::Rect panelScreen(const krellis::Rect &world) const override;
+    std::optional<krellis::Rect> fromScreenRect(const std::optional<krellis::Rect> &screen) const override;
+    std::optional<krellis::Rect> floatWorld(const std::string &) const override { return std::nullopt; }
+    std::optional<krellis::FloatingLayer> floatingLayer() const override { return krellis::FloatingLayer::Overlay; }
+    krellis::Point minSize(const std::vector<std::string> &views) const override;
+    krellis::Point clientMinimum(EffectWindow *w) const; // the rule's minimum, raised to what the client itself will not go under
+    bool allowed(const std::vector<std::string> &views, krellis::Region region) const override;
     bool frameOnly(const std::string &panel) const override;
     bool reducedMotion() const override { return !m_glide; }
     bool flyTo() const override { return m_flyTo; }
     double clockMs() const override { return realMs(); }
     bool tabsAllowed() const override { return false; }
-    const trellis::RectMap &lastRects() const override;
-    void beginTween(const trellis::RectMap &previous, double nowMs) override;
+    const krellis::RectMap &lastRects() const override;
+    void beginTween(const krellis::RectMap &previous, double nowMs) override;
 
-    // Input (called by TrellisInput; return true when the event was consumed).
+    // Input (called by KrellisInput; return true when the event was consumed).
     bool handleButton(const PointerButtonEvent &e);
     bool handleMotion(const PointerMotionEvent &e);
     bool handleAxis(const PointerAxisEvent &e, bool titleBar = false);
@@ -135,9 +135,9 @@ public Q_SLOTS:
     void toggleDock(int index);
     void toggleDockActive();
     // Keyboard navigation (directions are screen sides): act on the active window.
-    void focusDirection(trellis::Edge dir);
-    void moveDirection(trellis::Edge dir);
-    bool resizeStep(trellis::Edge dir, double fraction);
+    void focusDirection(krellis::Edge dir);
+    void moveDirection(krellis::Edge dir);
+    bool resizeStep(krellis::Edge dir, double fraction);
     bool undoRedo(bool redo); // false when there is nothing to do or an edit is in progress (both say so in a toast)
     void clearHistory() { m_history.clear(); }
     void toast(const QString &text); // no-op with toasts off; a repeat of the visible text only restarts its timer
@@ -160,7 +160,7 @@ private Q_SLOTS:
     void resizeStepped(KWin::EffectWindow *w, const RectF &geometry);
 
 private:
-    friend class TrellisEffect;
+    friend class KrellisEffect;
     QPointer<LogicalOutput> m_output;
     std::function<void(EffectWindow *, QPointF)> m_transfer;
     // A KWin-driven drag whose pointer left this output: the effect moves the live drag to the canvas under it.
@@ -179,10 +179,10 @@ private:
     bool m_unloading = false;
     bool m_toasts = true;
     bool m_flyTo = false; // long camera jumps zoom out, pan and zoom in (needs glide)
-    struct ResizeBoundary { std::string split; int index; trellis::Axis axis; double start; };
+    struct ResizeBoundary { std::string split; int index; krellis::Axis axis; double start; };
     struct NativeResize {
         QPointer<EffectWindow> window;
-        trellis::LayoutDocument before;
+        krellis::LayoutDocument before;
         TRect painted, camera;
         RectF native, lastNative;
         std::optional<bool> decision;
@@ -190,7 +190,7 @@ private:
         QPointF anchor;
         bool floating = false;
         std::vector<ResizeBoundary> boundaries;
-        std::optional<trellis::Edge> stash; // an edge tile squeezed below the collapse width: the edge it slides out of
+        std::optional<krellis::Edge> stash; // an edge tile squeezed below the collapse width: the edge it slides out of
     };
     std::optional<NativeResize> m_resize;
     void startResize(EffectWindow *window);
@@ -204,14 +204,14 @@ private:
     void prepareUnload();
     void detachWindow(EffectWindow *w);
     static QString appId(EffectWindow *w);
-    trellis::ViewRules rulesFor(EffectWindow *w) const;
+    krellis::ViewRules rulesFor(EffectWindow *w) const;
     void loadRules();
-    std::map<QString, trellis::ViewRules> m_rules;
+    std::map<QString, krellis::ViewRules> m_rules;
     QString m_rulesFile;
     std::map<std::string, TRect> m_rememberedFloats;
     // Drawers: an edge tile resized to a sliver. It becomes an overlay float (its revealed rect) that rests mostly
     // past the screen edge, leaving `m_drawerStripPx` visible, and slides out while the pointer is over it.
-    struct Drawer { trellis::Edge edge; bool open = false; int seq = 0; bool pinned = false; }; // seq: stash order, which is the order along the edge
+    struct Drawer { krellis::Edge edge; bool open = false; int seq = 0; bool pinned = false; }; // seq: stash order, which is the order along the edge
     std::map<std::string, Drawer> m_drawers;
     double m_drawerStripPx = 12;     // sliver left in view while closed
     double m_drawerCollapsePx = 40;  // an edge tile squeezed thinner than this collapses
@@ -222,9 +222,9 @@ private:
     std::optional<TRect> drawerTab(const std::string &panel) const; // a closed drawer's tab on screen
     void updateDrawerTabs();
     void setDrawerOpen(const std::string &panel, bool open, bool pinned = false); // slide a drawer out or back; pinned stays out until the pointer has visited it
-    bool drawerEdgeFree(trellis::Edge edge) const; // false where another display joins this one: a drawer there would open onto it
-    void stashPanel(const std::string &panel, trellis::Edge edge, const TRect &from);
-    TRect drawerMapRect(const std::string &panel, const trellis::Rect &open) const; // what the minimap draws of a float
+    bool drawerEdgeFree(krellis::Edge edge) const; // false where another display joins this one: a drawer there would open onto it
+    void stashPanel(const std::string &panel, krellis::Edge edge, const TRect &from);
+    TRect drawerMapRect(const std::string &panel, const krellis::Rect &open) const; // what the minimap draws of a float
     std::optional<TRect> drawerSlice(const std::string &panel) const; // what a closed drawer shows of its edge: its share of it
     void updateDrawerHover(const PointerMotionEvent &event);
     void forgetDrawer(const std::string &panel); // also drops the paint elevation an open one has
@@ -246,7 +246,7 @@ private:
     bool scratchWindow(EffectWindow *w) const;
     // Turn the docked window into a centred overlay float. False when it can't (nothing left to tile, or not docked).
     bool m_scratchpad = false; // [General] scratchpad, mirrored from the effect; off, no window counts as scratch
-    trellis::Theme *m_theme = nullptr; // owned by the effect; the tokens every overlay scene binds to
+    krellis::Theme *m_theme = nullptr; // owned by the effect; the tokens every overlay scene binds to
     // An overlay scene with the theme handed in as its `theme` property; null (and logged) when the QML fails to load.
     std::unique_ptr<OffscreenQuickScene> makeScene(const QString &file);
     void themeChanged(); // the colours moved: repaint every overlay
@@ -255,20 +255,21 @@ private:
     bool layerShown() const;
     double m_layerDim = 0, m_layerTarget = 0;
     Tracked *trackedFor(EffectWindow *w);
+    Tracked *trackedForPanel(const std::string &panel);
     void relayout(bool animate);
     TRect panelAt(const TRect &world, const TRect &camera) const;
     // The layout rect (world space) a panel is drawn from: the live drag preview, else the document.
     const TRect *worldRect(const std::string &panel) const;
     std::optional<TRect> floatScreen(const std::string &panel) const;
-    void dockAtEnd(const trellis::NodePtr &panel);
-    void dockAtSpawn(const trellis::NodePtr &panel); // by m_spawnTarget
-    void dockAtPointer(const trellis::NodePtr &panel);
-    void dockAtFocused(const trellis::NodePtr &panel);
+    void dockAtEnd(const krellis::NodePtr &panel);
+    void dockAtSpawn(const krellis::NodePtr &panel); // by m_spawnTarget
+    void dockAtPointer(const krellis::NodePtr &panel);
+    void dockAtFocused(const krellis::NodePtr &panel);
     void startDrag(EffectWindow *w, QPointF pointer);
     void moveDrag(QPointF pointer);
     void endDrag(bool commit);
     void updateSlot(double dt);
-    bool fillVacancyFor(const trellis::NodePtr &panel, const std::optional<QPointF> &cursor);
+    bool fillVacancyFor(const krellis::NodePtr &panel, const std::optional<QPointF> &cursor);
     TRect screenRect(const std::string &panel) const;
     TRect sizingCamera() const;
     TRect restRect(const std::string &panel, const TRect *world = nullptr) const;
@@ -294,18 +295,18 @@ private:
     void startFlight(EffectWindow *w, FlightKind kind, TRect from, TRect to, double opacity = 1);
     bool flightRect(EffectWindow *w, const Tracked &t, TRect &rect, double &opacity) const;
 
-    trellis::LayoutDocument m_doc;
+    krellis::LayoutDocument m_doc;
     // Undo/redo of layout edits the user made. Window opens and closes, minimizing and scratchpad show/hide are not
-    // edits; undo restores the arrangement and keeps what the compositor owns (see trellis::reconcile).
-    trellis::History m_history;
+    // edits; undo restores the arrangement and keeps what the compositor owns (see krellis::reconcile).
+    krellis::History m_history;
     int m_editDepth = 0;
     static double realMs();
-    void commitEdit(const char *label, const trellis::LayoutDocument &before, const trellis::LayoutDocument &next, const std::string &key = {});
+    void commitEdit(const char *label, const krellis::LayoutDocument &before, const krellis::LayoutDocument &next, const std::string &key = {});
     // Records the document as it was on entry, if it differs on exit. Nested scopes leave the recording to the outermost.
     class EditScope
     {
     public:
-        EditScope(TrellisCanvas &canvas, const char *label, std::string key = {})
+        EditScope(KrellisCanvas &canvas, const char *label, std::string key = {})
             : m_canvas(canvas), m_label(label), m_key(std::move(key)), m_outer(canvas.m_editDepth++ == 0), m_before(canvas.m_doc) {}
         ~EditScope()
         {
@@ -315,16 +316,16 @@ private:
         EditScope(const EditScope &) = delete;
         EditScope &operator=(const EditScope &) = delete;
     private:
-        TrellisCanvas &m_canvas;
+        KrellisCanvas &m_canvas;
         const char *m_label;
         std::string m_key;
         bool m_outer;
-        trellis::LayoutDocument m_before;
+        krellis::LayoutDocument m_before;
     };
-    trellis::RectSpring m_camera;
-    trellis::Navigator m_nav;
-    trellis::LayoutTween m_tween;
-    trellis::Entries m_rects; // panel world rects
+    krellis::RectSpring m_camera;
+    krellis::Navigator m_nav;
+    krellis::LayoutTween m_tween;
+    krellis::Entries m_rects; // panel world rects
     std::vector<Tracked> m_windows;
     AnimationClock m_clock;
     double m_nowMs = 0;
@@ -334,7 +335,7 @@ private:
     std::unique_ptr<class OffscreenQuickScene> m_bar;
     QRectF m_uiScreen, m_uiFrom;
     double m_areaChangedMs = -1000;
-    QRectF m_screen;          // KWin panel-aware rectangle; m_area also reserves the Trellis bar
+    QRectF m_screen;          // KWin panel-aware rectangle; m_area also reserves the Krellis bar
     QString m_hoverKey, m_pressKey, m_barSignature;
     bool m_mapOn = false, m_pressBar = false;
     bool m_swallowMiddle = false; // a middle press flipped a seam: its release is ours too
@@ -384,16 +385,17 @@ private:
     double m_pinchScale = 1;
     std::map<EffectWindow *, Flight> m_flights;
     std::map<EffectWindow *, double> m_popups;
-    std::unique_ptr<trellis::DragSession> m_session;
+    std::unique_ptr<krellis::DragSession> m_session;
     EffectWindow *m_dragWindow = nullptr;
     RectF m_dragStartGeometry;
     int m_simForceFloat = -1;
-    trellis::config::SpawnTarget m_spawnTarget = trellis::config::SpawnTarget::Pointer; // where a new tiled window opens
+    krellis::config::SpawnTarget m_spawnTarget = krellis::config::SpawnTarget::Pointer; // where a new tiled window opens
     std::string m_lastActivePanel; // the panel of the last tracked window to be activated (KWin activates a new window before windowAdded)
     double m_peekPx = 40; // gutter of neighbouring tiles left in view around a zoomed framing; 0 = off
+    bool m_closeFocus = true;  // closing the focused window focuses its layout neighbour
     bool m_floatFirst = false; // floating-first mode: new windows float, and drops tile only at screen edges and corners
-    trellis::Point m_tileMinimum{1, 1}; // layout floor of an app without a rule ([General] tileMinWidth/tileMinHeight)
-    int m_iconBelow = 160; // tiles drawn narrower than this show an icon instead of the window; 0 = never
+    krellis::Point m_tileMinimum{1, 1}; // layout floor of an app without a rule ([General] tileMinWidth/tileMinHeight)
+    int m_iconBelow = 0;   // tiles drawn narrower than this show an icon instead of the window; 0 = never
     double m_landMs = 200; // glide off: duration of the move-and-scale a window plays when its real geometry changes; 0 = none
     struct Landing { TRect from; double start; };
     std::map<EffectWindow *, Landing> m_landings;
@@ -401,7 +403,7 @@ private:
     bool m_shiftHeld = false; // from the latest pointer event; Shift floats a dragged window
     bool floatModifierHeld() const;
     bool m_dragFromKWin = false;
-    trellis::RectMap m_lastRects; // what was drawn last frame; rebuilt by refreshRects()
+    krellis::RectMap m_lastRects; // what was drawn last frame; rebuilt by refreshRects()
     void refreshRects();
     std::unique_ptr<class OffscreenQuickScene> m_slot;
     double m_slotOpacity = 0;
@@ -450,12 +452,12 @@ private:
 };
 
 // One effect-chain participant, owning an independent state machine per output.
-class TrellisEffect : public Effect
+class KrellisEffect : public Effect
 {
     Q_OBJECT
 public:
-    TrellisEffect();
-    ~TrellisEffect() override;
+    KrellisEffect();
+    ~KrellisEffect() override;
     bool isActive() const override { return true; }
     int requestedEffectChainPosition() const override { return 50; }
     void prePaintScreen(ScreenPrePaintData &data) override;
@@ -561,7 +563,7 @@ public Q_SLOTS:
     QString sessionStatus() const;
     void restoreSession();
 private:
-    void applySettings(const trellis::config::Settings &settings);
+    void applySettings(const krellis::config::Settings &settings);
     void syncOutputs();
     void initializeSession();
     void scheduleSave();
@@ -569,7 +571,7 @@ private:
     void markSessionInteraction();
     bool writeSession();
     QString outputKey(LogicalOutput *output) const;
-    trellis::SessionSnapshot m_savedSession;
+    krellis::SessionSnapshot m_savedSession;
     QTimer *m_saveTimer = nullptr, *m_restoreTimer = nullptr;
     bool m_restoreComplete = true, m_userTouched = false, m_restoring = false, m_shuttingDown = false;
     int m_sessionMatches = 0, m_sessionAmbiguous = 0, m_pendingUnique = 0;
@@ -588,7 +590,7 @@ private:
     std::map<Window *, NativeState> m_nativeStates;
     struct SurfaceHit {
         EffectWindow *window;
-        TrellisCanvas *canvas;
+        KrellisCanvas *canvas;
         TRect shown;
         QPointF mapped;
         bool decoration, inert;
@@ -628,32 +630,33 @@ private:
     void hideHint(); // the hold turned into something else: drop the sheet and stay quiet until the chord is released
     void hideHintUi();
     QVariantList helpGroups() const;
-    trellis::ChordHint m_chord;
+    krellis::ChordHint m_chord;
     QTimer *m_chordTimer = nullptr;
     Qt::KeyboardModifiers m_simMods; // held modifiers of simKey, standing in for the compositor's keyboard state
     bool m_whichKey = true;
     void syncScratchShortcuts(); // Meta+G and Meta+Shift+G exist only while the scratchpad is enabled
     QList<QAction *> m_scratchActions;
     bool m_scratchpad = false;
-    void transfer(EffectWindow *window, TrellisCanvas *target);
-    TrellisCanvas *canvasAt(QPointF point) const;
-    TrellisCanvas *owner(EffectWindow *window) const;
-    TrellisCanvas *current() const;
-    trellis::Theme m_theme; // before the canvases: their scenes read it while they are destroyed
-    std::vector<std::unique_ptr<TrellisCanvas>> m_canvases;
-    std::unique_ptr<TrellisInput> m_input;
-    TrellisCanvas *m_pointerCanvas = nullptr, *m_pinchCanvas = nullptr;
+    void transfer(EffectWindow *window, KrellisCanvas *target);
+    KrellisCanvas *canvasAt(QPointF point) const;
+    KrellisCanvas *owner(EffectWindow *window) const;
+    KrellisCanvas *current() const;
+    krellis::Theme m_theme; // before the canvases: their scenes read it while they are destroyed
+    std::vector<std::unique_ptr<KrellisCanvas>> m_canvases;
+    std::unique_ptr<KrellisInput> m_input;
+    KrellisCanvas *m_pointerCanvas = nullptr, *m_pinchCanvas = nullptr;
     LogicalOutput *m_selectedOutput = nullptr;
-    trellis::config::SpawnTarget m_spawnTarget = trellis::config::SpawnTarget::Pointer; // loaded from trellisrc; mirrored into every canvas
+    krellis::config::SpawnTarget m_spawnTarget = krellis::config::SpawnTarget::Pointer; // loaded from krellisrc; mirrored into every canvas
     double m_peekPx = 40;         // likewise ([General] peek, pixels)
-    bool m_floatFirst = false; // loaded from trellisrc; mirrored into every canvas
+    bool m_closeFocus = true;  // loaded from krellisrc; mirrored into every canvas
+    bool m_floatFirst = false; // loaded from krellisrc; mirrored into every canvas
     bool m_mapPinned = false;  // likewise
     bool m_showMap = true;     // [General] map, default on; the minimap shortcut flips and saves it
-    trellis::Point m_tileMinimum{1, 1}; // loaded from trellisrc; mirrored into every canvas
-    int m_iconBelow = 160; // loaded from trellisrc ([General] iconBelow); mirrored into every canvas
-    double m_landMs = 200; // loaded from trellisrc ([General] landMs); mirrored into every canvas
-    bool m_toastsOn = true, m_flyToOn = false; // loaded from trellisrc; mirrored into every canvas
-    bool m_glide = false; // loaded from trellisrc ([General] glide, default off); mirrored into every canvas
+    krellis::Point m_tileMinimum{1, 1}; // loaded from krellisrc; mirrored into every canvas
+    int m_iconBelow = 0;   // loaded from krellisrc ([General] iconBelow); mirrored into every canvas
+    double m_landMs = 200; // loaded from krellisrc ([General] landMs); mirrored into every canvas
+    bool m_toastsOn = true, m_flyToOn = false; // loaded from krellisrc; mirrored into every canvas
+    bool m_glide = false; // loaded from krellisrc ([General] glide, default off); mirrored into every canvas
 };
 
 } // namespace KWin

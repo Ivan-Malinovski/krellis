@@ -3,12 +3,12 @@ set -euo pipefail
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-project=/home/ivan/dev/kwin-trellis
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
-cat >"$XDG_CONFIG_HOME/trellisrc" <<'RULES'
+project=/home/ivan/dev/krellis
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
+cat >"$XDG_CONFIG_HOME/krellisrc" <<'RULES'
 [ViewRules]
-trellis-input-fixture\minWidth=640
-trellis-input-fixture\minHeight=1200
+krellis-input-fixture\minWidth=640
+krellis-input-fixture\minHeight=1200
 RULES
 call reloadRules
 c++ -fPIC "$project/scenarios/input-client.cpp" -o "$NEST_WORK/input-client" $(pkg-config --cflags --libs Qt6Widgets)

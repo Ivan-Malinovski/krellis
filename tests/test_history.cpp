@@ -5,7 +5,7 @@
 
 #include <QtTest>
 
-using namespace trellis;
+using namespace krellis;
 
 static NodePtr P(const char *id, const char *view) { return makePanel(id, {view}); }
 

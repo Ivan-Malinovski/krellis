@@ -3,7 +3,7 @@
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 active() { call dump | sed -n 's/^ACTIVE //p'; }
 xof() { call dump | sed -n "s/^$1 .* screen \([0-9.]*\),.*/\1/p" | head -1; }
 wof() { call dump | sed -n "s/^$1 .* screen [0-9.]*,[0-9.]* \([0-9.]*\)x.*/\1/p" | head -1; }
@@ -27,7 +27,7 @@ call resizeStep right 0.1; sleep 0.6
 grown=$(wof p3)
 awk "BEGIN{exit !($grown > $w)}" && echo "PASS resize right grows" || echo "FAIL resize right grows: $w -> $grown"
 call toggleResizeMode; check "resize mode on" "$(call resizeModeActive)" true
-sleep 0.5; /home/ivan/dev/kwin-trellis/tools/shot key-nav-resize >/dev/null
+sleep 0.5; /home/ivan/dev/krellis/tools/shot key-nav-resize >/dev/null
 call simKey 16777236 true; call simKey 16777236 false; sleep 0.6   # Right
 again=$(wof p3)
 awk "BEGIN{exit !($again > $grown)}" && echo "PASS resize mode arrow grows" || echo "FAIL resize mode arrow grows: $grown -> $again"

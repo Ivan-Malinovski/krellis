@@ -2,7 +2,7 @@
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 for n in A B C D E; do
   alacritty --title "win-$n" -e sh -c "echo $n; sleep 600" >/dev/null 2>&1 &
   if [ "$n" = C ]; then closing_client=$!; fi
@@ -10,10 +10,10 @@ for n in A B C D E; do
 done
 sleep 1.5
 echo "--- five"; call dump
-/home/ivan/dev/kwin-trellis/tools/shot five >/dev/null
+/home/ivan/dev/krellis/tools/shot five >/dev/null
 kill "$closing_client"
 sleep 0.08; echo "--- after close (mid)"; call dump
-/home/ivan/dev/kwin-trellis/tools/shot closing >/dev/null
+/home/ivan/dev/krellis/tools/shot closing >/dev/null
 sleep 1.5; echo "--- after close (rest)"; call dump
-/home/ivan/dev/kwin-trellis/tools/shot four >/dev/null
+/home/ivan/dev/krellis/tools/shot four >/dev/null
 pkill -P "$$" -x alacritty

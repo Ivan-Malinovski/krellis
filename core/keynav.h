@@ -7,7 +7,7 @@
 
 #include <optional>
 
-namespace trellis {
+namespace krellis {
 
 /// The panel nearest to `from` towards `dir`, or empty. Candidates lie wholly past the origin's edge; the
 /// one sharing the most of the origin's extent wins, then the nearest along the axis, then the nearest centre.
@@ -25,4 +25,4 @@ LayoutDocument moveInDirection(LayoutDocument doc, const std::string &panelId, E
 NodePtr resizeInDirection(const NodePtr &root, const LayoutMetrics &metrics, const std::string &panelId, Edge dir,
                           double fraction);
 
-} // namespace trellis
+} // namespace krellis

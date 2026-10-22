@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace trellis {
+namespace krellis {
 
 struct Rect {
     double x = 0, y = 0, w = 0, h = 0;
@@ -144,4 +144,4 @@ private:
     std::unordered_map<std::string, size_t> m_index;
 };
 
-} // namespace trellis
+} // namespace krellis

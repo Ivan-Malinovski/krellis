@@ -6,7 +6,7 @@
 #include <functional>
 #include <optional>
 
-namespace trellis {
+namespace krellis {
 
 std::string uid(const std::string &prefix);
 LayoutDocument emptyDocument();
@@ -39,6 +39,10 @@ std::optional<LayoutDocument> vacatePanel(const LayoutDocument &doc, const std::
 LayoutDocument fillVacancy(LayoutDocument doc, const std::string &vacancyId, NodePtr panel);
 LayoutDocument detachView(LayoutDocument doc, const std::string &viewId, bool keepProportions = false);
 LayoutDocument closeView(LayoutDocument doc, const std::string &viewId);
+/// The docked panel that should take focus when `viewId` closes: the nearest sibling in the split the window
+/// leaves (the previous one, else the next), or for a sibling group the window nearest the gap. Empty when the
+/// panel survives the close (other tabs), is not docked, or has no occupied sibling.
+std::string closeFocusPanel(const LayoutDocument &doc, const std::string &viewId);
 LayoutDocument selectView(LayoutDocument doc, const std::string &viewId);
 LayoutDocument addTab(LayoutDocument doc, const std::string &panelId, const std::string &viewId,
                       std::optional<int> index = std::nullopt, bool select = true);
@@ -88,4 +92,4 @@ LayoutDocument restorePanel(LayoutDocument doc, const std::string &panelId, Floa
 LayoutDocument sanitize(LayoutDocument input, const std::function<bool(const std::string &)> &isKnownType = nullptr);
 std::vector<std::string> viewIds(const LayoutDocument &doc);
 
-} // namespace trellis
+} // namespace krellis

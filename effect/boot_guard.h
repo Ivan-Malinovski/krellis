@@ -6,12 +6,12 @@ namespace KWin {
 
 /// The factory's isSupported(): false when the previous runs kept dying soon after loading. It is called on every load and
 /// every support query, so it only reads, except that the first refusal leaves a flag and sends the notification once.
-bool trellisBootAllowed();
+bool krellisBootAllowed();
 /// The effect's constructor: records this start, counting an early death of the previous run as a strike.
-void trellisBootStarted();
+void krellisBootStarted();
 /// The effect lived long enough to count as healthy.
-void trellisBootSurvived();
+void krellisBootSurvived();
 /// Unloaded normally (destructor): the next start begins from zero.
-void trellisBootClean();
+void krellisBootClean();
 
 } // namespace KWin

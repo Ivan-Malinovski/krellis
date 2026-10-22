@@ -6,7 +6,7 @@
 #include <set>
 #include <string>
 
-namespace trellis {
+namespace krellis {
 
 /// `snapshot` is the layout to go back to, `now` the live document. The result has the snapshot's arrangement, but:
 /// - windows that have since closed are removed (a closed window is never resurrected);
@@ -17,4 +17,4 @@ namespace trellis {
 /// `sanitize` is not used: a live document has no `views` records, so it would drop everything.
 LayoutDocument reconcile(const LayoutDocument &snapshot, const LayoutDocument &now, const std::set<std::string> &fromNow = {});
 
-} // namespace trellis
+} // namespace krellis

@@ -3,7 +3,7 @@
 
 #include <QtTest>
 
-using namespace trellis;
+using namespace krellis;
 
 class TestChordSafemode : public QObject
 {

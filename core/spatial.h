@@ -5,7 +5,7 @@
 
 #include <optional>
 
-namespace trellis {
+namespace krellis {
 
 /// Panels and empty stages: the leaves a view can sit beside.
 std::vector<std::string> leafIds(const NodePtr &node);
@@ -78,4 +78,4 @@ NodePtr insertAtSeam(const NodePtr &root, const SplitSeam &seam, const NodePtr &
 NodePtr applyDockTarget(const NodePtr &root, const DockTargetSpec &target, const NodePtr &incoming,
                         const std::string &splitId);
 
-} // namespace trellis
+} // namespace krellis

@@ -1,4 +1,4 @@
-#include "trellis_effect.h"
+#include "krellis_effect.h"
 #include "effect/effecthandler.h"
 #include "window.h"
 #include "pointer_input.h"
@@ -14,7 +14,7 @@
 
 namespace KWin {
 
-std::optional<TrellisEffect::SurfaceHit> TrellisEffect::surfaceHit(QPointF point) const
+std::optional<KrellisEffect::SurfaceHit> KrellisEffect::surfaceHit(QPointF point) const
 {
     auto hitWindow = [this, point](EffectWindow *w, bool grabbed, bool borders = false) -> std::optional<SurfaceHit> {
         auto *canvas = owner(w);
@@ -40,7 +40,7 @@ std::optional<TrellisEffect::SurfaceHit> TrellisEffect::surfaceHit(QPointF point
             reach = reach.marginsAdded(QMarginsF(m.left() * sx, m.top() * sy, m.right() * sx, m.bottom() * sy));
         }
         if (!shown || (!grabbed && !reach.contains(point))) return std::nullopt;
-        const auto mapped = trellis::mapPoint({point.x(), point.y()}, *shown, {f.x(), f.y(), f.width(), f.height()});
+        const auto mapped = krellis::mapPoint({point.x(), point.y()}, *shown, {f.x(), f.y(), f.width(), f.height()});
         if (!mapped) return std::nullopt;
         const QPointF rest(mapped->x, mapped->y);
         if (!grabbed && !w->window()->hitTest(rest)) return std::nullopt;
@@ -48,7 +48,7 @@ std::optional<TrellisEffect::SurfaceHit> TrellisEffect::surfaceHit(QPointF point
         const bool nativeDecorationGrab = grabbed && m_grabDecoration
             && (w->isUserMove() || w->isUserResize());
         const bool busy = !nativeDecorationGrab && (canvas->m_nav.gestureActive()
-            || canvas->m_drag != TrellisCanvas::Drag::None || canvas->m_session);
+            || canvas->m_drag != KrellisCanvas::Drag::None || canvas->m_session);
         const double scale = std::min(shown->w / f.width(), shown->h / f.height());
         const bool unusable = !decoration && !canvas->rulesFor(w).interactive(scale);
         const auto *tracked = canvas->trackedFor(w);
@@ -74,7 +74,7 @@ std::optional<TrellisEffect::SurfaceHit> TrellisEffect::surfaceHit(QPointF point
     return std::nullopt;
 }
 
-void TrellisEffect::leaveSurface()
+void KrellisEffect::leaveSurface()
 {
     leaveDecoration();
     if (!waylandServer() || !waylandServer()->seat()) {
@@ -91,7 +91,7 @@ void TrellisEffect::leaveSurface()
     seat->notifyPointerLeave();
 }
 
-void TrellisEffect::leaveDecoration()
+void KrellisEffect::leaveDecoration()
 {
     if (m_decorWindow && m_decorWindow->window() && m_decorWindow->window()->decoration()) {
         QHoverEvent leave(QEvent::HoverLeave, QPointF(-1, -1), QPointF(), m_decorPosition);
@@ -104,7 +104,7 @@ void TrellisEffect::leaveDecoration()
     m_decorPosition = {};
 }
 
-void TrellisEffect::focusDecoration(const SurfaceHit &hit, QPointF position)
+void KrellisEffect::focusDecoration(const SurfaceHit &hit, QPointF position)
 {
     auto *window = hit.window->window();
     const QPointF local = hit.mapped - QPointF(window->pos());
@@ -124,7 +124,7 @@ void TrellisEffect::focusDecoration(const SurfaceHit &hit, QPointF position)
     window->processDecorationMove(local, position);
 }
 
-void TrellisEffect::focusSurface(const SurfaceHit &hit, QPointF point)
+void KrellisEffect::focusSurface(const SurfaceHit &hit, QPointF point)
 {
     leaveDecoration();
     auto *window = hit.window->window();
@@ -142,7 +142,7 @@ void TrellisEffect::focusSurface(const SurfaceHit &hit, QPointF point)
     seat->notifyPointerMotion(point);
 }
 
-bool TrellisEffect::surfaceMotion(const PointerMotionEvent &event)
+bool KrellisEffect::surfaceMotion(const PointerMotionEvent &event)
 {
     if (m_pinchCanvas) { leaveSurface(); return true; }
     const auto hit = surfaceHit(event.position);
@@ -173,7 +173,7 @@ bool TrellisEffect::surfaceMotion(const PointerMotionEvent &event)
     return true;
 }
 
-bool TrellisEffect::surfaceButton(const PointerButtonEvent &event)
+bool KrellisEffect::surfaceButton(const PointerButtonEvent &event)
 {
     if (m_pinchCanvas) { leaveSurface(); return true; }
     const auto hit = surfaceHit(event.position);
@@ -236,7 +236,7 @@ bool TrellisEffect::surfaceButton(const PointerButtonEvent &event)
     return true;
 }
 
-bool TrellisEffect::surfaceAxis(const PointerAxisEvent &event)
+bool KrellisEffect::surfaceAxis(const PointerAxisEvent &event)
 {
     if (m_pinchCanvas) { leaveSurface(); return true; }
     const auto hit = surfaceHit(event.position);

@@ -7,7 +7,7 @@
 #include <random>
 #include <set>
 
-namespace trellis {
+namespace krellis {
 
 std::string uid(const std::string &prefix)
 {
@@ -177,6 +177,40 @@ LayoutDocument closeView(LayoutDocument doc, const std::string &viewId)
     doc = detachView(std::move(doc), viewId, true);
     doc.views.erase(viewId);
     return doc;
+}
+
+static NodePtr occupiedPanelAt(const NodePtr &node, bool fromEnd)
+{
+    if (node->kind == Node::Kind::Panel)
+        return isVacant(node) ? nullptr : node;
+    if (node->kind == Node::Kind::Stage)
+        return node->child ? occupiedPanelAt(node->child, fromEnd) : nullptr;
+    for (size_t n = 0; n < node->children.size(); ++n)
+        if (auto found = occupiedPanelAt(node->children[fromEnd ? node->children.size() - 1 - n : n], fromEnd))
+            return found;
+    return nullptr;
+}
+
+std::string closeFocusPanel(const LayoutDocument &doc, const std::string &viewId)
+{
+    const NodePtr panel = panelOfView(doc, viewId);
+    if (!panel || panel->views.size() != 1 || !locatePanel(doc, panel->id) || locatePanel(doc, panel->id).where != PanelLocation::Where::Docked)
+        return {};
+    const NodePtr split = parentSplit(doc.root, panel->id);
+    if (!split)
+        return {};
+    size_t at = 0;
+    while (at < split->children.size() && split->children[at]->id != panel->id)
+        ++at;
+    for (size_t step = 1; step < split->children.size(); ++step) {
+        if (at >= step)
+            if (auto found = occupiedPanelAt(split->children[at - step], true))
+                return found->id;
+        if (at + step < split->children.size())
+            if (auto found = occupiedPanelAt(split->children[at + step], false))
+                return found->id;
+    }
+    return {};
 }
 
 LayoutDocument selectView(LayoutDocument doc, const std::string &viewId)
@@ -498,4 +532,4 @@ std::vector<std::string> viewIds(const LayoutDocument &doc)
     return out;
 }
 
-} // namespace trellis
+} // namespace krellis

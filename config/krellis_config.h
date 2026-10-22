@@ -3,16 +3,17 @@
 #include <QString>
 #include <QVariant>
 
-// ~/.config/trellisrc. Plain keys live in [General]; per-application rules live in [ViewRules] as
+// ~/.config/krellisrc. Plain keys live in [General]; per-application rules live in [ViewRules] as
 // "<app>\<key>=<value>" lines (QSettings group syntax). Both the effect and the settings module go through here so
 // they cannot disagree about the file's shape.
-namespace trellis::config {
+namespace krellis::config {
 
 // Where a new tiled window opens.
 enum class SpawnTarget { Pointer, Focused, End };
 
 struct Settings
 {
+    bool closeFocus = true;       // closing the focused window focuses its neighbour in the layout
     bool floatFirst = false;      // new windows float; drops tile only at screen edges and corners
     SpawnTarget spawnTarget = SpawnTarget::Pointer; // beside the tile under the cursor | the focused tile | the end of the row
     double peek = 40;             // pixels of neighbouring tiles kept in view around a zoomed framing; 0 = off
@@ -26,7 +27,7 @@ struct Settings
     bool whichKey = true;         // holding Meta+Alt shows the keyboard cheat sheet
     int whichKeyDelayMs = 400;    // how long the chord is held before the cheat sheet shows
     int tileMinWidth = 1, tileMinHeight = 1; // pixel minimum of a tile for apps without a rule; 1 = pure proportions (deep splits keep shrinking), 320x200 = the old floor
-    int iconBelow = 160;          // tiles drawn narrower than this many pixels show an icon; 0 = windows stay live at any size
+    int iconBelow = 0;            // tiles drawn narrower than this many pixels show an icon; 0 (default) = windows stay live at any size
     double landMs = 200;          // glide off: duration of the move-and-scale after a real geometry change
     bool operator==(const Settings &) const = default;
 };
@@ -43,6 +44,8 @@ struct AppRule
 };
 
 QString defaultPath();
+// A file in the effect's state directory (~/.local/state/krellis). The first call also copies a pre-rename session.json over.
+QString stateFile(const QString &name);
 
 Settings load(const QString &file = defaultPath());
 // Writes only the General keys, leaving rules and anything unknown in the file alone.
@@ -54,4 +57,4 @@ QList<AppRule> loadRules(const QString &file = defaultPath());
 // Replaces the whole [ViewRules] section.
 bool saveRules(const QList<AppRule> &rules, const QString &file = defaultPath());
 
-} // namespace trellis::config
+} // namespace krellis::config

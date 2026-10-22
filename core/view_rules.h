@@ -1,6 +1,6 @@
 #pragma once
 #include "spatial.h"
-namespace trellis {
+namespace krellis {
 enum class ViewPlacement { Side, Stage, Floating };
 enum class ViewScaling { Interactive, Inert, None };
 struct ViewRules {

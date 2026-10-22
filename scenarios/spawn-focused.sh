@@ -1,9 +1,9 @@
 # spawnTarget=focused: a new tiled window opens beside the focused window, wherever the pointer is. Run with
-#   NEST_TRELLISRC=<file with spawnTarget=focused> (the check below reads the log line to prove the key was seen).
+#   NEST_KRELLISRC=<file with spawnTarget=focused> (the check below reads the log line to prove the key was seen).
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 order() { call dump | awk '/^ORDER/ { $1=""; print; exit }' | xargs; }
 pos() { call dump | sed -nE "s/^$1 .* screen ([-0-9.]+),([-0-9.]+) .*/\1 \2/p" | head -1; }
 rc=0

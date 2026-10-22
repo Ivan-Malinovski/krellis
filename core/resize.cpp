@@ -6,7 +6,7 @@
 #include <limits>
 #include <map>
 
-namespace trellis {
+namespace krellis {
 
 namespace {
 
@@ -240,4 +240,4 @@ BoundaryDragResult dragBoundary(const NodePtr &root, const LayoutMetrics &metric
     return result;
 }
 
-} // namespace trellis
+} // namespace krellis

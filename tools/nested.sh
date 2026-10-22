@@ -6,26 +6,26 @@
 # <plugin-root> must contain kwin/effects/plugins/*.so . The scenario script runs with
 #   NEST_BUS (dbus addr is inherited), NEST_SOCKET and NEST_OUT (output dir) set.
 set -euo pipefail
-export NEST_SOCKET=${NEST_SOCKET:-trellis-nest}
+export NEST_SOCKET=${NEST_SOCKET:-krellis-nest}
 if [ -S "${XDG_RUNTIME_DIR:?}/$NEST_SOCKET" ]; then
     echo "Nested socket $NEST_SOCKET is already in use" >&2
     exit 1
 fi
 root=$(realpath "$1"); effects=$2; scenario=$(realpath "$3"); W=${4:-1280}; H=${5:-800}
-work=${NEST_WORK:-/tmp/trellis-nest}; rm -rf "$work"; mkdir -p "$work/config" "$work/out" "$work/data" "$work/state/kwin-trellis"
+work=${NEST_WORK:-/tmp/krellis-nest}; rm -rf "$work"; mkdir -p "$work/config" "$work/out" "$work/data" "$work/state/krellis"
 {
   echo "[Plugins]"
   IFS=, read -ra ids <<<"$effects"; for e in "${ids[@]}"; do echo "${e}Enabled=true"; done
   echo "blurEnabled=false"; echo "[Compositing]"; echo "Backend=OpenGL"
 } > "$work/config/kwinrc"
-if [ -n "${NEST_TRELLISRC:-}" ]; then cp "$NEST_TRELLISRC" "$work/config/trellisrc"; else printf "[General]\nglide=true\nmap=false\nfollowTheme=false\ntoasts=false\nwhichKey=false\n" >"$work/config/trellisrc"; fi
+if [ -n "${NEST_KRELLISRC:-}" ]; then cp "$NEST_KRELLISRC" "$work/config/krellisrc"; else printf "[General]\nglide=true\nmap=false\nfollowTheme=false\ntoasts=false\nwhichKey=false\n" >"$work/config/krellisrc"; fi
 # NEST_KDEGLOBALS: a colour scheme for the nested session (theme scenarios); without it the built-in palette is used.
 if [ -n "${NEST_KDEGLOBALS:-}" ]; then cp "$NEST_KDEGLOBALS" "$work/config/kdeglobals"; fi
 # NEST_BOOT_STRIKES=N: seed the crash-loop marker as if the last start died N times in a row, just now (safe-mode scenario).
 if [ -n "${NEST_BOOT_STRIKES:-}" ]; then
-  printf '{"startedAtMs":%s,"cleanExit":false,"survived":false,"strikes":%s,"notified":true}\n' "$(( $(date +%s%3N) - 1000 ))" "$NEST_BOOT_STRIKES" >"$work/state/kwin-trellis/boot.json"
+  printf '{"startedAtMs":%s,"cleanExit":false,"survived":false,"strikes":%s,"notified":true}\n' "$(( $(date +%s%3N) - 1000 ))" "$NEST_BOOT_STRIKES" >"$work/state/krellis/boot.json"
 fi
-if [ -n "${NEST_SESSION_FILE:-}" ]; then cp "$NEST_SESSION_FILE" "$work/state/kwin-trellis/session.json"; fi
+if [ -n "${NEST_SESSION_FILE:-}" ]; then cp "$NEST_SESSION_FILE" "$work/state/krellis/session.json"; fi
 export NEST_OUTPUTS=${NEST_OUTPUTS:-1}
 export NEST_BACKEND_FLAG=
 case "${NEST_BACKEND:-wayland}" in virtual) NEST_BACKEND_FLAG=--virtual;; drm) NEST_BACKEND_FLAG=--drm;; esac
@@ -34,7 +34,7 @@ exec dbus-run-session -- bash -c '
   export XDG_STATE_HOME="$NEST_WORK/state"
   export XDG_CONFIG_HOME="$NEST_WORK/config" XDG_DATA_HOME="$NEST_WORK/data" XDG_CACHE_HOME="$NEST_WORK/cache"
   export QT_PLUGIN_PATH="'"$root"'${QT_PLUGIN_PATH:+:$QT_PLUGIN_PATH}"
-  export KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1 QT_LOGGING_RULES="kwin_*.debug=false;trellis*.debug=true"
+  export KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1 QT_LOGGING_RULES="kwin_*.debug=false;krellis*.debug=true"
   export QT_FORCE_STDERR_LOGGING=1
   kwin_wayland $NEST_BACKEND_FLAG --socket "$NEST_SOCKET" --output-count "$NEST_OUTPUTS" --width '"$W"' --height '"$H"' --no-lockscreen --no-global-shortcuts >"$NEST_OUT/kwin.log" 2>&1 &
   kw=$!

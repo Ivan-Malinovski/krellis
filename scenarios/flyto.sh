@@ -4,7 +4,7 @@
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 camw() { call dump | sed -n 's/^camera [-0-9.e]* [-0-9.e]* \([-0-9.e]*\) .*/\1/p'; }
 sample() { # name: sample the camera width every 80 ms for 1.6 s, print min/max
   local lo=999 hi=0 w
@@ -25,7 +25,7 @@ echo "--- short hop"
 call focusIndex 6 & pid=$!; sample near-on; wait $pid
 sleep 1
 echo "--- flyTo off"
-printf '[General]\nglide=true\nmap=false\nflyTo=false\nfollowTheme=false\ntoasts=false\nwhichKey=false\n' >"$NEST_WORK/config/trellisrc"
+printf '[General]\nglide=true\nmap=false\nflyTo=false\nfollowTheme=false\ntoasts=false\nwhichKey=false\n' >"$NEST_WORK/config/krellisrc"
 call reloadSettings
 call focusIndex 0; sleep 2.5
 call focusIndex 7 & pid=$!; sample far-off; wait $pid

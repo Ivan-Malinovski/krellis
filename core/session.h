@@ -1,7 +1,7 @@
 #pragma once
 #include "document.h"
 #include <tuple>
-namespace trellis {
+namespace krellis {
 // A stable app identity, optionally refined by an application-supplied role.
 // Deliberately excludes captions, process IDs and connection-local window UUIDs.
 struct WindowIdentity {

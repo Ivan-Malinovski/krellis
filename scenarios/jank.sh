@@ -1,7 +1,7 @@
 # Sample drawn position/size of every window across a layout change (closing the middle window).
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET; unset DISPLAY
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 for n in A B C; do alacritty --title "win-$n" -e sh -c "echo $n; sleep 600" >/dev/null 2>&1 & pids="$pids $!"; sleep 2; done
 sleep 1
 echo "--- before"; call dump | grep -E "^p"

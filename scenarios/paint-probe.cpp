@@ -17,14 +17,14 @@
 namespace KWin {
 class PaintProbe : public Effect {
     Q_OBJECT
-    Q_CLASSINFO("D-Bus Interface", "org.kde.kwin.TrellisPaintProbe")
+    Q_CLASSINFO("D-Bus Interface", "org.kde.kwin.KrellisPaintProbe")
 public:
     PaintProbe() {
         m_allowed = qEnvironmentVariable("WAYLAND_DISPLAY") != qEnvironmentVariable("NEST_SOCKET")
-            && qEnvironmentVariable("NEST_SOCKET").startsWith("trellis-test-");
-        QDBusConnection::sessionBus().registerObject("/TrellisPaintProbe", this, QDBusConnection::ExportAllSlots);
+            && qEnvironmentVariable("NEST_SOCKET").startsWith("krellis-test-");
+        QDBusConnection::sessionBus().registerObject("/KrellisPaintProbe", this, QDBusConnection::ExportAllSlots);
     }
-    ~PaintProbe() override { QDBusConnection::sessionBus().unregisterObject("/TrellisPaintProbe"); }
+    ~PaintProbe() override { QDBusConnection::sessionBus().unregisterObject("/KrellisPaintProbe"); }
     bool isActive() const override { return m_allowed; }
     int requestedEffectChainPosition() const override { return 0; }
     void paintScreen(const RenderTarget &target, const RenderViewport &viewport, int mask, const Region &region, LogicalOutput *screen) override {

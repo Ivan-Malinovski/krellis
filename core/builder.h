@@ -5,7 +5,7 @@
 
 #include <stdexcept>
 
-namespace trellis {
+namespace krellis {
 
 struct LayoutSpec {
     enum class Kind { View, Panel, Split, Stage };
@@ -42,4 +42,4 @@ struct FloatSpec {
 /// Compile a layout description into a document. Throws std::runtime_error on invalid specs.
 LayoutDocument createDocument(const LayoutSpec *root, const std::vector<FloatSpec> &floating = {});
 
-} // namespace trellis
+} // namespace krellis

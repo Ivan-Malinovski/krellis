@@ -35,6 +35,12 @@ KCM.SimpleKCM {
                 checked: kcm.floatFirst
                 onToggled: kcm.floatFirst = checked
             }
+            QQC2.CheckBox {
+                Kirigami.FormData.label: i18n("Closing a window:")
+                text: i18n("Focus its neighbour in the layout")
+                checked: kcm.closeFocus
+                onToggled: kcm.closeFocus = checked
+            }
             RowLayout {
                 Kirigami.FormData.label: i18n("Tiny windows:")
                 QQC2.SpinBox {

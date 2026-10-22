@@ -1,6 +1,6 @@
 #include "input_geometry.h"
 #include <QtTest>
-using namespace trellis;
+using namespace krellis;
 class TestInputGeometry : public QObject {
     Q_OBJECT
 private slots:

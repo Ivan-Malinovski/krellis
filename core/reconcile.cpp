@@ -4,7 +4,7 @@
 
 #include <algorithm>
 
-namespace trellis {
+namespace krellis {
 
 namespace {
 bool contains(const std::set<std::string> &set, const std::string &v) { return set.count(v) != 0; }
@@ -71,4 +71,4 @@ LayoutDocument reconcile(const LayoutDocument &snapshot, const LayoutDocument &n
     return out;
 }
 
-} // namespace trellis
+} // namespace krellis

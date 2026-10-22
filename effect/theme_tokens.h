@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace trellis {
+namespace krellis {
 
 struct ThemeTokens {
     QColor surface;       // panels and cards; QML applies the translucency
@@ -114,4 +114,4 @@ inline ThemeTokens deriveTokens(const SchemeInputs &s)
     return t;
 }
 
-} // namespace trellis
+} // namespace krellis

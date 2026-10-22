@@ -1,4 +1,4 @@
-#include "trellis_effect.h"
+#include "krellis_effect.h"
 #include "effect/effecthandler.h"
 #include "effect/offscreenquickview.h"
 #include "window.h"
@@ -12,18 +12,18 @@
 #include <cmath>
 
 namespace KWin {
-using namespace trellis;
+using namespace krellis;
 
-QString TrellisCanvas::appId(EffectWindow *w)
+QString KrellisCanvas::appId(EffectWindow *w)
 {
     if (!w || !w->window()) return {};
     const auto desktop = w->window()->desktopFileName();
     return desktop.isEmpty() ? w->window()->resourceClass() : desktop;
 }
-void TrellisCanvas::loadRules()
+void KrellisCanvas::loadRules()
 {
     m_rules.clear();
-    m_rulesFile = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/trellisrc");
+    m_rulesFile = krellis::config::defaultPath();
     QSettings config(m_rulesFile, QSettings::IniFormat);
     config.sync();
     // Materialize the INI sections before querying nested groups. Qt parses
@@ -57,14 +57,14 @@ void TrellisCanvas::loadRules()
         config.endGroup();
     }
 }
-bool TrellisCanvas::scratchWindow(EffectWindow *w) const
+bool KrellisCanvas::scratchWindow(EffectWindow *w) const
 {
     if (!w || !m_scratchpad) return false;
     if (m_markedScratch && m_markedScratch(w)) return true;
     const auto found = m_rules.find(appId(w));
     return found != m_rules.end() && found->second.scratchpad;
 }
-ViewRules TrellisCanvas::rulesFor(EffectWindow *w) const
+ViewRules KrellisCanvas::rulesFor(EffectWindow *w) const
 {
     const auto found = m_rules.find(appId(w));
     ViewRules rule = found == m_rules.end() ? ViewRules{} : found->second;
@@ -78,13 +78,13 @@ ViewRules TrellisCanvas::rulesFor(EffectWindow *w) const
     }
     return rule;
 }
-bool TrellisCanvas::layerShown() const
+bool KrellisCanvas::layerShown() const
 {
     return std::any_of(m_windows.begin(), m_windows.end(), [this](const Tracked &t) {
         return !t.window->isMinimized() && !t.window->isHidden() && scratchWindow(t.window);
     });
 }
-bool TrellisCanvas::floatForScratch(EffectWindow *w, int slot)
+bool KrellisCanvas::floatForScratch(EffectWindow *w, int slot)
 {
     if (m_resize) finishResize(false);
     const Tracked *t = trackedFor(w);
@@ -102,7 +102,7 @@ bool TrellisCanvas::floatForScratch(EffectWindow *w, int slot)
     startFlight(w, FlightKind::Glide, from, {}, opacity);
     return true;
 }
-Point TrellisCanvas::clientMinimum(EffectWindow *w) const
+Point KrellisCanvas::clientMinimum(EffectWindow *w) const
 {
     const auto rule = rulesFor(w);
     Point minimum = rule.minimum;
@@ -113,7 +113,7 @@ Point TrellisCanvas::clientMinimum(EffectWindow *w) const
     }
     return minimum;
 }
-Point TrellisCanvas::minSize(const std::vector<std::string> &views) const
+Point KrellisCanvas::minSize(const std::vector<std::string> &views) const
 {
     Point minimum{0, 0};
     for (const auto &view : views)
@@ -126,22 +126,22 @@ Point TrellisCanvas::minSize(const std::vector<std::string> &views) const
         }
     return minimum;
 }
-bool TrellisCanvas::allowed(const std::vector<std::string> &views, trellis::Region region) const
+bool KrellisCanvas::allowed(const std::vector<std::string> &views, krellis::Region region) const
 {
-    const auto where = region == trellis::Region::Stage ? ViewPlacement::Stage
-        : region == trellis::Region::Floating ? ViewPlacement::Floating : ViewPlacement::Side;
+    const auto where = region == krellis::Region::Stage ? ViewPlacement::Stage
+        : region == krellis::Region::Floating ? ViewPlacement::Floating : ViewPlacement::Side;
     for (const auto &view : views)
         for (const auto &t : m_windows)
             if (t.view == view && !rulesFor(t.window).allows(where)) return false;
     return true;
 }
-bool TrellisCanvas::frameOnly(const std::string &panel) const
+bool KrellisCanvas::frameOnly(const std::string &panel) const
 {
     return !(m_session && m_session->active() && m_session->lifted()->id == panel) && iconTile(screenRect(panel), m_iconBelow);
 }
 
-void TrellisCanvas::toggleDockActive() { toggleDock(activeIndex()); }
-void TrellisCanvas::toggleDock(int index)
+void KrellisCanvas::toggleDockActive() { toggleDock(activeIndex()); }
+void KrellisCanvas::toggleDock(int index)
 {
     if (m_resize) finishResize(false);
     if (index < 0 || index >= int(m_windows.size())) return;
@@ -162,7 +162,7 @@ void TrellisCanvas::toggleDock(int index)
         } else if (stage && findNode(m_doc.root, stage->id)) {
             TRect shown{0, 0, m_area.width(), m_area.height()};
             if (const auto *rect = worldRect(stage->id)) shown = panelAt(*rect, m_camera.value);
-            m_doc = insertPanel(m_doc, location.panel, DockTarget::beside(stage->id, shown.w >= shown.h ? trellis::Edge::Right : trellis::Edge::Bottom));
+            m_doc = insertPanel(m_doc, location.panel, DockTarget::beside(stage->id, shown.w >= shown.h ? krellis::Edge::Right : krellis::Edge::Bottom));
         } else dockAtEnd(location.panel);
         relayout(true);
         m_nav.include(stage ? std::vector<std::string>{stage->id, t.panel} : std::vector<std::string>{t.panel});
@@ -182,7 +182,7 @@ void TrellisCanvas::toggleDock(int index)
     effects->activateWindow(t.window);
 }
 
-void TrellisCanvas::updateTiles(double dt)
+void KrellisCanvas::updateTiles(double dt)
 {
     QStringList ids;
     for (const auto &t : m_windows) ids << QString::fromStdString(t.panel);
@@ -235,7 +235,7 @@ void TrellisCanvas::updateTiles(double dt)
     }
 }
 
-bool TrellisCanvas::peeking(const std::string &panel) const
+bool KrellisCanvas::peeking(const std::string &panel) const
 {
     if (m_peekPx <= 0 || m_session || m_nav.overviewing() || floatScreen(panel) || !m_rects.find(panel)) return false;
     const auto &inside = m_nav.framedLeaves();
@@ -243,7 +243,7 @@ bool TrellisCanvas::peeking(const std::string &panel) const
 }
 
 // A click on the edge of a tile that is out of focus widens the framing to take it in.
-bool TrellisCanvas::handlePeekButton(const PointerButtonEvent &event)
+bool KrellisCanvas::handlePeekButton(const PointerButtonEvent &event)
 {
     if (event.button != Qt::LeftButton) return false;
     if (event.state == PointerButtonState::Released && !m_peekPressed.empty()) {
@@ -251,7 +251,7 @@ bool TrellisCanvas::handlePeekButton(const PointerButtonEvent &event)
         m_peekPressed.clear();
         for (const auto &t : m_windows) if (t.panel == panel) {
             if (const auto rect = visualRect(t.window); rect && QRectF(rect->x, rect->y, rect->w, rect->h).contains(event.position)) {
-                m_nav.include(trellis::leafIds(m_rects.find(panel)->node));
+                m_nav.include(krellis::leafIds(m_rects.find(panel)->node));
                 applyRest();
             }
             break;
@@ -275,7 +275,7 @@ bool TrellisCanvas::handlePeekButton(const PointerButtonEvent &event)
     return false;
 }
 
-bool TrellisCanvas::handleIconButton(const PointerButtonEvent &event)
+bool KrellisCanvas::handleIconButton(const PointerButtonEvent &event)
 {
     if (event.button != Qt::LeftButton) return false;
     if (event.state == PointerButtonState::Released && !m_iconPressed.empty()) {
@@ -310,17 +310,17 @@ bool TrellisCanvas::handleIconButton(const PointerButtonEvent &event)
     }
     return false;
 }
-bool TrellisCanvas::handleIconMotion(const PointerMotionEvent &event)
+bool KrellisCanvas::handleIconMotion(const PointerMotionEvent &event)
 {
     if (m_iconPressed.empty()) return false;
-    if (!m_session && (event.position - m_iconAnchor).manhattanLength() > trellis::DragSession::Threshold) {
+    if (!m_session && (event.position - m_iconAnchor).manhattanLength() > krellis::DragSession::Threshold) {
         for (const auto &t : m_windows) if (t.panel == m_iconPressed) { startDrag(t.window, m_iconAnchor); break; }
     }
     if (m_session) moveDrag(event.position);
     return true;
 }
 
-void TrellisEffect::reloadRules()
+void KrellisEffect::reloadRules()
 {
     for (const auto &canvas : m_canvases) {
         if (canvas->m_resize) canvas->finishResize(false);
@@ -334,7 +334,7 @@ void TrellisEffect::reloadRules()
         canvas->loadRules();
         canvas->relayout(true);
         for (const auto &[window, paint] : before)
-            canvas->startFlight(window, TrellisCanvas::FlightKind::Glide, paint.first, {}, paint.second);
+            canvas->startFlight(window, KrellisCanvas::FlightKind::Glide, paint.first, {}, paint.second);
     }
 }
 

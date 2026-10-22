@@ -1,6 +1,6 @@
 #include "session.h"
 #include <set>
-namespace trellis {
+namespace krellis {
 std::map<size_t, size_t> uniqueWindowMatches(const std::vector<WindowIdentity> &saved, const std::vector<WindowIdentity> &live)
 {
     std::map<WindowIdentity, std::vector<size_t>> previous, current;

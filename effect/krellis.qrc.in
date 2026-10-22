@@ -1,5 +1,5 @@
 <RCC>
-  <qresource prefix="/@TRELLIS_ID@">
+  <qresource prefix="/@KRELLIS_ID@">
     <file alias="bar.qml">@CMAKE_CURRENT_SOURCE_DIR@/bar.qml</file>
     <file alias="tiles.qml">@CMAKE_CURRENT_SOURCE_DIR@/tiles.qml</file>
     <file alias="minimap.qml">@CMAKE_CURRENT_SOURCE_DIR@/minimap.qml</file>

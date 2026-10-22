@@ -1,6 +1,6 @@
 #include "view_rules.h"
 #include <QtTest>
-using namespace trellis;
+using namespace krellis;
 class TestViewRules : public QObject {
     Q_OBJECT
 private slots:

@@ -2,7 +2,7 @@
 #include "session.h"
 #include <QByteArray>
 #include <QString>
-namespace trellis {
+namespace krellis {
 struct SavedCanvas {
     std::string output;
     LayoutDocument document;

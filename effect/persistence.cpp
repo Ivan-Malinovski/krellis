@@ -1,7 +1,8 @@
-#include "trellis_effect.h"
+#include "krellis_effect.h"
 #include "effect/effecthandler.h"
 #include "core/output.h"
 #include "window.h"
+#include "krellis_config.h"
 #include <QStandardPaths>
 #include <QFile>
 #include <QSaveFile>
@@ -11,9 +12,9 @@
 #include <set>
 
 namespace KWin {
-using namespace trellis;
+using namespace krellis;
 
-QString TrellisEffect::outputKey(LogicalOutput *output) const
+QString KrellisEffect::outputKey(LogicalOutput *output) const
 {
     if (output->serialNumber().isEmpty()) return QStringLiteral("connector:") + output->name();
     const QString serial = output->manufacturer() + QLatin1Char('|') + output->model() + QLatin1Char('|') + output->serialNumber();
@@ -22,27 +23,27 @@ QString TrellisEffect::outputKey(LogicalOutput *output) const
         copies += other->manufacturer() + QLatin1Char('|') + other->model() + QLatin1Char('|') + other->serialNumber() == serial;
     return QStringLiteral("monitor:") + serial + (copies > 1 ? QLatin1Char('|') + output->name() : QString());
 }
-QString TrellisEffect::sessionStatus() const
+QString KrellisEffect::sessionStatus() const
 {
     return QStringLiteral("SESSION complete %1 matched %2 ambiguous %3 pending %4 error '%5'")
         .arg(m_restoreComplete).arg(m_sessionMatches).arg(m_sessionAmbiguous).arg(m_pendingUnique).arg(m_sessionError);
 }
-void TrellisEffect::initializeSession()
+void KrellisEffect::initializeSession()
 {
-    m_sessionFile = QStandardPaths::writableLocation(QStandardPaths::GenericStateLocation) + QStringLiteral("/kwin-trellis/session.json");
+    m_sessionFile = krellis::config::stateFile(QStringLiteral("session.json"));
     m_saveTimer = new QTimer(this); m_saveTimer->setSingleShot(true);
     connect(m_saveTimer, &QTimer::timeout, this, [this] {
         if (m_restoreComplete && (m_userTouched || m_pendingUnique == 0)) writeSession();
     });
     m_restoreTimer = new QTimer(this); m_restoreTimer->setSingleShot(true);
-    connect(m_restoreTimer, &QTimer::timeout, this, &TrellisEffect::restoreSession);
+    connect(m_restoreTimer, &QTimer::timeout, this, &KrellisEffect::restoreSession);
     QFile file(m_sessionFile);
     if (!file.exists()) return;
     if (!file.open(QIODevice::ReadOnly)) { m_sessionError = QStringLiteral("Cannot read saved session"); return; }
     const auto saved = decodeSession(file.read(2 * 1024 * 1024 + 1), &m_sessionError);
     if (saved) { m_savedSession = *saved; m_restoreComplete = m_savedSession.empty(); }
 }
-void TrellisEffect::sessionWindowOpened()
+void KrellisEffect::sessionWindowOpened()
 {
     if (!m_savedSession.empty() && !m_userTouched && m_sessionError.isEmpty()) {
         m_restoreComplete = false;
@@ -50,11 +51,11 @@ void TrellisEffect::sessionWindowOpened()
         m_restoreTimer->start(750); // Wait for a startup batch, including duplicates.
     } else scheduleSave();
 }
-void TrellisEffect::scheduleSave()
+void KrellisEffect::scheduleSave()
 {
     if (!m_shuttingDown && !m_restoring && m_restoreComplete && m_sessionError.isEmpty()) m_saveTimer->start(750);
 }
-void TrellisEffect::markSessionInteraction()
+void KrellisEffect::markSessionInteraction()
 {
     if (m_restoring) return;
     m_userTouched = true;
@@ -62,12 +63,12 @@ void TrellisEffect::markSessionInteraction()
     m_restoreTimer->stop();
     scheduleSave();
 }
-bool TrellisEffect::saveSession()
+bool KrellisEffect::saveSession()
 {
     markSessionInteraction();
     return writeSession();
 }
-bool TrellisEffect::writeSession()
+bool KrellisEffect::writeSession()
 {
     if (!m_sessionError.isEmpty()) return false; // Preserve unreadable/corrupt state for inspection.
     for (const auto &canvas : m_canvases) if (canvas->m_resize) return false; // Never save a resize preview.
@@ -81,7 +82,7 @@ bool TrellisEffect::writeSession()
         saved.document.navigation = canvas->m_nav.serialize();
         for (const auto &t : canvas->m_windows) {
             if (!t.window->window()) continue;
-            saved.windows[t.panel] = {TrellisCanvas::appId(t.window).toStdString(), t.window->window()->windowRole().toStdString()};
+            saved.windows[t.panel] = {KrellisCanvas::appId(t.window).toStdString(), t.window->window()->windowRole().toStdString()};
             ++windows;
         }
         snapshot.push_back(std::move(saved));
@@ -96,7 +97,7 @@ bool TrellisEffect::writeSession()
     const auto bytes = encodeSession(snapshot);
     return file.write(bytes) == bytes.size() && file.commit();
 }
-void TrellisEffect::restoreSession()
+void KrellisEffect::restoreSession()
 {
     for (const auto &canvas : m_canvases) if (canvas->m_resize) canvas->finishResize(false);
     m_restoreTimer->stop();
@@ -116,9 +117,9 @@ void TrellisEffect::restoreSession()
     // Count unmanaged singleton duplicates too; a hidden native window is
     // still an ambiguous identity and must not silently pick a saved slot.
     for (auto *window : effects->stackingOrder()) {
-        if (!TrellisCanvas::manageable(window) || !window->window()) continue;
+        if (!KrellisCanvas::manageable(window) || !window->window()) continue;
         windows.push_back(window);
-        live.push_back({TrellisCanvas::appId(window).toStdString(), window->window()->windowRole().toStdString()});
+        live.push_back({KrellisCanvas::appId(window).toStdString(), window->window()->windowRole().toStdString()});
         if (auto *canvas = owner(window)) before[window] = canvas->visualRect(window).value_or(TRect{});
         if (window->isMinimized()) wasHidden.insert(window);
     }
@@ -128,12 +129,12 @@ void TrellisEffect::restoreSession()
         if (key.app.empty() || count > 1) m_sessionAmbiguous += int(count);
         else ++m_pendingUnique;
     }
-    std::map<TrellisCanvas *, std::map<std::string, NodePtr>> bindings;
-    std::map<TrellisCanvas *, size_t> savedFor;
+    std::map<KrellisCanvas *, std::map<std::string, NodePtr>> bindings;
+    std::map<KrellisCanvas *, size_t> savedFor;
     std::set<EffectWindow *> matched;
     for (const auto &[savedIndex, liveIndex] : matches) {
         const auto &slot = savedSlots[savedIndex]; const auto &saved = m_savedSession[slot.canvas];
-        TrellisCanvas *target = nullptr;
+        KrellisCanvas *target = nullptr;
         for (const auto &c : m_canvases)
             if (c->m_output && outputKey(c->m_output).toStdString() == saved.output) { target=c.get(); break; }
         if (!target) continue;
@@ -177,9 +178,9 @@ void TrellisEffect::restoreSession()
         for (const auto &t : canvas->m_windows) if (matched.contains(t.window)) {
             const bool hidden=t.window->isMinimized();
             if (hidden && !wasHidden.contains(t.window))
-                canvas->startFlight(t.window,TrellisCanvas::FlightKind::Hide,before[t.window],canvas->chipRect(t.window));
+                canvas->startFlight(t.window,KrellisCanvas::FlightKind::Hide,before[t.window],canvas->chipRect(t.window));
             else if (!hidden)
-                canvas->startFlight(t.window,wasHidden.contains(t.window)?TrellisCanvas::FlightKind::Restore:TrellisCanvas::FlightKind::Glide,
+                canvas->startFlight(t.window,wasHidden.contains(t.window)?KrellisCanvas::FlightKind::Restore:KrellisCanvas::FlightKind::Glide,
                     wasHidden.contains(t.window)?canvas->chipRect(t.window):before[t.window],{},wasHidden.contains(t.window)?0.1:1);
         }
         canvas->updateBar();

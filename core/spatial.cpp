@@ -6,7 +6,7 @@
 #include <limits>
 #include <set>
 
-namespace trellis {
+namespace krellis {
 
 std::vector<std::string> leafIds(const NodePtr &node)
 {
@@ -424,4 +424,4 @@ NodePtr applyDockTarget(const NodePtr &root, const DockTargetSpec &target, const
     return insertBeside(root, target.id, incoming, target.edge, splitId);
 }
 
-} // namespace trellis
+} // namespace krellis

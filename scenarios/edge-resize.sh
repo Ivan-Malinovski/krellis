@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Real pointer drags on the edges of tiled windows must start a native resize and change the split.
 set -euo pipefail
-[[ "$NEST_SOCKET" == trellis-test-* ]]
+[[ "$NEST_SOCKET" == krellis-test-* ]]
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-project=/home/ivan/dev/kwin-trellis
+project=/home/ivan/dev/krellis
 trap 'for process in ${clients:-}; do kill "$process" 2>/dev/null || true; done' EXIT
 
 c++ -std=c++20 -fPIC "$project/scenarios/pointer-driver.cpp" -o "$NEST_WORK/pointer-driver" $(pkg-config --cflags --libs KWaylandClient wayland-client)
@@ -21,7 +21,7 @@ python3 - "$NEST_WORK" "$NEST_OUT" <<'PY'
 import json,os,pathlib,re,subprocess,time,sys
 work,out=map(pathlib.Path,sys.argv[1:])
 def call(method,*args):
-    return subprocess.check_output(['qdbus6','org.kde.KWin','/Trellis','org.kde.kwin.KWin.TrellisEffect.'+method,*map(str,args)],text=True).strip()
+    return subprocess.check_output(['qdbus6','org.kde.KWin','/Krellis','org.kde.kwin.KWin.KrellisEffect.'+method,*map(str,args)],text=True).strip()
 def dump(label):
     s=call('dump'); (out/(label+'.txt')).write_text(s); return s
 def geometry(name):
@@ -34,7 +34,7 @@ def point(name,title=True):
 def native(label):
     js=work/(label+'.js')
     js.write_text("console.warn('EDGE_"+label+" '+JSON.stringify(workspace.windowList().filter(w=>w.caption.startsWith('edge-')).map(w=>({name:w.caption,active:w.active,move:w.move,resize:w.resize,x:w.frameGeometry.x,y:w.frameGeometry.y,w:w.frameGeometry.width,h:w.frameGeometry.height,csd:!w.noBorder&&!w.decoration}))));")
-    i=subprocess.check_output(['qdbus6','org.kde.KWin','/Scripting','org.kde.kwin.Scripting.loadScript',str(js),'trellis-edge-'+label],text=True).strip()
+    i=subprocess.check_output(['qdbus6','org.kde.KWin','/Scripting','org.kde.kwin.Scripting.loadScript',str(js),'krellis-edge-'+label],text=True).strip()
     subprocess.check_call(['qdbus6','org.kde.KWin','/Scripting/Script'+i,'org.kde.kwin.Script.run'],stdout=subprocess.DEVNULL)
     for _ in range(30):
         marker='EDGE_'+label+' '

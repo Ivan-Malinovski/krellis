@@ -2,7 +2,7 @@
 
 #include <QtTest>
 
-using namespace trellis;
+using namespace krellis;
 
 class TestMotion : public QObject
 {

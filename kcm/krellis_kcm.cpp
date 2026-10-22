@@ -1,4 +1,4 @@
-#include "trellis_kcm.h"
+#include "krellis_kcm.h"
 #include <KLocalizedString>
 #include <KPluginFactory>
 #include <algorithm>
@@ -6,7 +6,7 @@
 #include <QDBusMessage>
 #include <QDBusPendingCall>
 
-using namespace trellis::config;
+using namespace krellis::config;
 
 QHash<int, QByteArray> RulesModel::roleNames() const
 {
@@ -99,35 +99,35 @@ bool RulesModel::contains(const QString &app) const
     return std::any_of(m_rules.begin(), m_rules.end(), [&](const AppRule &r) { return r.app == app.trimmed(); });
 }
 
-TrellisKcm::TrellisKcm(QObject *parent, const KPluginMetaData &data)
+KrellisKcm::KrellisKcm(QObject *parent, const KPluginMetaData &data)
     : KQuickConfigModule(parent, data)
 {
     setButtons(Apply | Default);
-    connect(&m_rules, &RulesModel::edited, this, &TrellisKcm::refreshState);
+    connect(&m_rules, &RulesModel::edited, this, &KrellisKcm::refreshState);
 }
 
-void TrellisKcm::load()
+void KrellisKcm::load()
 {
-    m_current = m_saved = trellis::config::load();
+    m_current = m_saved = krellis::config::load();
     m_savedRules = loadRules();
     m_rules.setRules(m_savedRules);
     Q_EMIT settingsChanged();
     refreshState();
 }
 
-void TrellisKcm::save()
+void KrellisKcm::save()
 {
-    trellis::config::save(m_current);
+    krellis::config::save(m_current);
     saveRules(m_rules.rules());
     m_saved = m_current;
     m_savedRules = m_rules.rules();
     refreshState();
     // Tell a running effect to re-read the file; with the effect off nobody answers and that is fine.
-    QDBusConnection::sessionBus().asyncCall(QDBusMessage::createMethodCall(QStringLiteral("org.kde.KWin"), QStringLiteral("/Trellis"),
-        QStringLiteral("org.kde.kwin.KWin.TrellisEffect"), QStringLiteral("reloadSettings")));
+    QDBusConnection::sessionBus().asyncCall(QDBusMessage::createMethodCall(QStringLiteral("org.kde.KWin"), QStringLiteral("/Krellis"),
+        QStringLiteral("org.kde.kwin.KWin.KrellisEffect"), QStringLiteral("reloadSettings")));
 }
 
-void TrellisKcm::defaults()
+void KrellisKcm::defaults()
 {
     m_current = Settings{};
     m_rules.setRules({});
@@ -135,12 +135,12 @@ void TrellisKcm::defaults()
     refreshState();
 }
 
-void TrellisKcm::refreshState()
+void KrellisKcm::refreshState()
 {
     setNeedsSave(!(m_current == m_saved) || m_rules.rules() != m_savedRules);
     setRepresentsDefaults(m_current == Settings{} && m_rules.rules().isEmpty());
 }
 
-K_PLUGIN_CLASS_WITH_JSON(TrellisKcm, "kcm_trellis.json")
+K_PLUGIN_CLASS_WITH_JSON(KrellisKcm, "kcm_krellis.json")
 
-#include "trellis_kcm.moc"
+#include "krellis_kcm.moc"

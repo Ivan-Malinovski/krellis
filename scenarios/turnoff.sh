@@ -2,7 +2,7 @@
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-call() { qdbus6 org.kde.KWin /Trellis "$@"; }
+call() { qdbus6 org.kde.KWin /Krellis "$@"; }
 for n in A B; do
   alacritty --title "win-$n" -e sh -c "echo $n; sleep 600" >/dev/null 2>&1 &
   sleep 2
@@ -18,16 +18,16 @@ geo() {
   sleep 0.5
   grep 'GEO ' "$NEST_OUT/kwin.log" | tail -1 | sed 's/.*GEO //'
 }
-echo "--- tiled"; call org.kde.kwin.KWin.TrellisEffect.dump | grep "^p"
+echo "--- tiled"; call org.kde.kwin.KWin.KrellisEffect.dump | grep "^p"
 echo "tiled geometry: $(geo tiled)"
 echo "loaded before: $(qdbus6 org.kde.KWin /Effects org.freedesktop.DBus.Properties.Get org.kde.kwin.Effects loadedEffects | tr '\n' ' ')"
-call org.kde.kwin.KWin.TrellisEffect.turnOff
+call org.kde.kwin.KWin.KrellisEffect.turnOff
 sleep 1.5
-if call org.kde.kwin.KWin.TrellisEffect.dump >/dev/null 2>&1; then echo "FAIL /Trellis still registered"; rc=1; else echo "OK /Trellis gone"; rc=0; fi
+if call org.kde.kwin.KWin.KrellisEffect.dump >/dev/null 2>&1; then echo "FAIL /Krellis still registered"; rc=1; else echo "OK /Krellis gone"; rc=0; fi
 loaded=$(qdbus6 org.kde.KWin /Effects org.freedesktop.DBus.Properties.Get org.kde.kwin.Effects loadedEffects | tr '\n' ' ')
 echo "loaded after: $loaded"
-case "$loaded" in *trellis*) echo "FAIL still loaded"; rc=1;; esac
+case "$loaded" in *krellis*) echo "FAIL still loaded"; rc=1;; esac
 echo "native geometry: $(geo after)"
-/home/ivan/dev/kwin-trellis/tools/shot after-turnoff
+/home/ivan/dev/krellis/tools/shot after-turnoff
 pkill -P "$$" -x alacritty
 exit $rc

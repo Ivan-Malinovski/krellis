@@ -5,7 +5,7 @@
 
 #include <functional>
 
-namespace trellis {
+namespace krellis {
 
 inline const Rect UNIT{0, 0, 1, 1};
 
@@ -48,4 +48,4 @@ NodePtr flipBoundary(const NodePtr &root, const std::string &splitId, int index,
 NodePtr resizeBoundary(const NodePtr &split, int index, double position,
                        const std::function<double(int)> &min = nullptr);
 
-} // namespace trellis
+} // namespace krellis

@@ -2,7 +2,7 @@
 # Ctrl+scroll is left alone; the minimap names the mode and its (?) opens the shortcut sheet.
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET; unset DISPLAY
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 ALT=$((0x08000000)); CTRL=$((0x04000000))
 for n in A B C D; do alacritty --title "win-$n" -e sh -c "echo $n; sleep 600" >/dev/null 2>&1 & sleep 2; done
 sleep 1
@@ -31,9 +31,9 @@ hx=$((gx + gw - 20)); hy=$((gy + gh - 186 + 15))
 echo "help button at $hx,$hy"
 call simMotion $((gx + gw - 8)) $((gy + gh - 30)); sleep 0.8
 call simMotion $hx $hy; sleep 0.8; call dump | grep -E "^MAP"
-/home/ivan/dev/kwin-trellis/tools/shot map-help-early >/dev/null; sleep 2
-/home/ivan/dev/kwin-trellis/tools/shot map-help >/dev/null
+/home/ivan/dev/krellis/tools/shot map-help-early >/dev/null; sleep 2
+/home/ivan/dev/krellis/tools/shot map-help >/dev/null
 call simMotion 600 300; sleep 0.8; call dump | grep -E "^MAP"
 call toggleFloatFirst >/dev/null 2>&1 || call setFloatFirst true >/dev/null 2>&1; sleep 0.8; call dump | grep -E "^MAP"
-/home/ivan/dev/kwin-trellis/tools/shot map-floating >/dev/null
+/home/ivan/dev/krellis/tools/shot map-floating >/dev/null
 pkill -P "$$" -x alacritty

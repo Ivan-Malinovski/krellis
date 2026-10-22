@@ -7,7 +7,7 @@
 #include <QtTest>
 #include <cmath>
 
-using namespace trellis;
+using namespace krellis;
 
 namespace {
 using Strings = std::vector<std::string>;

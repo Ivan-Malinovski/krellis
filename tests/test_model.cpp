@@ -5,8 +5,8 @@
 
 #include <QtTest>
 
-using namespace trellis;
-namespace L = trellis::layout;
+using namespace krellis;
+namespace L = krellis::layout;
 
 static NodePtr P(const char *id, std::vector<std::string> views) { return makePanel(id, std::move(views)); }
 
@@ -98,6 +98,23 @@ private slots:
         QVERIFY(!locatePanel(doc, "docs"));
         QVERIFY(findStage(doc.root) && !findStage(doc.root)->child);
         QVERIFY(!doc.views.count("a"));
+    }
+    void closeFocusGoesToNearestSibling()
+    {
+        auto root = L::row({L::panel({L::view("t", "a")}, "pa"),
+                            L::column({L::panel({L::view("t", "b")}, "pb"), L::panel({L::view("t", "c")}, "pc")}),
+                            L::panel({L::view("t", "d")}, "pd")});
+        const auto doc = createDocument(&root);
+        // The previous sibling wins; the first window falls back to the next one, and a group yields the leaf next to the gap.
+        QCOMPARE(closeFocusPanel(doc, "d"), std::string("pc"));
+        QCOMPARE(closeFocusPanel(doc, "a"), std::string("pb"));
+        QCOMPARE(closeFocusPanel(doc, "b"), std::string("pc"));
+        QCOMPARE(closeFocusPanel(doc, "c"), std::string("pb"));
+        // A window with another tab keeps focus in its own panel, and a lone window has nobody to hand it to.
+        auto tabs = L::row({L::panel({L::view("t", "a"), L::view("t", "x")}, "pa"), L::panel({L::view("t", "b")}, "pb")});
+        QVERIFY(closeFocusPanel(createDocument(&tabs), "a").empty());
+        auto alone = L::row({L::panel({L::view("t", "a")}, "pa")});
+        QVERIFY(closeFocusPanel(createDocument(&alone), "a").empty());
     }
     void closeSharesProportionally()
     {

@@ -2,7 +2,7 @@
 // where to group them. The chords themselves come from KGlobalAccel at show time, so a rebound key shows as bound.
 #pragma once
 
-namespace trellis {
+namespace krellis {
 
 struct HelpRow {
     const char *id;       // the QAction object name in registerShortcuts()
@@ -17,36 +17,36 @@ struct HelpGroup {
 };
 
 inline constexpr HelpRow kHelpNavigate[] = {
-    {"TrellisOverview", "Overview"},
-    {"TrellisBack", "Back"},
-    {"TrellisForward", "Forward"},
-    {"TrellisStepOut", "Step out"},
-    {"TrellisNextPanel", "Next panel"},
-    {"TrellisPreviousPanel", "Previous panel"},
-    {"TrellisFocusLeft", "Focus panel", true},
+    {"KrellisOverview", "Overview"},
+    {"KrellisBack", "Back"},
+    {"KrellisForward", "Forward"},
+    {"KrellisStepOut", "Step out"},
+    {"KrellisNextPanel", "Next panel"},
+    {"KrellisPreviousPanel", "Previous panel"},
+    {"KrellisFocusLeft", "Focus panel", true},
 };
 inline constexpr HelpRow kHelpArrange[] = {
-    {"TrellisMoveLeft", "Move panel", true},
-    {"TrellisResizeMode", "Resize mode"},
-    {"TrellisMaximize", "Maximize"},
-    {"TrellisFloat", "Float"},
-    {"TrellisFlip", "Flip split"},
-    {"TrellisStash", "Stash in edge drawer"},
-    {"TrellisHide", "Hide to dock"},
-    {"TrellisClose", "Close"},
-    {"TrellisUndo", "Undo layout edit"},
-    {"TrellisRedo", "Redo layout edit"},
+    {"KrellisMoveLeft", "Move panel", true},
+    {"KrellisResizeMode", "Resize mode"},
+    {"KrellisMaximize", "Maximize"},
+    {"KrellisFloat", "Float"},
+    {"KrellisFlip", "Flip split"},
+    {"KrellisStash", "Stash in edge drawer"},
+    {"KrellisHide", "Hide to dock"},
+    {"KrellisClose", "Close"},
+    {"KrellisUndo", "Undo layout edit"},
+    {"KrellisRedo", "Redo layout edit"},
 };
 inline constexpr HelpRow kHelpInterface[] = {
-    {"TrellisBar", "Toggle bar"},
-    {"TrellisMap", "Toggle map"},
-    {"TrellisMode", "Floating / tiling first"},
-    {"TrellisSaveView", "Save view"},
-    {"TrellisOff", "Turn off Trellis"},
+    {"KrellisBar", "Toggle bar"},
+    {"KrellisMap", "Toggle map"},
+    {"KrellisMode", "Floating / tiling first"},
+    {"KrellisSaveView", "Save view"},
+    {"KrellisOff", "Turn off Krellis"},
 };
 inline constexpr HelpRow kHelpScratch[] = {
-    {"TrellisScratchpad", "Scratchpad"},
-    {"TrellisScratchMark", "Mark as scratchpad"},
+    {"KrellisScratchpad", "Scratchpad"},
+    {"KrellisScratchMark", "Mark as scratchpad"},
 };
 
 inline constexpr HelpGroup kHelpGroups[] = {
@@ -55,4 +55,4 @@ inline constexpr HelpGroup kHelpGroups[] = {
     {"Interface", kHelpInterface, int(sizeof(kHelpInterface) / sizeof(HelpRow))},
 };
 
-} // namespace trellis
+} // namespace krellis

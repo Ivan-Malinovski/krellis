@@ -4,7 +4,7 @@
 
 #include <cstdint>
 
-namespace trellis {
+namespace krellis {
 
 struct BootMarker {
     std::int64_t startedAtMs = 0; // wall clock
@@ -36,4 +36,4 @@ inline BootDecision decideBoot(const BootMarker &prev, std::int64_t nowMs)
     return {strikes < BOOT_STRIKE_LIMIT, strikes};
 }
 
-} // namespace trellis
+} // namespace krellis

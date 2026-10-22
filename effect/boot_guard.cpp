@@ -1,5 +1,6 @@
 #include "boot_guard.h"
 
+#include "krellis_config.h"
 #include "safemode.h"
 
 #include <QDateTime>
@@ -17,7 +18,7 @@ namespace KWin {
 namespace {
 
 struct Stored {
-    trellis::BootMarker marker;
+    krellis::BootMarker marker;
     bool notified = false;
 };
 
@@ -27,7 +28,7 @@ qint64 nowMs() { return QDateTime::currentMSecsSinceEpoch(); }
 
 QString markerPath()
 {
-    return QStandardPaths::writableLocation(QStandardPaths::GenericStateLocation) + QStringLiteral("/kwin-trellis/boot.json");
+    return krellis::config::stateFile(QStringLiteral("boot.json"));
 }
 
 // A missing or unreadable file is a clean default: the guard must never lock the effect out because of its own bookkeeping.
@@ -66,19 +67,19 @@ void notifyBlocked()
 {
     QProcess::startDetached(QStringLiteral("sh"),
                             {QStringLiteral("-c"),
-                             QStringLiteral("sleep 20; notify-send -a kwin-trellis -i dialog-warning 'Trellis was not loaded' "
-                                            "'KWin kept crashing soon after loading the Trellis effect, so it stays off. "
+                             QStringLiteral("sleep 20; notify-send -a krellis -i dialog-warning 'Krellis was not loaded' "
+                                            "'KWin kept crashing soon after loading the Krellis effect, so it stays off. "
                                             "Run tools/live.sh reset once the cause is fixed.'")});
 }
 
 } // namespace
 
-bool trellisBootAllowed()
+bool krellisBootAllowed()
 {
     Stored s = load();
-    const trellis::BootDecision d = trellis::decideBoot(s.marker, nowMs());
+    const krellis::BootDecision d = krellis::decideBoot(s.marker, nowMs());
     if (d.allow) return true;
-    qWarning() << "Trellis not loaded: the last" << d.strikes << "starts ended in a crash within two minutes (marker" << markerPath() << ")";
+    qWarning() << "Krellis not loaded: the last" << d.strikes << "starts ended in a crash within two minutes (marker" << markerPath() << ")";
     if (!s.notified) {
         s.notified = true;
         save(s);
@@ -87,17 +88,17 @@ bool trellisBootAllowed()
     return false;
 }
 
-void trellisBootStarted()
+void krellisBootStarted()
 {
     const Stored prev = load();
-    const trellis::BootDecision d = trellis::decideBoot(prev.marker, nowMs());
+    const krellis::BootDecision d = krellis::decideBoot(prev.marker, nowMs());
     g_startedAtMs = nowMs();
     Stored s;
     s.marker = {g_startedAtMs, false, false, d.strikes};
     save(s);
 }
 
-void trellisBootSurvived()
+void krellisBootSurvived()
 {
     Stored s = load();
     if (s.marker.startedAtMs != g_startedAtMs) return; // someone else's marker
@@ -105,7 +106,7 @@ void trellisBootSurvived()
     save(s);
 }
 
-void trellisBootClean()
+void krellisBootClean()
 {
     Stored s = load();
     if (s.marker.startedAtMs != g_startedAtMs) return;

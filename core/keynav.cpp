@@ -6,7 +6,7 @@
 #include <cmath>
 #include <limits>
 
-namespace trellis {
+namespace krellis {
 
 namespace {
 
@@ -184,4 +184,4 @@ NodePtr resizeInDirection(const NodePtr &root, const LayoutMetrics &metrics, con
     return result.drag.to(clamped);
 }
 
-} // namespace trellis
+} // namespace krellis

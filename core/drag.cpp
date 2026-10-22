@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace trellis {
+namespace krellis {
 
 namespace {
 
@@ -681,7 +681,7 @@ void DragSession::apply(const std::optional<DropTarget> &next, double nowMs)
         NodePtr placeholder = makePanel(DROP_SLOT, {DROP_SLOT}, DROP_SLOT);
         const auto &spec = next->spec;
         if (spec.seam || !m_dropBase.has(spec.id)) {
-            NodePtr previewRoot = applyDockTarget(m_pdoc.root, spec, placeholder, "__trellis-seam-preview");
+            NodePtr previewRoot = applyDockTarget(m_pdoc.root, spec, placeholder, "__krellis-seam-preview");
             // Back in its old slot: preview the original sizes, with the slot standing for the panel.
             if (m_inDoc && !m_fromFloat && sameShape(m_origin.root, previewRoot, DROP_SLOT, m_lifted->id))
                 previewRoot = renameNode(m_origin.root, m_lifted->id, DROP_SLOT);
@@ -979,4 +979,4 @@ DragOutcome DragSession::end(bool commit, double nowMs)
     return out;
 }
 
-} // namespace trellis
+} // namespace krellis

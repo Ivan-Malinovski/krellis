@@ -1,7 +1,7 @@
 #pragma once
 #include <KQuickConfigModule>
 #include <QAbstractListModel>
-#include "trellis_config.h"
+#include "krellis_config.h"
 
 // Per-application rules as a list model the QML edits in place.
 class RulesModel : public QAbstractListModel
@@ -16,8 +16,8 @@ public:
     bool setData(const QModelIndex &index, const QVariant &value, int role) override;
     QHash<int, QByteArray> roleNames() const override;
 
-    const QList<trellis::config::AppRule> &rules() const { return m_rules; }
-    void setRules(QList<trellis::config::AppRule> rules);
+    const QList<krellis::config::AppRule> &rules() const { return m_rules; }
+    void setRules(QList<krellis::config::AppRule> rules);
     Q_INVOKABLE void add(const QString &app);
     Q_INVOKABLE void remove(int row);
     Q_INVOKABLE void set(int row, const QString &role, const QVariant &value);
@@ -27,12 +27,13 @@ Q_SIGNALS:
     void edited();
 
 private:
-    QList<trellis::config::AppRule> m_rules;
+    QList<krellis::config::AppRule> m_rules;
 };
 
-class TrellisKcm : public KQuickConfigModule
+class KrellisKcm : public KQuickConfigModule
 {
     Q_OBJECT
+    Q_PROPERTY(bool closeFocus READ closeFocus WRITE setCloseFocus NOTIFY settingsChanged)
     Q_PROPERTY(bool floatFirst READ floatFirst WRITE setFloatFirst NOTIFY settingsChanged)
     Q_PROPERTY(int spawnTarget READ spawnTarget WRITE setSpawnTarget NOTIFY settingsChanged) // 0 pointer, 1 focused, 2 end
     Q_PROPERTY(int peek READ peek WRITE setPeek NOTIFY settingsChanged)
@@ -51,12 +52,13 @@ class TrellisKcm : public KQuickConfigModule
     Q_PROPERTY(int whichKeyDelayMs READ whichKeyDelayMs WRITE setWhichKeyDelayMs NOTIFY settingsChanged)
     Q_PROPERTY(RulesModel *rules READ rules CONSTANT)
 public:
-    TrellisKcm(QObject *parent, const KPluginMetaData &data);
+    KrellisKcm(QObject *parent, const KPluginMetaData &data);
 
     void load() override;
     void save() override;
     void defaults() override;
 
+    bool closeFocus() const { return m_current.closeFocus; }
     bool floatFirst() const { return m_current.floatFirst; }
     int spawnTarget() const { return int(m_current.spawnTarget); }
     int peek() const { return int(m_current.peek); }
@@ -73,8 +75,9 @@ public:
     bool flyTo() const { return m_current.flyTo; }
     bool whichKey() const { return m_current.whichKey; }
     int whichKeyDelayMs() const { return m_current.whichKeyDelayMs; }
+    void setCloseFocus(bool v) { edit([&] { m_current.closeFocus = v; }); }
     void setFloatFirst(bool v) { edit([&] { m_current.floatFirst = v; }); }
-    void setSpawnTarget(int v) { edit([&] { m_current.spawnTarget = trellis::config::SpawnTarget(std::clamp(v, 0, 2)); }); }
+    void setSpawnTarget(int v) { edit([&] { m_current.spawnTarget = krellis::config::SpawnTarget(std::clamp(v, 0, 2)); }); }
     void setPeek(int v) { edit([&] { m_current.peek = v; }); }
     void setMap(bool v) { edit([&] { m_current.map = v; }); }
     void setMapPinned(bool v) { edit([&] { m_current.mapPinned = v; }); }
@@ -98,7 +101,7 @@ private:
     template<class F> void edit(F &&apply) { apply(); settingsChanged(); refreshState(); }
     void refreshState();
 
-    trellis::config::Settings m_current, m_saved;
-    QList<trellis::config::AppRule> m_savedRules;
+    krellis::config::Settings m_current, m_saved;
+    QList<krellis::config::AppRule> m_savedRules;
     RulesModel m_rules;
 };

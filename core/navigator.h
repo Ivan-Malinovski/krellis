@@ -12,7 +12,7 @@
 
 #include <functional>
 
-namespace trellis {
+namespace krellis {
 
 enum class NavMode { Off, Focus, Free };
 
@@ -136,4 +136,4 @@ private:
     } m_wheel;
 };
 
-} // namespace trellis
+} // namespace krellis

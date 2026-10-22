@@ -6,7 +6,7 @@
 
 #include <KConfigWatcher>
 
-namespace trellis {
+namespace krellis {
 
 // The tokens the QML overlays bind to (`required property QtObject theme`). With `follow` off they are the built-in
 // palette; on, they come from the Plasma colour scheme and accent in kdeglobals and track changes live.
@@ -77,4 +77,4 @@ private:
     KConfigWatcher::Ptr m_watcher;
 };
 
-} // namespace trellis
+} // namespace krellis

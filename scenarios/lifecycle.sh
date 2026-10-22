@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Enable/disable the effect only inside tools/nested.sh. Native inspection uses
-# KWin scripting, so assertions still work after /Trellis has been unregistered.
+# KWin scripting, so assertions still work after /Krellis has been unregistered.
 set -euo pipefail
-test "${NEST_SOCKET:-}" = trellis-nest
+test "${NEST_SOCKET:-}" = krellis-nest
 test -S "$XDG_RUNTIME_DIR/$NEST_SOCKET"
 test "${XDG_CONFIG_HOME:-}" = "$NEST_WORK/config"
 test "${XDG_STATE_HOME:-}" = "$NEST_WORK/state"
@@ -10,15 +10,15 @@ test -n "${DBUS_SESSION_BUS_ADDRESS:-}"
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-project=/home/ivan/dev/kwin-trellis
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+project=/home/ivan/dev/krellis
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 effect() { qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects."$@"; }
 trap 'for process in ${clients:-}; do kill "$process" 2>/dev/null || true; done' EXIT
 
 script() {
     local label=$1 id
     cat >"$NEST_WORK/$label.js"
-    id=$(qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$NEST_WORK/$label.js" "trellis-lifecycle-$label")
+    id=$(qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$NEST_WORK/$label.js" "krellis-lifecycle-$label")
     qdbus6 org.kde.KWin "/Scripting/Script$id" org.kde.kwin.Script.run
 }
 snapshot() {
@@ -28,12 +28,12 @@ var rows = workspace.windowList().filter(function(w) { return w.caption.indexOf(
     var r = w.frameGeometry;
     return {name:w.caption, x:r.x, y:r.y, w:r.width, h:r.height, output:w.output ? w.output.name : '', above:w.keepAbove, below:w.keepBelow, minimized:w.minimized, move:w.move, resize:w.resize};
 });
-console.warn('TRELLIS_NATIVE_$label ' + JSON.stringify(rows));
+console.warn('KRELLIS_NATIVE_$label ' + JSON.stringify(rows));
 JS
     for attempt in $(seq 1 60); do
         if python3 - "$NEST_OUT/kwin.log" "$NEST_OUT/$label.json" "$label" <<'PY'
 import json, sys
-marker = 'TRELLIS_NATIVE_' + sys.argv[3] + ' '
+marker = 'KRELLIS_NATIVE_' + sys.argv[3] + ' '
 for line in open(sys.argv[1]):
     if marker in line:
         value = json.loads(line.split(marker, 1)[1])
@@ -52,7 +52,7 @@ indexOf() {
     awk -v wanted="'$name'" '/ screen / { if (!found && index($0,wanted)) {print n+0; found=1} n++ }' <<<"$snapshot"
 }
 
-effect unloadEffect trellis
+effect unloadEffect krellis
 c++ -fPIC "$project/scenarios/lifecycle-client.cpp" -o "$NEST_WORK/lifecycle-client" $(pkg-config --cflags --libs Qt6Widgets)
 clients=
 for app in alpha above hidden minimized closed; do
@@ -108,7 +108,7 @@ for name,w in baseline.items():
     for key in ('x','y','w','h'):
         assert abs(w[key]-prepared[name][key])<=1, (name,key,prepared[name],w)
 PY
-effect loadEffect trellis | grep true
+effect loadEffect krellis | grep true
 sleep 1.5
 
 # Moving between canvases must not replace the global native baseline.
@@ -161,7 +161,7 @@ sleep 0.4
 call simDragStart "$(indexOf 0 lifecycle-above)" 300 180 | grep true
 call simDragMove 800 400
 sleep 0.2
-effect unloadEffect trellis
+effect unloadEffect krellis
 sleep 0.8
 snapshot disabled
 python3 - "$NEST_OUT/baseline.json" "$NEST_OUT/disabled.json" <<'PY'
@@ -219,8 +219,8 @@ snapshot disabled-settled
 # A second enable/disable must capture the restored state rather than the old
 # effect's transient geometry. Remove this scenario's saved state between loads.
 test "${XDG_STATE_HOME:-}" = "$NEST_WORK/state"
-rm -f "$XDG_STATE_HOME/kwin-trellis/session.json"
-effect loadEffect trellis | grep true
+rm -f "$XDG_STATE_HOME/krellis/session.json"
+effect loadEffect krellis | grep true
 sleep 1
 script native-move <<'JS'
 var alpha = workspace.windowList().filter(function(w) { return w.caption === 'lifecycle-alpha'; })[0];
@@ -234,7 +234,7 @@ import json,sys
 alpha = next(w for w in json.load(open(sys.argv[1])) if w['name']=='lifecycle-alpha')
 assert alpha['move'], alpha
 PY
-effect unloadEffect trellis
+effect unloadEffect krellis
 sleep 0.8
 snapshot reloaded
 python3 - "$NEST_OUT/disabled-settled.json" "$NEST_OUT/reloaded.json" <<'PY'
@@ -251,8 +251,8 @@ for name,actual in after.items():
 PY
 
 # Unload during a real native resize must cancel the grab and restore baseline.
-rm -f "$XDG_STATE_HOME/kwin-trellis/session.json"
-effect loadEffect trellis | grep true
+rm -f "$XDG_STATE_HOME/krellis/session.json"
+effect loadEffect krellis | grep true
 sleep 1
 alphaIndex=$(indexOf 0 lifecycle-alpha)
 call selectOutput 0
@@ -265,7 +265,7 @@ import json,sys
 alpha=next(w for w in json.load(open(sys.argv[1])) if w['name']=='lifecycle-alpha')
 assert alpha['resize'],alpha
 PYTEST
-effect unloadEffect trellis
+effect unloadEffect krellis
 sleep 0.8
 snapshot resize-unloaded
 python3 - "$NEST_OUT/disabled-settled.json" "$NEST_OUT/resize-unloaded.json" <<'PYTEST'
@@ -283,7 +283,7 @@ PYTEST
 
 # Singleton suppression is automatic policy, and must not leave an extra
 # minimized native window behind when the effect is disabled.
-cat >"$XDG_CONFIG_HOME/trellisrc" <<'INI'
+cat >"$XDG_CONFIG_HOME/krellisrc" <<'INI'
 [ViewRules]
 lifecycle-duplicate\singleton=true
 INI
@@ -293,8 +293,8 @@ for name in first second; do
 done
 sleep 0.4
 snapshot singleton-before
-rm -f "$XDG_STATE_HOME/kwin-trellis/session.json"
-effect loadEffect trellis | grep true
+rm -f "$XDG_STATE_HOME/krellis/session.json"
+effect loadEffect krellis | grep true
 sleep 1
 snapshot singleton-active
 python3 - "$NEST_OUT/singleton-active.json" <<'PY'
@@ -302,7 +302,7 @@ import json,sys
 windows=[w for w in json.load(open(sys.argv[1])) if w['name'].startswith('lifecycle-duplicate-')]
 assert len(windows)==2 and sum(w['minimized'] for w in windows)==1, windows
 PY
-effect unloadEffect trellis
+effect unloadEffect krellis
 sleep 0.8
 snapshot singleton-after
 python3 - "$NEST_OUT/singleton-before.json" "$NEST_OUT/singleton-after.json" <<'PY'

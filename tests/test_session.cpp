@@ -9,7 +9,7 @@
 #include <functional>
 #include <limits>
 
-using namespace trellis;
+using namespace krellis;
 
 namespace {
 using Strings = std::vector<std::string>;

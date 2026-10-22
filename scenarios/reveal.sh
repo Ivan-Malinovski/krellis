@@ -2,7 +2,7 @@
 # Seeded with spawnTarget=end (windows in opening order) and peek=0 so the camera is the frame itself (with a peek gutter the camera differs mid-row).
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET; unset DISPLAY
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 rc=0
 check() { [ "$2" = "$3" ] && echo "ok $1: $2" || { echo "FAIL $1: got '$2' want '$3'"; rc=1; }; }
 camw() { call dump | sed -nE 's/^camera [-0-9.e]+ [-0-9.e]+ ([-0-9.e]+) .*/\1/p'; }

@@ -1,19 +1,53 @@
-#include "trellis_config.h"
+#include "krellis_config.h"
+#include <QDir>
+#include <QFile>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QVariant>
 #include <algorithm>
 #include <cmath>
 
-namespace trellis::config {
+namespace krellis::config {
 
-QString defaultPath() { return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/trellisrc"); }
+QString defaultPath()
+{
+    const QString file = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/krellisrc");
+    // Krellis was called Trellis until 2026-10-22: take the old settings along once, and leave the old file alone.
+    static const bool migrated = [&file] {
+        const QString legacy = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/trellisrc");
+        if (!QFile::exists(file) && QFile::exists(legacy))
+            QFile::copy(legacy, file);
+        return true;
+    }();
+    Q_UNUSED(migrated)
+    return file;
+}
+
+QString stateFile(const QString &name)
+{
+    const QString base = QStandardPaths::writableLocation(QStandardPaths::GenericStateLocation);
+    const QString file = base + QStringLiteral("/krellis/") + name;
+    // The saved layout (session.json) came from kwin-trellis's state directory; copy it over once. The crash-loop
+    // marker is deliberately not carried over, so old strikes cannot keep the renamed effect off.
+    static const bool migrated = [&base, &file] {
+        const QString legacy = base + QStringLiteral("/kwin-trellis/session.json");
+        const QString target = base + QStringLiteral("/krellis/session.json");
+        if (!QFile::exists(target) && QFile::exists(legacy)) {
+            QDir().mkpath(base + QStringLiteral("/krellis"));
+            QFile::copy(legacy, target);
+        }
+        return true;
+    }();
+    Q_UNUSED(migrated)
+    return file;
+}
 
 Settings load(const QString &file)
 {
     // Qt's INI reader files [General] keys under their bare names, so "General/key" never matches on read.
     const QSettings c(file, QSettings::IniFormat);
     Settings s;
+    s.closeFocus = c.value(QStringLiteral("closeFocus"), s.closeFocus).toBool();
     s.floatFirst = c.value(QStringLiteral("floatFirst"), s.floatFirst).toBool();
     if (c.contains(QStringLiteral("spawnTarget"))) {
         const QString v = c.value(QStringLiteral("spawnTarget")).toString();
@@ -41,6 +75,7 @@ Settings load(const QString &file)
 bool save(const Settings &s, const QString &file)
 {
     QSettings c(file, QSettings::IniFormat);
+    c.setValue(QStringLiteral("closeFocus"), s.closeFocus);
     c.setValue(QStringLiteral("floatFirst"), s.floatFirst);
     c.setValue(QStringLiteral("spawnTarget"),
                s.spawnTarget == SpawnTarget::Focused ? QStringLiteral("focused")
@@ -126,4 +161,4 @@ bool saveRules(const QList<AppRule> &rules, const QString &file)
     return c.status() == QSettings::NoError;
 }
 
-} // namespace trellis::config
+} // namespace krellis::config

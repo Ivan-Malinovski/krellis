@@ -3,7 +3,7 @@ set -uo pipefail
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 rc=0
 ok() { echo "ok $1"; }
 bad() { echo "FAIL $1"; rc=1; }
@@ -11,7 +11,7 @@ order() { call dump | awk '/^ORDER/ { $1=""; print; exit }' | xargs; }
 floats() { call dump | grep -c ' FLOAT$'; }
 call setFloatFirst true
 [ "$(call floatFirst)" = true ] && ok "mode on" || bad "mode on"
-grep -q 'floatFirst=true' "$NEST_WORK/config/trellisrc" && ok "mode persisted" || bad "mode persisted"
+grep -q 'floatFirst=true' "$NEST_WORK/config/krellisrc" && ok "mode persisted" || bad "mode persisted"
 for n in A B C; do alacritty --title "win-$n" -e sleep 600 >/dev/null 2>&1 & sleep 1.5; done
 sleep 1
 [ "$(floats)" = 3 ] && ok "new windows float ($(floats))" || bad "new windows float: $(floats) floats, order '$(order)'"

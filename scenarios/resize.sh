@@ -4,10 +4,10 @@ set -euo pipefail
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 trap 'for process in ${clients:-}; do kill "$process" 2>/dev/null || true; done' EXIT
-project=/home/ivan/dev/kwin-trellis
-split_delta=${TRELLIS_RESIZE_DELTA:-65}
+project=/home/ivan/dev/krellis
+split_delta=${KRELLIS_RESIZE_DELTA:-65}
 zoom_delta=35
 if [ "$split_delta" -lt 0 ]; then zoom_delta=-35; fi
 c++ -fPIC "$project/scenarios/lifecycle-client.cpp" -o "$NEST_WORK/client" $(pkg-config --cflags --libs Qt6Widgets)
@@ -20,7 +20,7 @@ for app in alpha beta gamma; do
 done
 sleep 1
 call overview; sleep 0.8
-save() { call saveSession | grep -x true; cp "$XDG_STATE_HOME/kwin-trellis/session.json" "$NEST_OUT/$1.json"; call dump >"$NEST_OUT/$1.txt"; }
+save() { call saveSession | grep -x true; cp "$XDG_STATE_HOME/krellis/session.json" "$NEST_OUT/$1.json"; call dump >"$NEST_OUT/$1.txt"; }
 save baseline
 call simNativeResizeStart 0 1 0.5 | grep -x true
 call dump | tee "$NEST_OUT/start.txt" | grep 'RESIZE .*floating 0 boundaries 1'
@@ -47,7 +47,7 @@ call dump >"$NEST_OUT/zoom-preview.txt"
 call simNativeResizeEnd false | grep -x true
 sleep 0.8
 # Use a large native minimum to force a genuine paint scale for the float.
-cat >"$XDG_CONFIG_HOME/trellisrc" <<'RULES'
+cat >"$XDG_CONFIG_HOME/krellisrc" <<'RULES'
 [ViewRules]
 resize-alpha\minWidth=1200
 resize-alpha\minHeight=1000

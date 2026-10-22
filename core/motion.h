@@ -7,7 +7,7 @@
 #include <map>
 #include <string>
 
-namespace trellis {
+namespace krellis {
 
 struct Motion {
     static constexpr double stiffness = 210, damping = 29, maxStep = 0.032, epsilon = 0.0001;
@@ -51,4 +51,4 @@ std::function<double(double)> cubicBezier(double x1, double y1, double x2, doubl
 extern const std::function<double(double)> DOCK_EASE; // (.2,.75,.2,1)
 inline constexpr double DOCK_HIDE_MS = 300, DOCK_RESTORE_MS = 380;
 
-} // namespace trellis
+} // namespace krellis

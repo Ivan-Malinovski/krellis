@@ -1,13 +1,13 @@
-#include "trellis_effect.h"
+#include "krellis_effect.h"
 #include "window.h"
 #include "options.h"
 #include "effect/effecthandler.h"
 #include <algorithm>
 
 namespace KWin {
-using namespace trellis;
+using namespace krellis;
 
-void TrellisCanvas::startResize(EffectWindow *w)
+void KrellisCanvas::startResize(EffectWindow *w)
 {
     const auto *tracked = trackedFor(w);
     if (!tracked || !w->window() || m_session || m_resize) return;
@@ -30,8 +30,8 @@ void TrellisCanvas::startResize(EffectWindow *w)
     if (!state.floating) {
         // Follow the panel's ancestry to the closest divider for each dragged edge.
         // Outside edges have no divider and cannot change the canvas extent.
-        for (const auto edge : {trellis::Edge::Left, trellis::Edge::Right, trellis::Edge::Top, trellis::Edge::Bottom}) {
-            if (!(edge == trellis::Edge::Left ? left : edge == trellis::Edge::Right ? right : edge == trellis::Edge::Top ? top : bottom)) continue;
+        for (const auto edge : {krellis::Edge::Left, krellis::Edge::Right, krellis::Edge::Top, krellis::Edge::Bottom}) {
+            if (!(edge == krellis::Edge::Left ? left : edge == krellis::Edge::Right ? right : edge == krellis::Edge::Top ? top : bottom)) continue;
             std::string child = tracked->panel;
             while (const auto *entry = m_rects.find(child)) {
                 if (entry->parent.empty()) break;
@@ -59,13 +59,13 @@ void TrellisCanvas::startResize(EffectWindow *w)
     schedule();
 }
 
-void TrellisCanvas::resizeStepped(EffectWindow *w, const RectF &geometry)
+void KrellisCanvas::resizeStepped(EffectWindow *w, const RectF &geometry)
 {
     if (m_resize && m_resize->window == w) { m_resize->lastNative = geometry; ++m_resize->nativeSteps; }
     if (w->window()) resizeAt(w, w->window()->interactiveMoveResizeAnchor());
 }
 
-void TrellisCanvas::resizeAt(EffectWindow *w, QPointF pointer)
+void KrellisCanvas::resizeAt(EffectWindow *w, QPointF pointer)
 {
     if (!m_resize || m_resize->window != w) return;
     auto &state = *m_resize;
@@ -88,7 +88,7 @@ void TrellisCanvas::resizeAt(EffectWindow *w, QPointF pointer)
         const TRect normalized{(left - m_area.x()) / m_area.width(), (top - m_area.y()) / m_area.height(),
                                std::max(1.0, right - left) / m_area.width(), std::max(1.0, bottom - top) / m_area.height()};
         for (auto &floating : m_doc.floating)
-            if (floating.panel->id == tracked->panel) floating.rect = clampFloat(normalized, trellis::FloatingLayer::Overlay, m_doc.floatMargin);
+            if (floating.panel->id == tracked->panel) floating.rect = clampFloat(normalized, krellis::FloatingLayer::Overlay, m_doc.floatMargin);
     } else {
         m_doc.root = state.before.root;
         for (const auto &boundary : state.boundaries) {
@@ -106,11 +106,11 @@ void TrellisCanvas::resizeAt(EffectWindow *w, QPointF pointer)
             if (self && root) {
                 const auto &a = self->rect, &b = root->rect;
                 const double eps = 0.5;
-                std::optional<trellis::Edge> want;
-                if (leftEdge && std::abs(a.x + a.w - (b.x + b.w)) < eps && state.painted.w - delta.x() < m_drawerCollapsePx) want = trellis::Edge::Right;
-                else if (rightEdge && std::abs(a.x - b.x) < eps && state.painted.w + delta.x() < m_drawerCollapsePx) want = trellis::Edge::Left;
-                else if (topEdge && std::abs(a.y + a.h - (b.y + b.h)) < eps && state.painted.h - delta.y() < m_drawerCollapsePx) want = trellis::Edge::Bottom;
-                else if (bottomEdge && std::abs(a.y - b.y) < eps && state.painted.h + delta.y() < m_drawerCollapsePx) want = trellis::Edge::Top;
+                std::optional<krellis::Edge> want;
+                if (leftEdge && std::abs(a.x + a.w - (b.x + b.w)) < eps && state.painted.w - delta.x() < m_drawerCollapsePx) want = krellis::Edge::Right;
+                else if (rightEdge && std::abs(a.x - b.x) < eps && state.painted.w + delta.x() < m_drawerCollapsePx) want = krellis::Edge::Left;
+                else if (topEdge && std::abs(a.y + a.h - (b.y + b.h)) < eps && state.painted.h - delta.y() < m_drawerCollapsePx) want = krellis::Edge::Bottom;
+                else if (bottomEdge && std::abs(a.y - b.y) < eps && state.painted.h + delta.y() < m_drawerCollapsePx) want = krellis::Edge::Top;
                 // Not where another display joins this one: the pointer crossing over would open the drawer.
                 if (want && drawerEdgeFree(*want)) state.stash = want;
             }
@@ -121,7 +121,7 @@ void TrellisCanvas::resizeAt(EffectWindow *w, QPointF pointer)
     updateMarquee(0);
 }
 
-void TrellisCanvas::finishResize(bool commit)
+void KrellisCanvas::finishResize(bool commit)
 {
     if (!m_resize) return;
     auto state = std::move(*m_resize);
@@ -144,10 +144,10 @@ void TrellisCanvas::finishResize(bool commit)
                 // A resized drawer stays hugging the edge it slides out of.
                 if (const auto d = m_drawers.find(tracked->panel); d != m_drawers.end()) {
                     switch (d->second.edge) {
-                    case trellis::Edge::Left: floating.rect.x = 0; break;
-                    case trellis::Edge::Right: floating.rect.x = 1 - floating.rect.w; break;
-                    case trellis::Edge::Top: floating.rect.y = 0; break;
-                    case trellis::Edge::Bottom: floating.rect.y = 1 - floating.rect.h; break;
+                    case krellis::Edge::Left: floating.rect.x = 0; break;
+                    case krellis::Edge::Right: floating.rect.x = 1 - floating.rect.w; break;
+                    case krellis::Edge::Top: floating.rect.y = 0; break;
+                    case krellis::Edge::Bottom: floating.rect.y = 1 - floating.rect.h; break;
                     }
                 } else {
                     m_rememberedFloats[tracked->panel] = floating.rect;
@@ -158,7 +158,7 @@ void TrellisCanvas::finishResize(bool commit)
     relayout(true);
 }
 
-bool TrellisEffect::simNativeResizeStart(int index, double horizontal, double vertical)
+bool KrellisEffect::simNativeResizeStart(int index, double horizontal, double vertical)
 {
     auto *canvas = current();
     if (!canvas || index < 0 || index >= int(canvas->m_windows.size())) return false;
@@ -174,7 +174,7 @@ bool TrellisEffect::simNativeResizeStart(int index, double horizontal, double ve
     return window->isInteractiveResize() && canvas->m_resize.has_value();
 }
 
-bool TrellisEffect::simNativeResizeMove(double dx, double dy)
+bool KrellisEffect::simNativeResizeMove(double dx, double dy)
 {
     auto *canvas = current();
     if (!canvas || !canvas->m_resize || !canvas->m_resize->window) return false;
@@ -185,7 +185,7 @@ bool TrellisEffect::simNativeResizeMove(double dx, double dy)
     return true;
 }
 
-bool TrellisEffect::simNativeResizeEnd(bool commit)
+bool KrellisEffect::simNativeResizeEnd(bool commit)
 {
     auto *canvas = current();
     if (!canvas || !canvas->m_resize || !canvas->m_resize->window) return false;

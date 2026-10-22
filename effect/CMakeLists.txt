@@ -12,37 +12,37 @@ find_package(KF6Config REQUIRED)
 
 set(CMAKE_AUTORCC ON)
 # The plugin id doubles as the file name and the resource prefix. KWin never re-reads a plugin file it has already
-# mapped, so tools/install.sh builds each live install under a fresh id (trellis_<stamp>) and the new code loads
+# mapped, so tools/install.sh builds each live install under a fresh id (krellis_<stamp>) and the new code loads
 # without a logout. The default id is what the nested harness uses.
-set(TRELLIS_ID trellis CACHE STRING "Effect plugin id, also the .so file name")
+set(KRELLIS_ID krellis CACHE STRING "Effect plugin id, also the .so file name")
 # The effect's Configure button opens the settings module (kcm/), looked up under kwin/effects/configs.
-if(TRELLIS_BUILD_KCM)
-    set(TRELLIS_CONFIG_MODULE ",\n    \"X-KDE-ConfigModule\": \"kcm_trellis\"")
+if(KRELLIS_BUILD_KCM)
+    set(KRELLIS_CONFIG_MODULE ",\n    \"X-KDE-ConfigModule\": \"kcm_krellis\"")
 endif()
 configure_file(metadata.json.in ${CMAKE_CURRENT_BINARY_DIR}/metadata.json @ONLY)
-configure_file(trellis.qrc.in ${CMAKE_CURRENT_BINARY_DIR}/${TRELLIS_ID}.qrc @ONLY)
-add_library(trellis MODULE native_resize.cpp trellis_effect.cpp multicanvas.cpp surface_input.cpp view_rules.cpp persistence.cpp session_store.cpp theme.cpp boot_guard.cpp ${CMAKE_CURRENT_BINARY_DIR}/${TRELLIS_ID}.qrc)
-target_include_directories(trellis PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_compile_definitions(trellis PRIVATE TRELLIS_ID="${TRELLIS_ID}")
-target_link_libraries(trellis PRIVATE trellis_core trellis_config KWin::kwin KDecoration3::KDecoration KF6::CoreAddons KF6::GlobalAccel KF6::ColorScheme KF6::ConfigCore KF6::ConfigGui Qt6::DBus Qt6::Quick)
-set_target_properties(trellis PROPERTIES PREFIX "" OUTPUT_NAME ${TRELLIS_ID})
+configure_file(krellis.qrc.in ${CMAKE_CURRENT_BINARY_DIR}/${KRELLIS_ID}.qrc @ONLY)
+add_library(krellis MODULE native_resize.cpp krellis_effect.cpp multicanvas.cpp surface_input.cpp view_rules.cpp persistence.cpp session_store.cpp theme.cpp boot_guard.cpp ${CMAKE_CURRENT_BINARY_DIR}/${KRELLIS_ID}.qrc)
+target_include_directories(krellis PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_compile_definitions(krellis PRIVATE KRELLIS_ID="${KRELLIS_ID}")
+target_link_libraries(krellis PRIVATE krellis_core krellis_config KWin::kwin KDecoration3::KDecoration KF6::CoreAddons KF6::GlobalAccel KF6::ColorScheme KF6::ConfigCore KF6::ConfigGui Qt6::DBus Qt6::Quick)
+set_target_properties(krellis PROPERTIES PREFIX "" OUTPUT_NAME ${KRELLIS_ID})
 # Stage a plugin root the nested harness can point QT_PLUGIN_PATH at.
-add_custom_command(TARGET trellis POST_BUILD
+add_custom_command(TARGET krellis POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/root/kwin/effects/plugins
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:trellis> ${CMAKE_BINARY_DIR}/root/kwin/effects/plugins/${TRELLIS_ID}.so.new
-    COMMAND ${CMAKE_COMMAND} -E rename ${CMAKE_BINARY_DIR}/root/kwin/effects/plugins/${TRELLIS_ID}.so.new ${CMAKE_BINARY_DIR}/root/kwin/effects/plugins/${TRELLIS_ID}.so)
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:krellis> ${CMAKE_BINARY_DIR}/root/kwin/effects/plugins/${KRELLIS_ID}.so.new
+    COMMAND ${CMAKE_COMMAND} -E rename ${CMAKE_BINARY_DIR}/root/kwin/effects/plugins/${KRELLIS_ID}.so.new ${CMAKE_BINARY_DIR}/root/kwin/effects/plugins/${KRELLIS_ID}.so)
 
 # Explicit test-only target. It observes real frame buffers without driving damage.
-add_library(trellis_paint_probe MODULE EXCLUDE_FROM_ALL ../scenarios/paint-probe.cpp)
-target_link_libraries(trellis_paint_probe PRIVATE KWin::kwin Qt6::DBus Qt6::Quick KF6::CoreAddons)
-set_target_properties(trellis_paint_probe PROPERTIES PREFIX "" OUTPUT_NAME trellis_paint_probe)
-add_custom_command(TARGET trellis_paint_probe POST_BUILD
+add_library(krellis_paint_probe MODULE EXCLUDE_FROM_ALL ../scenarios/paint-probe.cpp)
+target_link_libraries(krellis_paint_probe PRIVATE KWin::kwin Qt6::DBus Qt6::Quick KF6::CoreAddons)
+set_target_properties(krellis_paint_probe PROPERTIES PREFIX "" OUTPUT_NAME krellis_paint_probe)
+add_custom_command(TARGET krellis_paint_probe POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/root/kwin/effects/plugins
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:trellis_paint_probe> ${CMAKE_BINARY_DIR}/root/kwin/effects/plugins/trellis_paint_probe.so.new
-    COMMAND ${CMAKE_COMMAND} -E rename ${CMAKE_BINARY_DIR}/root/kwin/effects/plugins/trellis_paint_probe.so.new ${CMAKE_BINARY_DIR}/root/kwin/effects/plugins/trellis_paint_probe.so)
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:krellis_paint_probe> ${CMAKE_BINARY_DIR}/root/kwin/effects/plugins/krellis_paint_probe.so.new
+    COMMAND ${CMAKE_COMMAND} -E rename ${CMAKE_BINARY_DIR}/root/kwin/effects/plugins/krellis_paint_probe.so.new ${CMAKE_BINARY_DIR}/root/kwin/effects/plugins/krellis_paint_probe.so)
 
 # Installs next to KWin's own effects; KWin only finds plugins under the system Qt plugin path.
 # ECM resolves its plugin dir to lib/plugins here, which is not on KWin's search path.
-set(TRELLIS_PLUGIN_DIR lib/qt6/plugins CACHE STRING "Qt plugin dir, relative to the install prefix")
-install(TARGETS trellis DESTINATION ${TRELLIS_PLUGIN_DIR}/kwin/effects/plugins)
-set_target_properties(trellis PROPERTIES SKIP_BUILD_RPATH TRUE INSTALL_RPATH "")
+set(KRELLIS_PLUGIN_DIR lib/qt6/plugins CACHE STRING "Qt plugin dir, relative to the install prefix")
+install(TARGETS krellis DESTINATION ${KRELLIS_PLUGIN_DIR}/kwin/effects/plugins)
+set_target_properties(krellis PROPERTIES SKIP_BUILD_RPATH TRUE INSTALL_RPATH "")

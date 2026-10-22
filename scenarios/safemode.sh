@@ -6,10 +6,10 @@
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-marker="$NEST_WORK/state/kwin-trellis/boot.json"
+marker="$NEST_WORK/state/krellis/boot.json"
 check() { if [ "$2" = "$3" ]; then echo "PASS $1"; else echo "FAIL $1: got '$2' want '$3'"; fi; }
 sleep 2
-loaded=no; qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect.version >/dev/null 2>&1 && loaded=yes
+loaded=no; qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect.version >/dev/null 2>&1 && loaded=yes
 echo "marker: $(cat "$marker" 2>/dev/null)"
 case "${SAFEMODE_EXPECT:?}" in
   load)
@@ -20,5 +20,5 @@ case "${SAFEMODE_EXPECT:?}" in
   refuse)
     check "effect refused to load" "$loaded" no
     check "marker left alone" "$(grep -o '"strikes":[0-9]*' "$marker")" '"strikes":1'
-    check "refusal logged" "$(grep -c 'Trellis not loaded' "$NEST_OUT/kwin.log" | sed 's/^[1-9][0-9]*$/yes/')" yes;;
+    check "refusal logged" "$(grep -c 'Krellis not loaded' "$NEST_OUT/kwin.log" | sed 's/^[1-9][0-9]*$/yes/')" yes;;
 esac

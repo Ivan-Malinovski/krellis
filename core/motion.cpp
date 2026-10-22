@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace trellis {
+namespace krellis {
 
 double easeOutQuint(double t)
 {
@@ -112,4 +112,4 @@ std::function<double(double)> cubicBezier(double x1, double y1, double x2, doubl
 
 const std::function<double(double)> DOCK_EASE = cubicBezier(0.2, 0.75, 0.2, 1);
 
-} // namespace trellis
+} // namespace krellis

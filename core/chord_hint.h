@@ -3,7 +3,7 @@
 
 #include <cstdint>
 
-namespace trellis {
+namespace krellis {
 
 class ChordHint
 {
@@ -62,4 +62,4 @@ private:
     bool m_pending = false, m_shown = false, m_latched = false;
 };
 
-} // namespace trellis
+} // namespace krellis

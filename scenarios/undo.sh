@@ -4,7 +4,7 @@
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 layout() { call dump | grep -E "^p[0-9]+ " | sed -E 's/ opacity.*//' | sort; }
 hist() { call dump | sed -n 's/^HISTORY //p'; }
 check() { if [ "$2" = "$3" ]; then echo "PASS $1"; else echo "FAIL $1: got '$2' want '$3'"; fi; }
@@ -35,7 +35,7 @@ panels_after=$(call dump | grep -cE "^p[0-9]+ ")
 check "a window closed" "$panels_after" "$((panels_before - 1))"
 call redo; sleep 1.5
 check "redo does not resurrect the closed window" "$(call dump | grep -cE "^p[0-9]+ ")" "$panels_after"
-/home/ivan/dev/kwin-trellis/tools/shot undo-after-close >/dev/null
+/home/ivan/dev/krellis/tools/shot undo-after-close >/dev/null
 echo "--- native resize: one step; a cancelled resize records none"
 before=$(hist); l0=$(layout)
 call simNativeResizeStart 0 1.0 0.5 >/dev/null; call simNativeResizeMove 60 0 >/dev/null; sleep 0.4; call simNativeResizeEnd true >/dev/null; sleep 1.2

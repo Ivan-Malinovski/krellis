@@ -3,9 +3,9 @@
 set -uo pipefail
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET; unset DISPLAY
-project=/home/ivan/dev/kwin-trellis
+project=/home/ivan/dev/krellis
 c++ -fPIC "$project/scenarios/panel.cpp" -o "$NEST_WORK/panel" $(pkg-config --cflags --libs Qt6Gui) -lLayerShellQtInterface
-call() { qdbus6 org.kde.KWin /Trellis org.kde.kwin.KWin.TrellisEffect."$@"; }
+call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 check() { if [ "$2" = "$3" ]; then echo "PASS $1"; else echo "FAIL $1: got '$2' want '$3'"; fi; }
 frame() { call dump | sed -n "s/^$1 .* frame \([0-9.-]*\),\([0-9.-]*\) \([0-9.]*\)x\([0-9.]*\) .*/\1 \2 \3 \4/p" | head -1; }
 for n in A B; do alacritty --title "win-$n" -e sh -c "echo $n; sleep 600" >/dev/null 2>&1 & sleep 2; done

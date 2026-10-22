@@ -4,7 +4,7 @@
 #include <KConfigGroup>
 #include <KSharedConfig>
 
-namespace trellis {
+namespace krellis {
 
 Theme::Theme(QObject *parent)
     : QObject(parent)
@@ -87,4 +87,4 @@ QString Theme::dump() const
     return out;
 }
 
-} // namespace trellis
+} // namespace krellis

@@ -1,4 +1,4 @@
-add_library(trellis_core STATIC
+add_library(krellis_core STATIC
     tree.cpp
     document.cpp
     spatial.cpp
@@ -11,6 +11,6 @@ add_library(trellis_core STATIC
     keynav.cpp
     reconcile.cpp
 )
-target_include_directories(trellis_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_options(trellis_core PRIVATE -Wall -Wextra)
-set_target_properties(trellis_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(krellis_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_options(krellis_core PRIVATE -Wall -Wextra)
+set_target_properties(krellis_core PROPERTIES POSITION_INDEPENDENT_CODE ON)

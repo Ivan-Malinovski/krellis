@@ -1,4 +1,4 @@
-#include "trellis_effect.h"
+#include "krellis_effect.h"
 #include "effect/effecthandler.h"
 #include "core/output.h"
 #include "core/renderviewport.h"
@@ -20,17 +20,17 @@ namespace KWin {
 
 // Compile stamp so a running compositor can be told apart from the installed file (see tools/live.sh).
 static const char kBuildStamp[] = "build " __DATE__ " " __TIME__; // ASCII so tools can grep the .so
-QString TrellisEffect::version() const { return QString::fromLatin1(kBuildStamp); }
+QString KrellisEffect::version() const { return QString::fromLatin1(kBuildStamp); }
 
 static qint64 chordNowMs()
 {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
-TrellisEffect::TrellisEffect()
+KrellisEffect::KrellisEffect()
 {
-    trellisBootStarted();
-    QTimer::singleShot(int(trellis::BOOT_SURVIVE_MS), this, [] { trellisBootSurvived(); }); // one write, no heartbeat
+    krellisBootStarted();
+    QTimer::singleShot(int(krellis::BOOT_SURVIVE_MS), this, [] { krellisBootSurvived(); }); // one write, no heartbeat
     m_chordTimer = new QTimer(this);
     m_chordTimer->setSingleShot(true);
     m_chordTimer->setTimerType(Qt::PreciseTimer);
@@ -39,10 +39,10 @@ TrellisEffect::TrellisEffect()
         if (m_chord.tick(now)) showHint();
         else if (m_chord.pending()) m_chordTimer->start(int(std::max<qint64>(1, m_chord.deadline() - now))); // fired a little early
     });
-    connect(&m_theme, &trellis::Theme::changed, this, [this] {
+    connect(&m_theme, &krellis::Theme::changed, this, [this] {
         for (const auto &canvas : m_canvases) canvas->themeChanged();
     });
-    applySettings(trellis::config::load());
+    applySettings(krellis::config::load());
     initializeSession();
     syncOutputs();
     connect(effects, &EffectsHandler::windowAdded, this, [this](EffectWindow *w) {
@@ -55,7 +55,7 @@ TrellisEffect::TrellisEffect()
             }
             return;
         }
-        if (TrellisCanvas::manageable(w)) rememberNative(w, false, false);
+        if (KrellisCanvas::manageable(w)) rememberNative(w, false, false);
         for (const auto &canvas : m_canvases)
             if (canvas->m_output == w->screen()) {
                 canvas->windowAdded(w);
@@ -69,25 +69,25 @@ TrellisEffect::TrellisEffect()
     });
     for (auto *window : effects->stackingOrder()) {
         watchOutput(window);
-        if (TrellisCanvas::manageable(window)) rememberNative(window, false, false);
+        if (KrellisCanvas::manageable(window)) rememberNative(window, false, false);
         for (const auto &canvas : m_canvases)
             if (canvas->m_output == window->screen())
                 canvas->windowAdded(window);
     }
     if (!effects->stackingOrder().isEmpty()) sessionWindowOpened();
     auto *timer = new QTimer(this);
-    connect(timer, &QTimer::timeout, this, &TrellisEffect::syncOutputs);
+    connect(timer, &QTimer::timeout, this, &KrellisEffect::syncOutputs);
     timer->start(100);
     registerShortcuts();
-    m_input = std::make_unique<TrellisInput>(this);
+    m_input = std::make_unique<KrellisInput>(this);
     input()->installInputEventFilter(m_input.get());
-    QDBusConnection::sessionBus().registerObject(QStringLiteral("/Trellis"), this,
+    QDBusConnection::sessionBus().registerObject(QStringLiteral("/Krellis"), this,
         QDBusConnection::ExportAllSlots | QDBusConnection::ExportAllInvokables);
 }
 
-TrellisEffect::~TrellisEffect()
+KrellisEffect::~KrellisEffect()
 {
-    trellisBootClean();
+    krellisBootClean();
     m_shuttingDown = true;
     m_saveTimer->stop();
     m_restoreTimer->stop();
@@ -103,10 +103,10 @@ TrellisEffect::~TrellisEffect()
     if (waylandServer() && waylandServer()->seat())
         if (auto *native = input()->findToplevel(effects->cursorPos()); native && native->surface())
             waylandServer()->seat()->notifyPointerEnter(native->surface(), effects->cursorPos(), native->inputTransformation());
-    QDBusConnection::sessionBus().unregisterObject(QStringLiteral("/Trellis"));
+    QDBusConnection::sessionBus().unregisterObject(QStringLiteral("/Krellis"));
 }
 
-void TrellisEffect::rememberNative(EffectWindow *window, bool automaticMinimize, bool mutation)
+void KrellisEffect::rememberNative(EffectWindow *window, bool automaticMinimize, bool mutation)
 {
     auto *native = window->window();
     if (m_shuttingDown || !native || native->isDeleted()) return;
@@ -124,7 +124,7 @@ void TrellisEffect::rememberNative(EffectWindow *window, bool automaticMinimize,
     if (automaticMinimize && !native->isMinimized()) it->second.automaticMinimize = true;
 }
 
-void TrellisEffect::restoreNative()
+void KrellisEffect::restoreNative()
 {
     // Geometry restoration can emit signals or finish a native interactive
     // operation. Work from guarded copies, with every canvas already quiesced.
@@ -150,14 +150,14 @@ void TrellisEffect::restoreNative()
         }
         window->moveResize(geometry);
         // Explicit hide/restore remains a native user action after disabling
-        // Trellis. Only an automatic singleton suppression is undone.
+        // Krellis. Only an automatic singleton suppression is undone.
         if (state.automaticMinimize && !state.minimized && window && !window->isDeleted()) window->setMinimized(false);
     }
     m_nativeStates.clear();
 }
 
 // Observe explicit KWin moves between outputs, excluding our camera-driven geometry.
-void TrellisEffect::watchOutput(EffectWindow *window)
+void KrellisEffect::watchOutput(EffectWindow *window)
 {
     connect(window, &EffectWindow::windowStartUserMovedResized, this, [this] { markSessionInteraction(); });
     connect(window, &EffectWindow::windowFrameGeometryChanged, this, [this](EffectWindow *w, const RectF &old) {
@@ -182,15 +182,16 @@ void TrellisEffect::watchOutput(EffectWindow *window)
     });
 }
 
-void TrellisEffect::syncOutputs()
+void KrellisEffect::syncOutputs()
 {
     if (m_shuttingDown) return;
     const auto outputs = effects->screens();
     for (auto *output : outputs) {
         if (std::any_of(m_canvases.begin(), m_canvases.end(), [output](const auto &c) { return c->m_output == output; }))
             continue;
-        auto canvas = std::make_unique<TrellisCanvas>(output);
+        auto canvas = std::make_unique<KrellisCanvas>(output);
         canvas->m_theme = &m_theme;
+        canvas->m_closeFocus = m_closeFocus;
         canvas->m_floatFirst = m_floatFirst;
         canvas->m_spawnTarget = m_spawnTarget;
         canvas->m_peekPx = m_peekPx;
@@ -245,7 +246,7 @@ void TrellisEffect::syncOutputs()
         if (m_selectedOutput == removed->m_output) m_selectedOutput = nullptr;
         if (m_pointerCanvas == removed) m_pointerCanvas = nullptr;
         if (m_pinchCanvas == removed) m_pinchCanvas = nullptr;
-        TrellisCanvas *target = nullptr;
+        KrellisCanvas *target = nullptr;
         for (const auto &c : m_canvases)
             if (outputs.contains(c->m_output)) { target = c.get(); break; }
         if (!target) { ++it; continue; } // Preserve documents until an output is available.
@@ -259,7 +260,7 @@ void TrellisEffect::syncOutputs()
     }
 }
 
-TrellisCanvas *TrellisEffect::owner(EffectWindow *w) const
+KrellisCanvas *KrellisEffect::owner(EffectWindow *w) const
 {
     for (const auto &canvas : m_canvases)
         if (canvas->trackedFor(w) || canvas->m_closing.count(w))
@@ -271,7 +272,7 @@ TrellisCanvas *TrellisEffect::owner(EffectWindow *w) const
     return nullptr;
 }
 
-TrellisCanvas *TrellisEffect::canvasAt(QPointF point) const
+KrellisCanvas *KrellisEffect::canvasAt(QPointF point) const
 {
     for (const auto &canvas : m_canvases)
         if (effects->screens().contains(canvas->m_output) && QRectF(QRect(canvas->m_output->geometry())).contains(point))
@@ -279,7 +280,7 @@ TrellisCanvas *TrellisEffect::canvasAt(QPointF point) const
     return nullptr;
 }
 
-TrellisCanvas *TrellisEffect::current() const
+KrellisCanvas *KrellisEffect::current() const
 {
     for (const auto &canvas : m_canvases)
         if (canvas->m_output == m_selectedOutput)
@@ -289,7 +290,7 @@ TrellisCanvas *TrellisEffect::current() const
     return m_canvases.empty() ? nullptr : m_canvases.front().get();
 }
 
-void TrellisCanvas::detachWindow(EffectWindow *w)
+void KrellisCanvas::detachWindow(EffectWindow *w)
 {
     if (auto *tracked = trackedFor(w)) {
         if (m_resize) finishResize(false);
@@ -300,14 +301,14 @@ void TrellisCanvas::detachWindow(EffectWindow *w)
             m_dragFromKWin = false;
         }
         m_flights.erase(w);
-        m_doc = trellis::closeView(m_doc, view);
+        m_doc = krellis::closeView(m_doc, view);
         std::erase_if(m_windows, [w](const auto &t) { return t.window == w; });
         relayout(true);
         updateDock();
     }
 }
 
-void TrellisEffect::transfer(EffectWindow *w, TrellisCanvas *target)
+void KrellisEffect::transfer(EffectWindow *w, KrellisCanvas *target)
 {
     auto *source = owner(w);
     if (!source || source == target || !source->trackedFor(w)) return;
@@ -322,13 +323,13 @@ void TrellisEffect::transfer(EffectWindow *w, TrellisCanvas *target)
     target->windowAdded(w);
     if (hidden) target->minimizedChanged(w);
     else {
-        target->startFlight(w, TrellisCanvas::FlightKind::Glide, from, {}, opacity);
+        target->startFlight(w, KrellisCanvas::FlightKind::Glide, from, {}, opacity);
         target->m_flights.at(w).crossOutput = true;
     }
     target->updateDock();
 }
 
-void TrellisEffect::prePaintScreen(ScreenPrePaintData &data)
+void KrellisEffect::prePaintScreen(ScreenPrePaintData &data)
 {
     // Surface damage arrives in native coordinates, while every managed window
     // can be painted elsewhere. The simple path cannot transform that damage.
@@ -337,17 +338,17 @@ void TrellisEffect::prePaintScreen(ScreenPrePaintData &data)
     for (const auto &canvas : m_canvases) canvas->prePaintScreen(data);
     effects->prePaintScreen(data);
 }
-void TrellisEffect::postPaintScreen()
+void KrellisEffect::postPaintScreen()
 {
     for (const auto &canvas : m_canvases) canvas->postPaintScreen();
     effects->postPaintScreen();
 }
-void TrellisEffect::prePaintWindow(RenderView *view, EffectWindow *w, WindowPrePaintData &data)
+void KrellisEffect::prePaintWindow(RenderView *view, EffectWindow *w, WindowPrePaintData &data)
 {
     if (auto *canvas = owner(w)) canvas->prePaintWindow(view, w, data);
     effects->prePaintWindow(view, w, data);
 }
-void TrellisEffect::paintWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data)
+void KrellisEffect::paintWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data)
 {
     if (auto *canvas = owner(w)) {
         // A zoomed or overshooting canvas must not paint onto its neighbour.
@@ -362,7 +363,7 @@ void TrellisEffect::paintWindow(const RenderTarget &rt, const RenderViewport &vp
     }
 }
 
-bool TrellisEffect::handleButton(const PointerButtonEvent &e)
+bool KrellisEffect::handleButton(const PointerButtonEvent &e)
 {
     if (m_whichKey && (m_chord.pending() || m_chord.shown())) hideHint();
     if (e.state == PointerButtonState::Pressed) markSessionInteraction();
@@ -391,7 +392,7 @@ bool TrellisEffect::handleButton(const PointerButtonEvent &e)
     }
     return handled || surfaceButton(e);
 }
-bool TrellisEffect::handleMotion(const PointerMotionEvent &e)
+bool KrellisEffect::handleMotion(const PointerMotionEvent &e)
 {
     for (const auto &canvas : m_canvases) canvas->m_shiftHeld = e.modifiers & Qt::ShiftModifier;
     if (auto *active = effects->activeWindow(); active && (active->isUserMove() || active->isUserResize())) {
@@ -408,7 +409,7 @@ bool TrellisEffect::handleMotion(const PointerMotionEvent &e)
     for (const auto &canvas : m_canvases) handled = canvas->handleMotion(e) || handled;
     return handled || surfaceMotion(e);
 }
-bool TrellisEffect::handleAxis(const PointerAxisEvent &e)
+bool KrellisEffect::handleAxis(const PointerAxisEvent &e)
 {
     if (auto *active = effects->activeWindow(); active && (active->isUserMove() || active->isUserResize()))
         return false; // KWin's interactive-move filter follows Effects in the chain.
@@ -425,7 +426,7 @@ bool TrellisEffect::handleAxis(const PointerAxisEvent &e)
 // Follows Meta and Alt (and Shift/Ctrl, which cancel the hold) from the key stream. Never consumes anything.
 // The flags are re-read from the event's modifier mask every time, so a release swallowed by a filter ahead of us
 // (TabBox, a grab) cannot leave one stuck; the event's own key wins because the mask may be sampled before or after it.
-void TrellisEffect::trackChord(const KeyboardKeyEvent &e)
+void KrellisEffect::trackChord(const KeyboardKeyEvent &e)
 {
     if (!m_whichKey) return;
     const bool pressed = e.state != KeyboardKeyState::Released;
@@ -456,26 +457,26 @@ void TrellisEffect::trackChord(const KeyboardKeyEvent &e)
     }
 }
 
-void TrellisEffect::hideHintUi()
+void KrellisEffect::hideHintUi()
 {
     m_chordTimer->stop();
     for (const auto &canvas : m_canvases) canvas->hideSheet();
 }
 
-void TrellisEffect::hideHint()
+void KrellisEffect::hideHint()
 {
     m_chord.dismiss();
     hideHintUi();
 }
 
-void TrellisEffect::showHint()
+void KrellisEffect::showHint()
 {
     if (auto *canvas = current()) canvas->showSheet(helpGroups());
 }
 
-QVariantList TrellisEffect::helpGroups() const
+QVariantList KrellisEffect::helpGroups() const
 {
-    auto rowsOf = [this](const trellis::HelpRow *rows, int count) {
+    auto rowsOf = [this](const krellis::HelpRow *rows, int count) {
         QVariantList out;
         for (int i = 0; i < count; ++i) {
             const auto *action = findChild<QAction *>(QString::fromLatin1(rows[i].id), Qt::FindDirectChildrenOnly);
@@ -492,15 +493,15 @@ QVariantList TrellisEffect::helpGroups() const
         return out;
     };
     QVariantList groups;
-    for (const auto &group : trellis::kHelpGroups)
+    for (const auto &group : krellis::kHelpGroups)
         groups << QVariantMap{{QStringLiteral("name"), QString::fromLatin1(group.name)}, {QStringLiteral("rows"), rowsOf(group.rows, group.count)}};
     if (m_scratchpad)
         groups << QVariantMap{{QStringLiteral("name"), QStringLiteral("Scratchpad")},
-                              {QStringLiteral("rows"), rowsOf(trellis::kHelpScratch, int(sizeof(trellis::kHelpScratch) / sizeof(trellis::HelpRow)))}};
+                              {QStringLiteral("rows"), rowsOf(krellis::kHelpScratch, int(sizeof(krellis::kHelpScratch) / sizeof(krellis::HelpRow)))}};
     return groups;
 }
 
-bool TrellisEffect::handleKey(const KeyboardKeyEvent &e)
+bool KrellisEffect::handleKey(const KeyboardKeyEvent &e)
 {
     trackChord(e);
     if (auto *active = effects->activeWindow(); active && (active->isUserMove() || active->isUserResize())) {
@@ -510,7 +511,7 @@ bool TrellisEffect::handleKey(const KeyboardKeyEvent &e)
     }
     if (e.state == KeyboardKeyState::Pressed) markSessionInteraction();
     if (m_resizeMode) return handleResizeKey(e);
-    TrellisCanvas *editing = nullptr;
+    KrellisCanvas *editing = nullptr;
     for (const auto &canvas : m_canvases) if (canvas->m_naming) { editing = canvas.get(); break; }
     if (e.state == KeyboardKeyState::Released && m_inertKeys.erase(e.key)) {
         if (editing) editing->handleKey(e);
@@ -523,7 +524,7 @@ bool TrellisEffect::handleKey(const KeyboardKeyEvent &e)
     bool handled = false, busy = false;
     for (const auto &canvas : m_canvases) {
         handled = canvas->handleKey(e) || handled;
-        busy = busy || canvas->m_nav.gestureActive() || canvas->m_drag != TrellisCanvas::Drag::None || bool(canvas->m_session);
+        busy = busy || canvas->m_nav.gestureActive() || canvas->m_drag != KrellisCanvas::Drag::None || bool(canvas->m_session);
     }
     if (e.state == KeyboardKeyState::Released && m_inertKeys.erase(e.key)) return true;
     if (busy && e.state != KeyboardKeyState::Released) {
@@ -532,23 +533,23 @@ bool TrellisEffect::handleKey(const KeyboardKeyEvent &e)
     }
     return handled;
 }
-void TrellisEffect::pinch(double scale, QPointF at, QPointF delta)
+void KrellisEffect::pinch(double scale, QPointF at, QPointF delta)
 {
     if (!m_pinchCanvas) m_pinchCanvas = canvasAt(at);
     leaveSurface();
     if (m_pinchCanvas) m_pinchCanvas->pinch(scale, at, delta);
 }
-void TrellisEffect::endPinch()
+void KrellisEffect::endPinch()
 {
     if (m_pinchCanvas) m_pinchCanvas->endPinch();
     m_pinchCanvas = nullptr;
 }
-QString TrellisEffect::barHit(double x, double y)
+QString KrellisEffect::barHit(double x, double y)
 {
     auto *canvas = canvasAt({x, y});
     return canvas ? canvas->barKey({x, y}) : QString();
 }
-QString TrellisEffect::dump()
+QString KrellisEffect::dump()
 {
     if (m_canvases.size() == 1) return m_canvases.front()->dump();
     QStringList lines;
@@ -556,59 +557,59 @@ QString TrellisEffect::dump()
         lines << QStringLiteral("OUTPUT %1 %2\n%3").arg(i).arg(m_canvases[i]->m_output->name(), m_canvases[i]->dump());
     return lines.join(QLatin1Char('\n'));
 }
-QString TrellisEffect::dumpOutput(int i)
+QString KrellisEffect::dumpOutput(int i)
 {
     return i >= 0 && i < int(m_canvases.size()) ? m_canvases[size_t(i)]->dump() : QString();
 }
-void TrellisEffect::selectOutput(int i)
+void KrellisEffect::selectOutput(int i)
 {
     m_selectedOutput = i >= 0 && i < int(m_canvases.size()) ? m_canvases[size_t(i)]->m_output : nullptr;
 }
-void TrellisEffect::moveToOutput(int window, int output)
+void KrellisEffect::moveToOutput(int window, int output)
 {
     markSessionInteraction();
     auto *canvas = current();
     if (!canvas || window < 0 || window >= int(canvas->m_windows.size()) || output < 0 || output >= int(m_canvases.size())) return;
     transfer(canvas->m_windows[size_t(window)].window, m_canvases[size_t(output)].get());
 }
-bool TrellisEffect::simDragStart(int i, double x, double y)
+bool KrellisEffect::simDragStart(int i, double x, double y)
 {
     auto *canvas = current();
     if (!canvas || !canvas->simDragStart(i, x, y)) return false;
     m_pointerCanvas = canvas;
     return true;
 }
-void TrellisEffect::simDragMove(double x, double y)
+void KrellisEffect::simDragMove(double x, double y)
 {
     if (m_pointerCanvas) m_pointerCanvas->simDragMove(x, y);
 }
-void TrellisEffect::simForceFloat(int mode)
+void KrellisEffect::simForceFloat(int mode)
 {
     for (const auto &canvas : m_canvases) canvas->m_simForceFloat = mode;
 }
-void TrellisEffect::simDragEnd(bool commit)
+void KrellisEffect::simDragEnd(bool commit)
 {
     auto *canvas = m_pointerCanvas;
     m_pointerCanvas = nullptr;
     if (canvas) canvas->simDragEnd(commit);
 }
-void TrellisEffect::overview() { markSessionInteraction(); if (auto *canvas = current()) canvas->overview(); }
-void TrellisEffect::toggleOverview() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleOverview(); }
-void TrellisEffect::focusIndex(int index) { markSessionInteraction(); if (auto *canvas = current()) canvas->focusIndex(index); }
-void TrellisEffect::toggleMaximize(int index) { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleMaximize(index); }
-void TrellisEffect::toggleHide(int index) { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleHide(index); }
-void TrellisEffect::toggleFloat(int index) { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleFloat(index); }
-void TrellisEffect::stepOut() { markSessionInteraction(); if (auto *canvas = current()) canvas->stepOut(); }
-void TrellisEffect::stepIn() { markSessionInteraction(); if (auto *canvas = current()) canvas->stepIn(); }
-void TrellisEffect::nextPanel() { markSessionInteraction(); if (auto *canvas = current()) canvas->nextPanel(); }
-void TrellisEffect::previousPanel() { markSessionInteraction(); if (auto *canvas = current()) canvas->previousPanel(); }
-void TrellisEffect::cyclePanel(int step) { markSessionInteraction(); if (auto *canvas = current()) canvas->cyclePanel(step); }
-void TrellisEffect::toggleMaximizeActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleMaximizeActive(); }
-void TrellisEffect::toggleFloatActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleFloatActive(); }
-void TrellisEffect::stashActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->stashActive(); }
-void TrellisEffect::flipActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->flipActive(); }
-void TrellisEffect::toggleHideActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleHideActive(); }
-std::vector<EffectWindow *> TrellisEffect::scratchWindows() const
+void KrellisEffect::overview() { markSessionInteraction(); if (auto *canvas = current()) canvas->overview(); }
+void KrellisEffect::toggleOverview() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleOverview(); }
+void KrellisEffect::focusIndex(int index) { markSessionInteraction(); if (auto *canvas = current()) canvas->focusIndex(index); }
+void KrellisEffect::toggleMaximize(int index) { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleMaximize(index); }
+void KrellisEffect::toggleHide(int index) { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleHide(index); }
+void KrellisEffect::toggleFloat(int index) { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleFloat(index); }
+void KrellisEffect::stepOut() { markSessionInteraction(); if (auto *canvas = current()) canvas->stepOut(); }
+void KrellisEffect::stepIn() { markSessionInteraction(); if (auto *canvas = current()) canvas->stepIn(); }
+void KrellisEffect::nextPanel() { markSessionInteraction(); if (auto *canvas = current()) canvas->nextPanel(); }
+void KrellisEffect::previousPanel() { markSessionInteraction(); if (auto *canvas = current()) canvas->previousPanel(); }
+void KrellisEffect::cyclePanel(int step) { markSessionInteraction(); if (auto *canvas = current()) canvas->cyclePanel(step); }
+void KrellisEffect::toggleMaximizeActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleMaximizeActive(); }
+void KrellisEffect::toggleFloatActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleFloatActive(); }
+void KrellisEffect::stashActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->stashActive(); }
+void KrellisEffect::flipActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->flipActive(); }
+void KrellisEffect::toggleHideActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleHideActive(); }
+std::vector<EffectWindow *> KrellisEffect::scratchWindows() const
 {
     std::vector<EffectWindow *> out;
     for (const auto &canvas : m_canvases)
@@ -616,8 +617,8 @@ std::vector<EffectWindow *> TrellisEffect::scratchWindows() const
             if (canvas->scratchWindow(t.window)) out.push_back(t.window);
     return out;
 }
-int TrellisEffect::scratchCount() const { return int(scratchWindows().size()); }
-QVariantMap TrellisEffect::scratchState() const
+int KrellisEffect::scratchCount() const { return int(scratchWindows().size()); }
+QVariantMap KrellisEffect::scratchState() const
 {
     const auto windows = scratchWindows();
     QVariantMap m;
@@ -629,14 +630,14 @@ QVariantMap TrellisEffect::scratchState() const
     m[QStringLiteral("canMark")] = active && owner(active);
     return m;
 }
-void TrellisEffect::refreshScratchUi()
+void KrellisEffect::refreshScratchUi()
 {
     for (const auto &canvas : m_canvases) {
         canvas->updateDock();
         canvas->updateMap(true);
     }
 }
-bool TrellisEffect::toggleScratchMarkActive()
+bool KrellisEffect::toggleScratchMarkActive()
 {
     if (!m_scratchpad) return false;
     markSessionInteraction();
@@ -649,7 +650,7 @@ bool TrellisEffect::toggleScratchMarkActive()
         refreshScratchUi();
         return true;
     }
-    if (canvas->scratchWindow(w)) return false; // flagged by a rule in trellisrc
+    if (canvas->scratchWindow(w)) return false; // flagged by a rule in krellisrc
     m_scratchMarks.erase(std::remove_if(m_scratchMarks.begin(), m_scratchMarks.end(), [](const QPointer<EffectWindow> &p) { return p.isNull(); }), m_scratchMarks.end());
     const int slot = int(std::count_if(m_scratchMarks.begin(), m_scratchMarks.end(), [](const QPointer<EffectWindow> &p) { return !p.isNull(); }));
     if (!canvas->floatForScratch(w, slot)) return false;
@@ -657,21 +658,21 @@ bool TrellisEffect::toggleScratchMarkActive()
     refreshScratchUi();
     return true;
 }
-bool TrellisEffect::scratchLayerShown() const
+bool KrellisEffect::scratchLayerShown() const
 {
     return std::any_of(m_canvases.begin(), m_canvases.end(), [](const auto &canvas) { return canvas->layerShown(); });
 }
 // One shortcut for the whole layer: if any scratch window is up they all go away together, otherwise they all come up
 // together on the output under the pointer, in the positions they were left in, the one used last on top. A name picks
 // out the windows of one app (or caption) for a shortcut of its own.
-void TrellisEffect::toggleScratch(const QString &name)
+void KrellisEffect::toggleScratch(const QString &name)
 {
     markSessionInteraction();
     auto windows = scratchWindows();
     if (!name.isEmpty()) {
         const QString needle = name.toLower();
         windows.erase(std::remove_if(windows.begin(), windows.end(), [&](EffectWindow *w) {
-            return TrellisCanvas::appId(w).toLower() != needle && !w->caption().toLower().contains(needle);
+            return KrellisCanvas::appId(w).toLower() != needle && !w->caption().toLower().contains(needle);
         }), windows.end());
     }
     if (windows.empty()) return;
@@ -681,14 +682,14 @@ void TrellisEffect::toggleScratch(const QString &name)
     refreshScratchUi();
     toast(up ? QStringLiteral("Scratchpad hidden") : QStringLiteral("Scratchpad shown"));
 }
-void TrellisEffect::hideScratch(const std::vector<EffectWindow *> &windows)
+void KrellisEffect::hideScratch(const std::vector<EffectWindow *> &windows)
 {
     m_scratchBusy = true;
     for (EffectWindow *w : windows)
         if (!w->isMinimized()) w->minimize();
     m_scratchBusy = false;
 }
-void TrellisEffect::showScratch(const std::vector<EffectWindow *> &windows)
+void KrellisEffect::showScratch(const std::vector<EffectWindow *> &windows)
 {
     m_scratchBusy = true;
     auto *target = canvasAt(effects->cursorPos());
@@ -705,7 +706,7 @@ void TrellisEffect::showScratch(const std::vector<EffectWindow *> &windows)
 }
 // Focus moving to a tiled window outside the layer (alt-tab, a click, a shortcut) puts the layer away; a dialog of a
 // scratch window, or anything the effect does not manage, leaves it alone.
-void TrellisEffect::scratchActivated(EffectWindow *w)
+void KrellisEffect::scratchActivated(EffectWindow *w)
 {
     if (!w || m_scratchBusy) return;
     const auto windows = scratchWindows();
@@ -723,7 +724,7 @@ void TrellisEffect::scratchActivated(EffectWindow *w)
 }
 // A click on bare canvas, with no window of any kind under it, also puts the layer away. The bar and the minimap
 // are the effect's own surfaces and keep their buttons.
-void TrellisEffect::scratchClick(QPointF point)
+void KrellisEffect::scratchClick(QPointF point)
 {
     if (m_scratchBusy || !scratchLayerShown()) return;
     auto *canvas = canvasAt(point);
@@ -734,26 +735,26 @@ void TrellisEffect::scratchClick(QPointF point)
     refreshScratchUi();
 }
 
-static std::optional<trellis::Edge> parseDirection(const QString &name)
+static std::optional<krellis::Edge> parseDirection(const QString &name)
 {
     const QString d = name.trimmed().toLower();
-    if (d == QLatin1String("left")) return trellis::Edge::Left;
-    if (d == QLatin1String("right")) return trellis::Edge::Right;
-    if (d == QLatin1String("up") || d == QLatin1String("top")) return trellis::Edge::Top;
-    if (d == QLatin1String("down") || d == QLatin1String("bottom")) return trellis::Edge::Bottom;
+    if (d == QLatin1String("left")) return krellis::Edge::Left;
+    if (d == QLatin1String("right")) return krellis::Edge::Right;
+    if (d == QLatin1String("up") || d == QLatin1String("top")) return krellis::Edge::Top;
+    if (d == QLatin1String("down") || d == QLatin1String("bottom")) return krellis::Edge::Bottom;
     return std::nullopt;
 }
-void TrellisEffect::focusDirection(const QString &direction)
+void KrellisEffect::focusDirection(const QString &direction)
 {
     markSessionInteraction();
     if (const auto dir = parseDirection(direction)) if (auto *canvas = current()) canvas->focusDirection(*dir);
 }
-void TrellisEffect::moveDirection(const QString &direction)
+void KrellisEffect::moveDirection(const QString &direction)
 {
     markSessionInteraction();
     if (const auto dir = parseDirection(direction)) if (auto *canvas = current()) canvas->moveDirection(*dir);
 }
-bool TrellisEffect::resizeStep(const QString &direction, double fraction)
+bool KrellisEffect::resizeStep(const QString &direction, double fraction)
 {
     markSessionInteraction();
     const auto dir = parseDirection(direction);
@@ -762,7 +763,7 @@ bool TrellisEffect::resizeStep(const QString &direction, double fraction)
 }
 // Resize mode swallows the keyboard so arrows resize the tile instead of reaching the application. It leaves on
 // Escape, Return, the shortcut again, or after a few idle seconds, so it can never trap the keyboard.
-void TrellisEffect::setResizeMode(bool on)
+void KrellisEffect::setResizeMode(bool on)
 {
     if (on == m_resizeMode) return;
     m_resizeMode = on;
@@ -780,10 +781,10 @@ void TrellisEffect::setResizeMode(bool on)
     for (const auto &canvas : m_canvases)
         canvas->setHint(on ? QStringLiteral("Resize  ·  arrows  ·  Shift = bigger  ·  Esc = done") : QString());
 }
-void TrellisEffect::undo() { markSessionInteraction(); if (auto *canvas = current()) canvas->undoRedo(false); }
-void TrellisEffect::redo() { markSessionInteraction(); if (auto *canvas = current()) canvas->undoRedo(true); }
-void TrellisEffect::toggleResizeMode() { markSessionInteraction(); setResizeMode(!m_resizeMode); }
-bool TrellisEffect::handleResizeKey(const KeyboardKeyEvent &e)
+void KrellisEffect::undo() { markSessionInteraction(); if (auto *canvas = current()) canvas->undoRedo(false); }
+void KrellisEffect::redo() { markSessionInteraction(); if (auto *canvas = current()) canvas->undoRedo(true); }
+void KrellisEffect::toggleResizeMode() { markSessionInteraction(); setResizeMode(!m_resizeMode); }
+bool KrellisEffect::handleResizeKey(const KeyboardKeyEvent &e)
 {
     if (e.state == KeyboardKeyState::Released) return m_inertKeys.erase(e.key) != 0;
     m_inertKeys.insert(e.key);
@@ -799,12 +800,12 @@ bool TrellisEffect::handleResizeKey(const KeyboardKeyEvent &e)
     }
     return true;
 }
-void TrellisEffect::turnOff()
+void KrellisEffect::turnOff()
 {
     // Emergency exit: unload after the shortcut handler returns, since unloading destroys this object.
-    QTimer::singleShot(0, [] { effects->unloadEffect(QStringLiteral(TRELLIS_ID)); });
+    QTimer::singleShot(0, [] { effects->unloadEffect(QStringLiteral(KRELLIS_ID)); });
 }
-void TrellisEffect::toggleBar()
+void KrellisEffect::toggleBar()
 {
     markSessionInteraction();
     bool on = false;
@@ -813,12 +814,13 @@ void TrellisEffect::toggleBar()
     toast(on ? QStringLiteral("Bar off") : QStringLiteral("Bar on"));
 }
 // A toast on the output the user is working on.
-void TrellisEffect::toast(const QString &text)
+void KrellisEffect::toast(const QString &text)
 {
     if (auto *canvas = current()) canvas->toast(text);
 }
-void TrellisEffect::applySettings(const trellis::config::Settings &settings)
+void KrellisEffect::applySettings(const krellis::config::Settings &settings)
 {
+    m_closeFocus = settings.closeFocus;
     m_floatFirst = settings.floatFirst;
     m_spawnTarget = settings.spawnTarget;
     m_peekPx = settings.peek;
@@ -845,6 +847,7 @@ void TrellisEffect::applySettings(const trellis::config::Settings &settings)
     m_scratchpad = settings.scratchpad;
     syncScratchShortcuts();
     for (const auto &canvas : m_canvases) {
+        canvas->m_closeFocus = m_closeFocus;
         canvas->m_floatFirst = m_floatFirst;
         canvas->m_spawnTarget = m_spawnTarget;
         canvas->m_peekPx = m_peekPx;
@@ -862,15 +865,15 @@ void TrellisEffect::applySettings(const trellis::config::Settings &settings)
         canvas->schedule();
     }
 }
-// The settings module saves trellisrc, then calls this so the change applies without a re-login.
-void TrellisEffect::reloadSettings()
+// The settings module saves krellisrc, then calls this so the change applies without a re-login.
+void KrellisEffect::reloadSettings()
 {
-    applySettings(trellis::config::load());
+    applySettings(krellis::config::load());
     m_theme.reload(); // the harness changes kdeglobals without the D-Bus notification KConfigWatcher listens for
     reloadRules();
 }
-bool TrellisEffect::floatFirst() const { return m_floatFirst; }
-void TrellisEffect::setFloatFirst(bool on)
+bool KrellisEffect::floatFirst() const { return m_floatFirst; }
+void KrellisEffect::setFloatFirst(bool on)
 {
     markSessionInteraction();
     m_floatFirst = on;
@@ -878,23 +881,23 @@ void TrellisEffect::setFloatFirst(bool on)
         canvas->m_floatFirst = on;
         canvas->updateMap();
     }
-    trellis::config::saveValue(QStringLiteral("floatFirst"), on);
+    krellis::config::saveValue(QStringLiteral("floatFirst"), on);
     toast(on ? QStringLiteral("Floating first") : QStringLiteral("Tiling first"));
 }
-void TrellisEffect::toggleFloatFirst() { setFloatFirst(!m_floatFirst); }
-bool TrellisEffect::mapPinned() const { return m_mapPinned; }
-void TrellisEffect::setMapPinned(bool on)
+void KrellisEffect::toggleFloatFirst() { setFloatFirst(!m_floatFirst); }
+bool KrellisEffect::mapPinned() const { return m_mapPinned; }
+void KrellisEffect::setMapPinned(bool on)
 {
     m_mapPinned = on;
     for (const auto &canvas : m_canvases) {
         canvas->m_mapPinned = on;
         canvas->updateMap();
     }
-    trellis::config::saveValue(QStringLiteral("mapPinned"), on);
+    krellis::config::saveValue(QStringLiteral("mapPinned"), on);
     toast(on ? QStringLiteral("Map pinned") : QStringLiteral("Map unpinned"));
 }
-void TrellisEffect::toggleMapPinned() { setMapPinned(!m_mapPinned); }
-void TrellisEffect::toggleMap()
+void KrellisEffect::toggleMapPinned() { setMapPinned(!m_mapPinned); }
+void KrellisEffect::toggleMap()
 {
     markSessionInteraction();
     auto *canvas = current();
@@ -905,17 +908,17 @@ void TrellisEffect::toggleMap()
         if (other.get() == canvas || other->m_mapOn == m_showMap) continue;
         other->toggleMap();
     }
-    trellis::config::saveValue(QStringLiteral("map"), m_showMap);
+    krellis::config::saveValue(QStringLiteral("map"), m_showMap);
     canvas->toast(m_showMap ? QStringLiteral("Map on") : QStringLiteral("Map off"));
 }
-void TrellisEffect::saveView() { markSessionInteraction(); if (auto *canvas = current()) canvas->beginFramingName(); }
-void TrellisEffect::closeActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->closeActive(); }
-void TrellisEffect::back() { markSessionInteraction(); if (auto *canvas = current()) canvas->back(); }
-void TrellisEffect::forward() { markSessionInteraction(); if (auto *canvas = current()) canvas->forward(); }
-void TrellisEffect::zoom(double factor, double px, double py) { markSessionInteraction(); if (auto *canvas = current()) canvas->zoom(factor, px, py); }
-void TrellisEffect::finishGesture() { markSessionInteraction(); if (auto *canvas = current()) canvas->finishGesture(); }
+void KrellisEffect::saveView() { markSessionInteraction(); if (auto *canvas = current()) canvas->beginFramingName(); }
+void KrellisEffect::closeActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->closeActive(); }
+void KrellisEffect::back() { markSessionInteraction(); if (auto *canvas = current()) canvas->back(); }
+void KrellisEffect::forward() { markSessionInteraction(); if (auto *canvas = current()) canvas->forward(); }
+void KrellisEffect::zoom(double factor, double px, double py) { markSessionInteraction(); if (auto *canvas = current()) canvas->zoom(factor, px, py); }
+void KrellisEffect::finishGesture() { markSessionInteraction(); if (auto *canvas = current()) canvas->finishGesture(); }
 
-void TrellisEffect::toggleDock(int index) { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleDock(index); }
-void TrellisEffect::toggleDockActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleDockActive(); }
+void KrellisEffect::toggleDock(int index) { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleDock(index); }
+void KrellisEffect::toggleDockActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleDockActive(); }
 
 } // namespace KWin
