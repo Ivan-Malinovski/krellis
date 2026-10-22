@@ -251,6 +251,7 @@ void KrellisEffect::registerShortcuts()
         const char *id, *text;
         QKeySequence keys;
         void (KrellisEffect::*slot)();
+        QKeySequence extra = {}; // a second chord for the same action, empty for none
     };
     const Binding bindings[] = {
         {"KrellisOverview", "Krellis: Toggle Overview", Qt::META | Qt::ALT | Qt::Key_Up, &KrellisEffect::toggleOverview},
@@ -274,10 +275,10 @@ void KrellisEffect::registerShortcuts()
         {"KrellisFocusRight", "Krellis: Focus Right", Qt::META | Qt::CTRL | Qt::Key_Right, &KrellisEffect::focusRight},
         {"KrellisFocusUp", "Krellis: Focus Up", Qt::META | Qt::CTRL | Qt::Key_Up, &KrellisEffect::focusUp},
         {"KrellisFocusDown", "Krellis: Focus Down", Qt::META | Qt::CTRL | Qt::Key_Down, &KrellisEffect::focusDown},
-        {"KrellisMoveLeft", "Krellis: Move Panel Left", Qt::META | Qt::Key_Left, &KrellisEffect::moveLeft},
-        {"KrellisMoveRight", "Krellis: Move Panel Right", Qt::META | Qt::Key_Right, &KrellisEffect::moveRight},
-        {"KrellisMoveUp", "Krellis: Move Panel Up", Qt::META | Qt::Key_Up, &KrellisEffect::moveUp},
-        {"KrellisMoveDown", "Krellis: Move Panel Down", Qt::META | Qt::Key_Down, &KrellisEffect::moveDown},
+        {"KrellisMoveLeft", "Krellis: Move Panel Left", Qt::META | Qt::Key_Left, &KrellisEffect::moveLeft, QKeySequence(Qt::META | Qt::Key_A)},
+        {"KrellisMoveRight", "Krellis: Move Panel Right", Qt::META | Qt::Key_Right, &KrellisEffect::moveRight, QKeySequence(Qt::META | Qt::Key_F)},
+        {"KrellisMoveUp", "Krellis: Move Panel Up", Qt::META | Qt::Key_Up, &KrellisEffect::moveUp, QKeySequence(Qt::META | Qt::Key_D)},
+        {"KrellisMoveDown", "Krellis: Move Panel Down", Qt::META | Qt::Key_Down, &KrellisEffect::moveDown, QKeySequence(Qt::META | Qt::Key_S)},
         {"KrellisResizeMode", "Krellis: Resize Mode", Qt::META | Qt::CTRL | Qt::Key_R, &KrellisEffect::toggleResizeMode},
         {"KrellisSaveView", "Krellis: Save View", Qt::META | Qt::ALT | Qt::Key_S, &KrellisEffect::saveView},
         {"KrellisUndo", "Krellis: Undo Layout Edit", Qt::META | Qt::ALT | Qt::Key_Z, &KrellisEffect::undo},
@@ -287,7 +288,9 @@ void KrellisEffect::registerShortcuts()
         auto *a = new QAction(this);
         a->setObjectName(QString::fromLatin1(b.id));
         a->setText(QString::fromLatin1(b.text));
-        KGlobalAccel::self()->setGlobalShortcut(a, b.keys);
+        QList<QKeySequence> chords{b.keys};
+        if (!b.extra.isEmpty()) chords << b.extra;
+        KGlobalAccel::self()->setGlobalShortcut(a, chords);
         connect(a, &QAction::triggered, this, [this, slot = b.slot] { hideHint(); (this->*slot)(); });
     }
 }

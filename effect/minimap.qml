@@ -50,7 +50,7 @@ Item {
         ["Meta+Alt + Left / Right", "Back / forward"],
         ["Meta + [ / ]", "Previous / next panel"],
         ["Meta+Ctrl + arrows", "Focus the tile in that direction"],
-        ["Meta + arrows", "Move the panel that way"],
+        ["Meta + arrows, or A S D F", "Move the panel that way (A left, S down, D up, F right)"],
         ["Meta+Ctrl+R", "Resize with the arrow keys"],
         ["Meta+G", "Show / hide the scratchpad"],
         ["Meta+Shift+G", "Make / unmake a scratch window"],
