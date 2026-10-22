@@ -5,7 +5,7 @@ set -euo pipefail
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-project=/home/ivan/dev/krellis
+project=$KRELLIS_ROOT
 trap 'for process in ${clients:-}; do kill "$process" 2>/dev/null || true; done' EXIT
 cat >"$XDG_CONFIG_HOME/krellisrc" <<'RULES'
 [ViewRules]
@@ -75,7 +75,7 @@ try:
         stats=json.loads(probe('stats'));(out/(label+'.json')).write_text(json.dumps(stats))
         assert stats['frames']>=6,stats
         if any(p['bad'] for p in stats['points']):
-            subprocess.check_call(['/home/ivan/dev/krellis/tools/shot',label+'-failed'])
+            subprocess.check_call([__import__('os').environ['KRELLIS_ROOT']+'/tools/shot',label+'-failed'])
         assert all(p['bad']==0 for p in stats['points']),stats
         assert all(p['seen']==3 for p in stats['points'][1::2]),stats
         assert probe('configure','[]')=='false'
@@ -124,7 +124,7 @@ try:
     # Keep blinking partial surface damage alive while capturing several settled frames.
     for i in range(3):
         time.sleep(.17)
-        subprocess.check_call([str(pathlib.Path('/home/ivan/dev/krellis/tools/shot')), 'idle-'+str(i)])
+        subprocess.check_call([str(pathlib.Path(__import__('os').environ['KRELLIS_ROOT']+'/tools/shot')), 'idle-'+str(i)])
     print('PASS real title-bar move, scaled translated targets, consecutive grabs, releases, visible-client delivery floating title and true corner resize')
 finally:
     if pointer.poll() is None:

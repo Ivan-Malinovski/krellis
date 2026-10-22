@@ -10,10 +10,10 @@ for n in A B C D E; do
 done
 sleep 1.5
 echo "--- five"; call dump
-/home/ivan/dev/krellis/tools/shot five >/dev/null
+$KRELLIS_ROOT/tools/shot five >/dev/null
 kill "$closing_client"
 sleep 0.08; echo "--- after close (mid)"; call dump
-/home/ivan/dev/krellis/tools/shot closing >/dev/null
+$KRELLIS_ROOT/tools/shot closing >/dev/null
 sleep 1.5; echo "--- after close (rest)"; call dump
-/home/ivan/dev/krellis/tools/shot four >/dev/null
+$KRELLIS_ROOT/tools/shot four >/dev/null
 pkill -P "$$" -x alacritty

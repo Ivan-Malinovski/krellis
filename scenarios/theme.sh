@@ -11,13 +11,13 @@ done
 call toggleBar >/dev/null
 sleep 1.5
 echo "--- light scheme, custom accent"; call dumpTheme
-/home/ivan/dev/krellis/tools/shot theme-light >/dev/null
+$KRELLIS_ROOT/tools/shot theme-light >/dev/null
 echo "--- switch to the dark scheme"
 { cat /usr/share/color-schemes/BreezeDark.colors; printf '\n[General]\nAccentColor=255,106,0\n'; } >"$NEST_WORK/config/kdeglobals"
 call reloadSettings; sleep 1; call dumpTheme
-/home/ivan/dev/krellis/tools/shot theme-dark >/dev/null
+$KRELLIS_ROOT/tools/shot theme-dark >/dev/null
 echo "--- followTheme off"
 printf '[General]\nglide=true\nmap=true\nmapPinned=true\nfollowTheme=false\n' >"$NEST_WORK/config/krellisrc"
 call reloadSettings; sleep 1; call dumpTheme
-/home/ivan/dev/krellis/tools/shot theme-literal >/dev/null
+$KRELLIS_ROOT/tools/shot theme-literal >/dev/null
 pkill -P "$$" -x alacritty

@@ -31,9 +31,9 @@ hx=$((gx + gw - 20)); hy=$((gy + gh - 186 + 15))
 echo "help button at $hx,$hy"
 call simMotion $((gx + gw - 8)) $((gy + gh - 30)); sleep 0.8
 call simMotion $hx $hy; sleep 0.8; call dump | grep -E "^MAP"
-/home/ivan/dev/krellis/tools/shot map-help-early >/dev/null; sleep 2
-/home/ivan/dev/krellis/tools/shot map-help >/dev/null
+$KRELLIS_ROOT/tools/shot map-help-early >/dev/null; sleep 2
+$KRELLIS_ROOT/tools/shot map-help >/dev/null
 call simMotion 600 300; sleep 0.8; call dump | grep -E "^MAP"
 call toggleFloatFirst >/dev/null 2>&1 || call setFloatFirst true >/dev/null 2>&1; sleep 0.8; call dump | grep -E "^MAP"
-/home/ivan/dev/krellis/tools/shot map-floating >/dev/null
+$KRELLIS_ROOT/tools/shot map-floating >/dev/null
 pkill -P "$$" -x alacritty

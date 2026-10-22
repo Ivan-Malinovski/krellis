@@ -6,7 +6,7 @@ export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
 call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 trap 'for process in ${clients:-}; do kill "$process" 2>/dev/null || true; done' EXIT
-project=/home/ivan/dev/krellis
+project=$KRELLIS_ROOT
 split_delta=${KRELLIS_RESIZE_DELTA:-65}
 zoom_delta=35
 if [ "$split_delta" -lt 0 ]; then zoom_delta=-35; fi

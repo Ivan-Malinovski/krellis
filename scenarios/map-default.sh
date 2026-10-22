@@ -9,7 +9,7 @@ shown() { call dump | sed -n "s/^MAP .* shown \([01]\) .*/\1/p" | head -1; }
 for n in A B; do alacritty --title "win-$n" -e sh -c "echo $n; sleep 600" >/dev/null 2>&1 & sleep 2; done
 sleep 1
 check "minimap is on by default" "$(shown)" 1
-/home/ivan/dev/krellis/tools/shot map-default >/dev/null
+$KRELLIS_ROOT/tools/shot map-default >/dev/null
 call toggleMap >/dev/null; sleep 1.2
 v=$(shown); check "toggle turns it off" "${v:-0}" 0
 check "the choice is saved" "$(grep -c '^map=false' "$XDG_CONFIG_HOME/krellisrc")" 1

@@ -13,7 +13,7 @@ echo "--- next"; call nextPanel; sleep 1.2; call dump | head -3
 echo "--- next"; call nextPanel; sleep 1.2; call dump | head -3
 echo "--- previous"; call previousPanel; sleep 1.2; call dump | head -3
 echo "--- maximize active"; call toggleMaximizeActive; sleep 1.2; call dump | head -3
-/home/ivan/dev/krellis/tools/shot keys-max >/dev/null
+$KRELLIS_ROOT/tools/shot keys-max >/dev/null
 call toggleMaximizeActive; sleep 1
 echo "--- float active"; call toggleFloatActive; sleep 1.2; call dump | head -5
 call toggleFloatActive; sleep 1

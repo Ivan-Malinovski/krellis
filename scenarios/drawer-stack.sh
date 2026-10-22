@@ -21,7 +21,7 @@ done
 call dump | grep -E "^DRAWER|^ORDER"
 check "two drawers" "$(call dump | grep -c '^DRAWER')" 2
 check "two tiles left" "$(call dump | grep '^ORDER' | wc -w)" 3
-/home/ivan/dev/krellis/tools/shot stack-closed >/dev/null
+$KRELLIS_ROOT/tools/shot stack-closed >/dev/null
 echo "--- hover the upper sliver (the first one stashed sits on top)"
 call simMotion 1275 100 >/dev/null; sleep 1.0
 drawer p4; drawer p3
@@ -32,13 +32,13 @@ call simMotion 1275 700 >/dev/null; sleep 0.6
 check "still the upper one" "$(drawer p4 | grep -c ' open ')" 1
 echo "--- leave, then hover the lower sliver"
 call simMotion 300 300 >/dev/null; sleep 0.12
-/home/ivan/dev/krellis/tools/shot stack-closing >/dev/null
+$KRELLIS_ROOT/tools/shot stack-closing >/dev/null
 sleep 0.9
 check "all closed again" "$(call dump | grep -c '^DRAWER .* open ')" 0
 call simMotion 1275 700 >/dev/null; sleep 1.0
 check "lower drawer open" "$(drawer p3 | grep -c ' open ')" 1
 check "upper drawer closed" "$(drawer p4 | grep -c ' closed ')" 1
-/home/ivan/dev/krellis/tools/shot stack-open >/dev/null
+$KRELLIS_ROOT/tools/shot stack-open >/dev/null
 echo "--- widen the open drawer from its inner edge"
 before=$(drawer p3 | sed -n 's/.* \([0-9.]*\)x[0-9.]*$/\1/p')
 call simNativeResizeStart 2 0 0.5 | grep -qx true || echo "FAIL no native resize on the drawer"

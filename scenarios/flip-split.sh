@@ -25,7 +25,7 @@ read -r ax ay aw ah < <(rect A); read -r bx by bw bh < <(rect B)
 echo "A $ax $ay $aw $ah   B $bx $by $bw $bh"
 check "stacked: B below A" "$(ok "$by > $ay + $ah - 1")" 1
 check "stacked: same column" "$(ok "$bx == $ax")" 1
-/home/ivan/dev/krellis/tools/shot flip-stacked >/dev/null
+$KRELLIS_ROOT/tools/shot flip-stacked >/dev/null
 echo "--- again: back"
 call flipActive; sleep 1.5
 read -r ax ay aw ah < <(rect A); read -r bx by bw bh < <(rect B)
@@ -52,7 +52,7 @@ check "A keeps its place" "$ax2 $aw2" "$ax $aw"
 check "A is untouched in height" "$ah2" "$ah"
 check "C and B now share a column" "$cx" "$bx3"
 check "C is above B" "$(ok "$by3 > $cy + $ch - 1")" 1
-/home/ivan/dev/krellis/tools/shot flip-three >/dev/null
+$KRELLIS_ROOT/tools/shot flip-three >/dev/null
 echo "--- and the key again puts the pair back side by side"
 call flipActive; sleep 1.5
 read -r bx4 by4 bw4 bh4 < <(rect B); read -r cx4 cy4 cw4 ch4 < <(rect C)

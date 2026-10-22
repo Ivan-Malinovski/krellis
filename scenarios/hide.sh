@@ -11,7 +11,7 @@ sleep 1
 echo "--- three"; call dump | tail -3
 call toggleHide 1; sleep 1.5
 echo "--- B hidden"; call dump | tail -3
-/home/ivan/dev/krellis/tools/shot hidden >/dev/null
+$KRELLIS_ROOT/tools/shot hidden >/dev/null
 call toggleHide 1; sleep 1.5
 echo "--- B restored"; call dump | tail -3
 pkill -P "$$" -x alacritty

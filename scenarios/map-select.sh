@@ -17,7 +17,7 @@ echo "--- drag over tiles A..C"
 call simButton $((sx + 10)) $((sy + 40)) true 0
 for x in 30 60 100 140; do call simMotion $((sx + x)) $((sy + 60)); done
 sleep 0.6; call dump | grep -E "^MAP"
-/home/ivan/dev/krellis/tools/shot map-select >/dev/null
+$KRELLIS_ROOT/tools/shot map-select >/dev/null
 call simButton $((sx + 145)) $((sy + 60)) false 0; sleep 1.2; cam
 echo "--- drag over tiles C..D"
 call overview; sleep 1
@@ -34,7 +34,7 @@ echo "--- click without moving still frames one tile"
 call simButton $((sx + 90)) $((sy + 40)) true 0; call simButton $((sx + 90)) $((sy + 40)) false 0; sleep 1.2; cam
 echo "--- mode pill"
 call dump | grep -E "^MAP"
-px=$((cardL + 179)); py=$((cardT + 15)); /home/ivan/dev/krellis/tools/shot map-pill >/dev/null
+px=$((cardL + 179)); py=$((cardT + 15)); $KRELLIS_ROOT/tools/shot map-pill >/dev/null
 call simButton $px $py true 0; call simButton $px $py false 0; sleep 0.8; call dump | grep -E "^MAP"
 call simButton $px $py true 0; call simButton $px $py false 0; sleep 0.8; call dump | grep -E "^MAP"
 pkill -P "$$" -x alacritty

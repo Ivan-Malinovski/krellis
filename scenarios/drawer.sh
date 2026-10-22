@@ -21,7 +21,7 @@ call simNativeResizeEnd true | grep -x true; sleep 1.2
 call dump | grep -E "DRAWER|ORDER|p[0-9]"
 call dump | grep -q "DRAWER .* closed" && echo "PASS collapsed into a closed drawer" || echo "FAIL no drawer"
 call dump | grep ORDER | grep -qE "ORDER .*p3" && echo "FAIL the tile is still tiled" || echo "PASS the neighbours took its place"
-/home/ivan/dev/krellis/tools/shot drawer-closed >/dev/null
+$KRELLIS_ROOT/tools/shot drawer-closed >/dev/null
 echo "--- hover the sliver"
 call dump | grep DRAWER
 x=$(call dump | sed -n 's/^DRAWER .* at \([0-9.]*\),.*/\1/p' | head -1); y=$(call dump | sed -n 's/^DRAWER .* at [0-9.]*,\([0-9.]*\) .*/\1/p' | head -1)
@@ -29,7 +29,7 @@ echo "sliver at $x,$y"
 call simMotion $(awk -v x="$x" 'BEGIN{printf "%d", x+4}') $(awk -v y="$y" 'BEGIN{printf "%d", y+200}') >/dev/null; sleep 1.0
 call dump | grep DRAWER
 call dump | grep -q "DRAWER .* open" && echo "PASS slides out under the pointer" || echo "FAIL did not open"
-/home/ivan/dev/krellis/tools/shot drawer-open >/dev/null
+$KRELLIS_ROOT/tools/shot drawer-open >/dev/null
 echo "--- leave"
 call simMotion 300 300 >/dev/null; sleep 1.0
 call dump | grep DRAWER

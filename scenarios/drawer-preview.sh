@@ -20,7 +20,7 @@ call simNativeResizeMove -900 0 >/dev/null; sleep 0.8
 call dump | grep '^SQUEEZE'
 check "preview once squeezed under the threshold" "$(call dump | grep -c '^SQUEEZE')" 1
 check "it is on the left edge" "$(call dump | grep -c '^SQUEEZE edge 0 ')" 1
-/home/ivan/dev/krellis/tools/shot squeeze-preview >/dev/null
+$KRELLIS_ROOT/tools/shot squeeze-preview >/dev/null
 call simNativeResizeMove -100 0 >/dev/null; sleep 1.2
 check "preview goes when the tile is widened again" "$(call dump | grep -c '^SQUEEZE')" 0
 call simNativeResizeMove -900 0 >/dev/null; sleep 0.5
@@ -42,7 +42,7 @@ call dump | grep -E "^DRAWER"
 check "clicking it opens the drawer" "$(call dump | grep '^DRAWER' | grep -c ' open ')" 1
 call simMotion $((cx - 5)) $((cy - 3)) >/dev/null; sleep 1.0
 check "it stays open with the pointer on the map" "$(call dump | grep '^DRAWER' | grep -c ' open ')" 1
-/home/ivan/dev/krellis/tools/shot map-opened-drawer >/dev/null
+$KRELLIS_ROOT/tools/shot map-opened-drawer >/dev/null
 call simMotion 5 400 >/dev/null; sleep 0.8
 call simMotion 700 300 >/dev/null; sleep 1.2
 check "after visiting it and leaving, it closes" "$(call dump | grep '^DRAWER' | grep -c ' closed ')" 1

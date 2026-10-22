@@ -29,7 +29,7 @@ call simButton 1230 776 true 0 >/dev/null; call simButton 1230 776 false 0 >/dev
 read -r gx gy gw gh < <(call dump | grep -E "^MAP" | sed -E 's/.*geometry ([0-9]+),([0-9]+) ([0-9]+)x([0-9]+).*/\1 \2 \3 \4/')
 sleep 2.5
 call simMotion $((gx + gw - 8)) $((gy + gh - 30)) >/dev/null; sleep 1.0
-/home/ivan/dev/krellis/tools/shot stash-two >/dev/null
+$KRELLIS_ROOT/tools/shot stash-two >/dev/null
 call simMotion 600 300 >/dev/null; sleep 0.5
 for _ in 1 2 3; do call dump | grep -q "^ACTIVE p3" && break; call nextPanel; sleep 0.5; done
 call dump | grep "^ACTIVE"

@@ -26,7 +26,7 @@ press $META; press $ALT; sleep 0.2
 check "not yet before the delay" "$(sheet)" ""
 sleep 0.5
 check "shown after the delay" "$(sheet)" shown
-/home/ivan/dev/krellis/tools/shot whichkey >/dev/null
+$KRELLIS_ROOT/tools/shot whichkey >/dev/null
 call dump | grep WHICHKEY
 press $KEY_A; sleep 0.5
 check "a key hides it" "$(sheet)" ""

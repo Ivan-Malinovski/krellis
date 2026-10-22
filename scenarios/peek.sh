@@ -7,7 +7,7 @@ sleep 1
 echo "--- overview"; call dump | grep -E "^camera|^framed|^p"
 call toggleMaximize 1; sleep 1.5
 echo "--- B framed"; call dump | grep -E "^camera|^framed|^p"
-/home/ivan/dev/krellis/tools/shot peek-framed >/dev/null
+$KRELLIS_ROOT/tools/shot peek-framed >/dev/null
 rc=0
 # p2 is the last column: a gutter on its left only, 40 px of the neighbour's edge on a 1280 px screen.
 set -- $(call dump | grep -E "^p2 " | sed -E 's/.* screen ([-0-9.]+),([0-9.]+) .*/\1 \2/')
@@ -20,7 +20,7 @@ call simButton 15 400 false 0; sleep 1.5
 fr=$(call dump | grep -E "^framed")
 echo "--- after the click"; call dump | grep -E "^camera|^framed|^p"
 case "$fr" in "framed 'p2'") echo "FAIL the click did not widen the frame"; rc=1;; *) echo "OK frame widened: $fr";; esac
-/home/ivan/dev/krellis/tools/shot peek-widened >/dev/null
+$KRELLIS_ROOT/tools/shot peek-widened >/dev/null
 echo "--- zoom back into the first column: right gutter only"
 call toggleMaximize 0; sleep 1.5; call dump | grep -E "^framed|^p1 "
 right=$(call dump | grep -E "^p3 " | sed -E 's/.* screen ([-0-9.]+),.*/\1/'); right=${right%.*}

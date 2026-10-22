@@ -5,6 +5,8 @@
         "Description": "Infinite-canvas tiling desktop: a camera over a tiled layout, with spring motion",
         "Category": "Window Management",
         "EnabledByDefault": false,
-        "License": "GPL"
+        "License": "MIT",
+        "Version": "@PROJECT_VERSION@",
+        "Website": "https://github.com/Ivan-Malinovski/krellis"
     }@KRELLIS_CONFIG_MODULE@
 }

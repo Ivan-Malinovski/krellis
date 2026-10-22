@@ -11,19 +11,19 @@ sleep 1.5
 call overview; sleep 1
 call dump | tee "$NEST_OUT/icons.txt"
 test "$(call dump | grep -c ' ICON')" -eq 9
-/home/ivan/dev/krellis/tools/shot icons
+$KRELLIS_ROOT/tools/shot icons
 for n in 1 2; do call simButton 60 300 true 0; call simButton 60 300 false 0; done
 sleep 1.2
 call dump | grep "^framed 'p1'$"
 ! call dump | grep "^p1 .* ICON"
-/home/ivan/dev/krellis/tools/shot icon-focused
+$KRELLIS_ROOT/tools/shot icon-focused
 call overview; sleep 1
 # A floating client above an icon tile owns both paint and pointer input.
 call toggleDock 4; sleep 1
 call simButton 600 300 true 0; call simMotion 640 320; sleep 0.2
 ! call dump | grep -q '^DRAG '
 call simButton 640 320 false 0
-/home/ivan/dev/krellis/tools/shot icons-floating
+$KRELLIS_ROOT/tools/shot icons-floating
 call toggleDock 4; call overview; sleep 1
 call simButton 60 300 true 0
 call simMotion 220 320; sleep 0.3

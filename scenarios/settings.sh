@@ -13,7 +13,7 @@ echo "--- open the module"
 kcmshell6 kcm_krellis >"$NEST_OUT/kcm.txt" 2>&1 &
 kcm=$!
 sleep 6
-/home/ivan/dev/krellis/tools/shot settings-kcm >/dev/null
+$KRELLIS_ROOT/tools/shot settings-kcm >/dev/null
 kill -0 $kcm 2>/dev/null && echo "OK module still running" || { echo "FAIL module exited"; rc=1; }
 echo "--- peek=0 and a rule, then reloadSettings"
 printf '[General]\nglide=true\npeek=0\nfloatFirst=true\n\n[ViewRules]\nAlacritty\\closable=false\n' >"$XDG_CONFIG_HOME/krellisrc"

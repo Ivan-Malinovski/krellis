@@ -28,6 +28,6 @@ loaded=$(qdbus6 org.kde.KWin /Effects org.freedesktop.DBus.Properties.Get org.kd
 echo "loaded after: $loaded"
 case "$loaded" in *krellis*) echo "FAIL still loaded"; rc=1;; esac
 echo "native geometry: $(geo after)"
-/home/ivan/dev/krellis/tools/shot after-turnoff
+$KRELLIS_ROOT/tools/shot after-turnoff
 pkill -P "$$" -x alacritty
 exit $rc

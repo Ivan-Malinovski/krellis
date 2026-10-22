@@ -11,7 +11,7 @@ for n in A B; do
 done
 echo "--- no toast at rest"; call dump | grep -E "^TOAST" || echo "none"
 echo "--- toggle bar"; call toggleBar >/dev/null; sleep 0.5; call dump | grep -E "^TOAST"
-/home/ivan/dev/krellis/tools/shot toast >/dev/null
+$KRELLIS_ROOT/tools/shot toast >/dev/null
 echo "--- toggle again 0.5 s later: replaced by the new text"; call toggleBar >/dev/null; sleep 0.4; call dump | grep -E "^TOAST"
 echo "--- expires"; sleep 2.2; call dump | grep -E "^TOAST" || echo "gone"
 echo "--- toasts off"

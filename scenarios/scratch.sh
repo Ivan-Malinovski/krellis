@@ -32,7 +32,7 @@ check "the dim is gone" "$(dim)" "0.00"
 call nextPanel; sleep 0.6
 call toggleScratchMarkActive; sleep 1.2
 check "second marked" "$(scratch)" "2 1"
-/home/ivan/dev/krellis/tools/shot scratch-layer >/dev/null
+$KRELLIS_ROOT/tools/shot scratch-layer >/dev/null
 call toggleScratch ""; sleep 1.2
 check "toggle hides the whole layer" "$(scratch)" "2 0"
 check "hidden scratch windows are not in the dock" "$(call dump | grep -c 'in Dock')" 0
@@ -42,7 +42,7 @@ check "both shown" "$(call dump | grep -c '^SCRATCHWIN p[0-9]* shown')" 2
 check "both float" "$(floats)" 2
 check "a scratch window has the focus" "$(isactivescratch)" 1
 check "layer dims again" "$(dim)" "1.00"
-sleep 1.5; /home/ivan/dev/krellis/tools/shot scratch-both >/dev/null
+sleep 1.5; $KRELLIS_ROOT/tools/shot scratch-both >/dev/null
 call nextPanel; sleep 0.6; check "cycling skips scratch windows" "$([ "$(isactivescratch)" = 0 ] && echo ok)" ok
 check "outside focus dismissed the layer" "$(scratch)" "2 0"
 echo "--- click outside"
@@ -61,7 +61,7 @@ for y in $(seq $((gy + gh - 40)) 3 $((gy + gh - 8))); do
   done
 done
 check "minimap exposes a scratchpad button" "$([ $px != 0 ] && echo found)" found
-/home/ivan/dev/krellis/tools/shot scratch-map >/dev/null
+$KRELLIS_ROOT/tools/shot scratch-map >/dev/null
 call simButton $px $py true 0; call simButton $px $py false 0; sleep 1.2
 check "minimap button shows the layer" "$(scratch)" "2 1"
 call simMotion $px $py; call simButton $px $py true 0; call simButton $px $py false 0; sleep 1.2

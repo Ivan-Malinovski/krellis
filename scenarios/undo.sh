@@ -35,7 +35,7 @@ panels_after=$(call dump | grep -cE "^p[0-9]+ ")
 check "a window closed" "$panels_after" "$((panels_before - 1))"
 call redo; sleep 1.5
 check "redo does not resurrect the closed window" "$(call dump | grep -cE "^p[0-9]+ ")" "$panels_after"
-/home/ivan/dev/krellis/tools/shot undo-after-close >/dev/null
+$KRELLIS_ROOT/tools/shot undo-after-close >/dev/null
 echo "--- native resize: one step; a cancelled resize records none"
 before=$(hist); l0=$(layout)
 call simNativeResizeStart 0 1.0 0.5 >/dev/null; call simNativeResizeMove 60 0 >/dev/null; sleep 0.4; call simNativeResizeEnd true >/dev/null; sleep 1.2

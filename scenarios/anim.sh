@@ -10,7 +10,7 @@ done
 sleep 1
 call focusIndex 1
 for i in 1 2 3 4 5 6; do
-  /home/ivan/dev/krellis/tools/shot mid-$i >/dev/null
+  $KRELLIS_ROOT/tools/shot mid-$i >/dev/null
   echo "--- sample $i"; call dump | head -3
 done
 pkill -P "$$" -x alacritty

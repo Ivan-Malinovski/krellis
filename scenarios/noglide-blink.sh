@@ -4,7 +4,7 @@
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET; unset DISPLAY
 call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
-c++ -fPIC /home/ivan/dev/krellis/scenarios/slow-client.cpp -o "$NEST_WORK/slow" $(pkg-config --cflags --libs Qt6Widgets)
+c++ -fPIC $KRELLIS_ROOT/scenarios/slow-client.cpp -o "$NEST_WORK/slow" $(pkg-config --cflags --libs Qt6Widgets)
 for n in A B C; do "$NEST_WORK/slow" "win-$n" >/dev/null 2>&1 & sleep 1.5; done
 sleep 1
 rm -f "$NEST_OUT/samples.txt"

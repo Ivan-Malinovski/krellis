@@ -5,7 +5,7 @@ set -euo pipefail
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-project=/home/ivan/dev/krellis
+project=$KRELLIS_ROOT
 trap 'for process in ${clients:-}; do kill "$process" 2>/dev/null || true; done' EXIT
 cat >"$XDG_CONFIG_HOME/krellisrc" <<'RULES'
 [ViewRules]
@@ -59,7 +59,7 @@ try:
             for i in range(40):  # wander across the canvas, ~60 fps
                 event(f'move {x+i*14%420-100} {y+(i*9)%200-60}');time.sleep(.016)
             time.sleep(.3)
-            subprocess.call([str(pathlib.Path('/home/ivan/dev/krellis/tools/shot')),'mid-'+phase+'-'+n])
+            subprocess.call([str(pathlib.Path(__import__('os').environ['KRELLIS_ROOT']+'/tools/shot')),'mid-'+phase+'-'+n])
             event('up');time.sleep(.8)
         results[phase]=json.loads(probe('blackStats'))
     (out/'black.json').write_text(json.dumps(results,indent=1))

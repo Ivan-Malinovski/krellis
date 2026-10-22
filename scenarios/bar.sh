@@ -13,7 +13,7 @@ sleep 0.5
 Y=776
 scan() { prev=""; for x in $(seq 0 6 1279); do k=$(call barHit $x $Y); if [ "$k" != "$prev" ]; then echo "x=$x '$k'"; prev=$k; fi; done; }
 echo "--- scan"; scan
-/home/ivan/dev/krellis/tools/shot bar >/dev/null
+$KRELLIS_ROOT/tools/shot bar >/dev/null
 echo "--- focus B (index 1), save framing, overview, go to framing"
 call focusIndex 1; sleep 1.2
 click() { call simButton $1 $Y true 0; call simButton $1 $Y false 0; sleep 1.2; }
@@ -24,6 +24,6 @@ call dump | grep -E "^camera|framed"
 ov=$(scan | grep "'overview'" | head -1 | sed 's/x=\([0-9]*\).*/\1/'); click $((ov+4)); echo "after overview"; call dump | grep -E "^camera|framed"
 fr=$(scan | grep "'framing:" | head -1 | sed 's/x=\([0-9]*\).*/\1/'); echo "framing at $fr"; click $((fr+4)); echo "after framing"; call dump | grep -E "^camera|framed"
 bk=$(scan | grep "'back'" | head -1 | sed 's/x=\([0-9]*\).*/\1/'); click $((bk+4)); echo "after back"; call dump | grep -E "^camera|framed"
-/home/ivan/dev/krellis/tools/shot bar2 >/dev/null
+$KRELLIS_ROOT/tools/shot bar2 >/dev/null
 rm=$(scan | grep "'rm:" | head -1 | sed 's/x=\([0-9]*\).*/\1/'); click $((rm+4)); echo "after remove"; scan
 pkill -P "$$" -x alacritty

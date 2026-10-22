@@ -6,7 +6,7 @@ set -euo pipefail
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-project=/home/ivan/dev/krellis
+project=$KRELLIS_ROOT
 trap 'for process in ${clients:-}; do kill "$process" 2>/dev/null || true; done' EXIT
 
 c++ -std=c++20 -fPIC "$project/scenarios/pointer-driver.cpp" -o "$NEST_WORK/pointer-driver" $(pkg-config --cflags --libs KWaylandClient wayland-client)

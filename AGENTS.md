@@ -50,7 +50,7 @@ It runs its own D-Bus session and throwaway `XDG_CONFIG_HOME`, socket `krellis-n
 
 ## Current implementation
 
-The ordered implementation list received implementations, but full desktop-demo parity is not complete; see `HANDOFF.md` for verification and remaining hardware limitations. `KrellisEffect` coordinates independent `KrellisCanvas` instances per output. `effect/surface_input.cpp` implements scaled Wayland input and popup transforms; `effect/view_rules.cpp`, `bar.qml`, and `tiles.qml` implement rules, framing names and small icon tiles. `effect/persistence.cpp` and `session_store.cpp` provide session storage backed by pure model rebinding in `core/session.cpp`.
+The ordered implementation list received implementations, but full desktop-demo parity is not complete; see `docs/dev/HANDOFF.md` for verification and remaining hardware limitations. `KrellisEffect` coordinates independent `KrellisCanvas` instances per output. `effect/surface_input.cpp` implements scaled Wayland input and popup transforms; `effect/view_rules.cpp`, `bar.qml`, and `tiles.qml` implement rules, framing names and small icon tiles. `effect/persistence.cpp` and `session_store.cpp` provide session storage backed by pure model rebinding in `core/session.cpp`.
 
 Animations: camera spring 210/29; layout 460 ms easeOutQuint; appear 220 ms; dock hide 300 ms; restore 380 ms; close 180 ms. Keep every visible transition animated.
 
@@ -96,7 +96,7 @@ Follow `~/AGENTS.md`: no pushes, no commits unless asked, no secrets.
 
 ## Audit corrections
 
-Read the desktop parity audit in HANDOFF.md before claiming completion/readiness. Stage-relative floating, the original launcher/magnifying dock, collapsed-group detail and reduced motion remain gaps. Lifecycle, interrupted flights and native resize now have implementations and nested coverage; see the latest HANDOFF.md continuation notes. No install rule/package exists. Do not infer subjective polish or full parity from scenario exit codes or matching timing constants.
+Read the desktop parity audit in docs/dev/HANDOFF.md before claiming completion/readiness. Stage-relative floating, the original launcher/magnifying dock, collapsed-group detail and reduced motion remain gaps. Lifecycle, interrupted flights and native resize now have implementations and nested coverage; see the latest HANDOFF.md continuation notes. No install rule/package exists. Do not infer subjective polish or full parity from scenario exit codes or matching timing constants.
 
 - Nested native-state fixtures use KWin scripting with `console.warn` and the harness forces Qt stderr logging, keeping snapshots in its own `out/kwin.log`. Do not inspect the live session journal for test output. Set `WAYLAND_DISPLAY=$NEST_SOCKET` inside the scenario; the incoming display belongs to the outer compositor.
 - Before recording fixture geometry, wait for native Wayland configure commits, then minimize in a separate script turn. A requested rectangle and committed frame can differ while a client is hidden.
@@ -159,7 +159,7 @@ Ivan runs two outputs (DP-2 3440x1440 landscape, HDMI-A-1 1440x2560 portrait to 
 
 Re-reading `examples/desktop/src` (App.tsx, desktop.ts, AppWindow.tsx): the demo mounts `<Workspace floating="stage">` with an empty `<Stage>` as the desktop, every app type has `placement="float"`, and `launch` opens windows as stage floats cascaded over the desktop. Tiling is the secondary mode: dragging a window past the stage edge docks it beside the desktop, the green button / "Dock Beside Desktop" calls `toggleDock`, and "Maximize" (frame the panel) is offered only for docked windows. Floats are stage-relative (they follow the camera and zoom with the desktop).
 
-The effect only has viewport-fixed Overlay floats (`floatingLayer()` returns Overlay, `floatWorld` returns nothing). A tiled window can therefore never be dragged into a float; only Meta+Shift+D or a `placement=floating` rule makes one, and an existing float re-docks when released within the overlay edge band. Matching the demo means a Stage-as-desktop mode: `floatingLayer()` = Stage, an empty Stage root, `floatWorld`/`floatScreen` for stage floats, new windows opening as stage floats, and stage floats in persistence, resize and painting. Not built yet; see the open decision in HANDOFF.md.
+The effect only has viewport-fixed Overlay floats (`floatingLayer()` returns Overlay, `floatWorld` returns nothing). A tiled window can therefore never be dragged into a float; only Meta+Shift+D or a `placement=floating` rule makes one, and an existing float re-docks when released within the overlay edge band. Matching the demo means a Stage-as-desktop mode: `floatingLayer()` = Stage, an empty Stage root, `floatWorld`/`floatScreen` for stage floats, new windows opening as stage floats, and stage floats in persistence, resize and painting. Not built yet; see the open decision in docs/dev/HANDOFF.md.
 
 ## Shift-drag floats (2026-10-20)
 

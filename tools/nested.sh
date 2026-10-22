@@ -11,6 +11,7 @@ if [ -S "${XDG_RUNTIME_DIR:?}/$NEST_SOCKET" ]; then
     echo "Nested socket $NEST_SOCKET is already in use" >&2
     exit 1
 fi
+export KRELLIS_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 root=$(realpath "$1"); effects=$2; scenario=$(realpath "$3"); W=${4:-1280}; H=${5:-800}
 work=${NEST_WORK:-/tmp/krellis-nest}; rm -rf "$work"; mkdir -p "$work/config" "$work/out" "$work/data" "$work/state/krellis"
 {

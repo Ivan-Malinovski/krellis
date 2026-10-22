@@ -33,7 +33,7 @@ call resizeStep right 0.1; sleep 0.6
 grown=$(wof p3)
 awk "BEGIN{exit !($grown > $w)}" && echo "PASS resize right grows" || echo "FAIL resize right grows: $w -> $grown"
 call toggleResizeMode; check "resize mode on" "$(call resizeModeActive)" true
-sleep 0.5; /home/ivan/dev/krellis/tools/shot key-nav-resize >/dev/null
+sleep 0.5; $KRELLIS_ROOT/tools/shot key-nav-resize >/dev/null
 call simKey 16777236 true; call simKey 16777236 false; sleep 0.6   # Right
 again=$(wof p3)
 awk "BEGIN{exit !($again > $grown)}" && echo "PASS resize mode arrow grows" || echo "FAIL resize mode arrow grows: $grown -> $again"

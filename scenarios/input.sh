@@ -10,7 +10,7 @@ for n in A B C; do
 done
 sleep 1
 echo "--- pinch in at centre"; call simPinch 1.4 640 400; call dump | head -2
-/home/ivan/dev/krellis/tools/shot pinch >/dev/null
+$KRELLIS_ROOT/tools/shot pinch >/dev/null
 call simPinchEnd; sleep 1.2; echo "--- after release"; call dump | head -2
 echo "--- overview"; call overview; sleep 1.2
 echo "--- Ctrl+Alt wheel step at B"; call simAxis -15 640 400 $CA; sleep 1.2; call dump | head -2

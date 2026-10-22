@@ -15,11 +15,11 @@ echo "--- drag A to the B|C seam (x=853 before the source collapses)"
 for x in 300 500 700 853; do call simDragMove $x 400; sleep 0.05; done
 sleep 0.3; call dump | grep -E "DRAG|SLOT|ORDER"
 sleep 0.5; echo "(settled)"; call dump; ls /tmp/krellis-nest/out/
-/home/ivan/dev/krellis/tools/shot seam-preview >/dev/null
+$KRELLIS_ROOT/tools/shot seam-preview >/dev/null
 echo "--- release"; call simDragEnd true
 sleep 0.15; call dump | grep -E "p[0-9]|ORDER"
 sleep 1.0; echo "(settled)"; call dump
-/home/ivan/dev/krellis/tools/shot after-seam >/dev/null
+$KRELLIS_ROOT/tools/shot after-seam >/dev/null
 echo "--- drag C (index 2) to the left frame band"
 call simDragStart 2 1000 400
 for x in 800 400 100 40 6 3; do call simDragMove $x 400; sleep 0.05; done

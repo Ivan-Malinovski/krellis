@@ -3,7 +3,7 @@ set -euo pipefail
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
-project=/home/ivan/dev/krellis
+project=$KRELLIS_ROOT
 call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
 cat >"$XDG_CONFIG_HOME/krellisrc" <<'RULES'
 [ViewRules]

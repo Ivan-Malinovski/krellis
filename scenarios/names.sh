@@ -30,5 +30,5 @@ call simKey 16777219 true; call simKey 16777219 false; call simText 'd'
 call simKey 16777220 true; call simKey 16777220 false; sleep 0.5
 call dump | tee "$NEST_OUT/saved.txt" | grep "^FRAMING .* 'Reading Øresund'$"
 call dump | grep '^NAMING 0 error 0$'
-/home/ivan/dev/krellis/tools/shot named-view
+$KRELLIS_ROOT/tools/shot named-view
 echo 'PASS named framing, Unicode, text editing, blank rejection and cancellation'
