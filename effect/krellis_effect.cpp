@@ -754,7 +754,7 @@ void KrellisCanvas::dockAtEnd(const NodePtr &panel)
 }
 
 // Open beside the tile under the cursor, on the side nearest it, as a drop there would. Near a tile's edge
-// that is the edge itself; in its middle the nearer left or right half (a drop would tab, a new window never does).
+// that is the edge itself; in its middle the nearer half of the tile's longer side (a drop would tab, a new window never does).
 void KrellisCanvas::dockAtPointer(const NodePtr &panel)
 {
     const QPointF cursor = effects->cursorPos();
@@ -773,8 +773,7 @@ void KrellisCanvas::dockAtPointer(const NodePtr &panel)
         if (!entry || point.x < entry->rect.x || point.x > entry->rect.x + entry->rect.w
             || point.y < entry->rect.y || point.y > entry->rect.y + entry->rect.h)
             continue;
-        const auto edge = krellis::dropEdge(point, entry->rect).value_or(
-            point.x < entry->rect.x + entry->rect.w / 2 ? krellis::Edge::Left : krellis::Edge::Right);
+        const auto edge = krellis::pointerSpawnEdge(point, entry->rect, m_area.width(), m_area.height());
         m_doc.root = applyDockTarget(m_doc.root, krellis::tileDropTarget(entries, id, edge), panel, uid("split"));
         return;
     }

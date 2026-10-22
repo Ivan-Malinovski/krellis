@@ -1,4 +1,4 @@
-# A new tiled window opens beside the tile under the cursor: near a tile's edge that edge, in its middle the nearer half.
+# A new tiled window opens beside the tile under the cursor: near a tile's edge that edge, in its middle the nearer half of its longer side.
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
@@ -13,7 +13,12 @@ call simMotion 1270 790; open w2; check second-appended "p1 p2"   # pointer over
 call dump | grep -E "^p[0-9]+ " | sed -E "s/ frame.*//"
 call simMotion 20 400; open w3; check left-edge-of-p1 "p3 p1 p2"
 call simMotion 1275 400; open w4; check right-edge-of-last "p3 p1 p2 p4"
-call simMotion 100 400; open w5                                    # inside p3 (left tile), not at an edge
-check inner-left-edge "p5 p3 p1 p2 p4"
+call simMotion 100 300; open w5                                    # middle of p3, a tall tile: splits its upper half, new window on top
+check tall-tile-middle-top "p5 p3 p1 p2 p4"
+# stacked, not side by side: same x, p5 above p3
+pos() { call dump | awk -v id="$1" '$1 == id { for (i = 1; i <= NF; i++) if ($i == "screen") { print $(i+1); exit } }'; }
+p3=$(pos p3); p5=$(pos p5)
+[ "${p3%%,*}" = "${p5%%,*}" ] && awk -v a="${p5##*,}" -v b="${p3##*,}" 'BEGIN { exit !(a < b) }' \
+    && echo "ok stacked: p5 $p5 above p3 $p3" || { echo "FAIL stacked: p5 $p5 p3 $p3"; rc=1; }
 pkill -x alacritty
 exit $rc

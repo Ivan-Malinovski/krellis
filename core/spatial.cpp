@@ -252,6 +252,15 @@ std::optional<Edge> dropEdge(Point point, const Rect &rect)
     return std::nullopt;
 }
 
+Edge pointerSpawnEdge(Point point, const Rect &rect, double widthPx, double heightPx)
+{
+    if (const auto edge = dropEdge(point, rect))
+        return *edge;
+    if (rect.w * widthPx >= rect.h * heightPx)
+        return point.x < rect.x + rect.w / 2 ? Edge::Left : Edge::Right;
+    return point.y < rect.y + rect.h / 2 ? Edge::Top : Edge::Bottom;
+}
+
 DropRects dropRects(const Rect &rect, Edge edge)
 {
     Rect slot = rect, remaining = rect, collapsed = rect;

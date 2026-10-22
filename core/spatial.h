@@ -66,6 +66,9 @@ struct DockTargetSpec {
 };
 
 std::optional<Edge> dropEdge(Point point, const Rect &rect);
+// Side a window opened at `point` takes in the tile `rect` (pixel size widthPx x heightPx): the nearby edge if the
+// point is close to one, otherwise the nearer half of the tile's longer side (a square counts as wide).
+Edge pointerSpawnEdge(Point point, const Rect &rect, double widthPx, double heightPx);
 struct DropRects {
     Rect slot, remaining, collapsed;
 };

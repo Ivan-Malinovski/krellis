@@ -206,6 +206,13 @@ private slots:
         QVERIFY(dropEdge({10, 50}, r) == Edge::Left);
         QVERIFY(!dropEdge({50, 50}, r));
         QVERIFY(dropEdge({50, 95}, r) == Edge::Bottom);
+        // Middle of the tile: the longer side decides; near an edge, that edge.
+        QVERIFY(pointerSpawnEdge({45, 50}, r, 100, 100) == Edge::Left);
+        QVERIFY(pointerSpawnEdge({55, 50}, r, 100, 100) == Edge::Right);
+        QVERIFY(pointerSpawnEdge({50, 45}, r, 100, 200) == Edge::Top);
+        QVERIFY(pointerSpawnEdge({50, 55}, r, 100, 200) == Edge::Bottom);
+        QVERIFY(pointerSpawnEdge({50, 55}, r, 200, 100) == Edge::Right);
+        QVERIFY(pointerSpawnEdge({10, 50}, r, 100, 200) == Edge::Left);
         auto d = dropRects(r, Edge::Right);
         QVERIFY(d.slot == (Rect{50, 0, 50, 100}));
         QVERIFY(d.collapsed == (Rect{100, 0, 0, 100}));
