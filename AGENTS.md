@@ -50,7 +50,7 @@ It runs its own D-Bus session and throwaway `XDG_CONFIG_HOME`, socket `krellis-n
 
 ## Current implementation
 
-The ordered implementation list received implementations, but full desktop-demo parity is not complete; see `docs/dev/HANDOFF.md` for verification and remaining hardware limitations. `KrellisEffect` coordinates independent `KrellisCanvas` instances per output. `effect/surface_input.cpp` implements scaled Wayland input and popup transforms; `effect/view_rules.cpp`, `bar.qml`, and `tiles.qml` implement rules, framing names and small icon tiles. `effect/persistence.cpp` and `session_store.cpp` provide session storage backed by pure model rebinding in `core/session.cpp`.
+The ordered implementation list received implementations, but full desktop-demo parity is not complete; real-hardware input, fractional scaling and unusual monitor layouts remain unverified. `KrellisEffect` coordinates independent `KrellisCanvas` instances per output. `effect/surface_input.cpp` implements scaled Wayland input and popup transforms; `effect/view_rules.cpp`, `bar.qml`, and `tiles.qml` implement rules, framing names and small icon tiles. `effect/persistence.cpp` and `session_store.cpp` provide session storage backed by pure model rebinding in `core/session.cpp`.
 
 Animations: camera spring 210/29; layout 460 ms easeOutQuint; appear 220 ms; dock hide 300 ms; restore 380 ms; close 180 ms. Keep every visible transition animated.
 
@@ -96,7 +96,7 @@ Follow `~/AGENTS.md`: no pushes, no commits unless asked, no secrets.
 
 ## Audit corrections
 
-Read the desktop parity audit in docs/dev/HANDOFF.md before claiming completion/readiness. Stage-relative floating, the original launcher/magnifying dock, collapsed-group detail and reduced motion remain gaps. Lifecycle, interrupted flights and native resize now have implementations and nested coverage; see the latest HANDOFF.md continuation notes. No install rule/package exists. Do not infer subjective polish or full parity from scenario exit codes or matching timing constants.
+Stage-relative floating, the original launcher/magnifying dock, collapsed-group detail and reduced motion remain gaps. Lifecycle, interrupted flights and native resize now have implementations and nested coverage; see the latest HANDOFF.md continuation notes. No install rule/package exists. Do not infer subjective polish or full parity from scenario exit codes or matching timing constants.
 
 - Nested native-state fixtures use KWin scripting with `console.warn` and the harness forces Qt stderr logging, keeping snapshots in its own `out/kwin.log`. Do not inspect the live session journal for test output. Set `WAYLAND_DISPLAY=$NEST_SOCKET` inside the scenario; the incoming display belongs to the outer compositor.
 - Before recording fixture geometry, wait for native Wayland configure commits, then minimize in a separate script turn. A requested rectangle and committed frame can differ while a client is hidden.
@@ -317,7 +317,7 @@ Drop/hover animation (2026-10-21): `frameChanged` now also runs while a drag ses
 - **Mouse.** Middle-click on the gap between two tiles flips that pair (`KrellisCanvas::seamAt` finds the split and index from `m_rects`; reach is the gap plus 2 px, so a click on a window is left alone). The release is swallowed too (`m_swallowMiddle`). `simMiddleButton x y press` is the test hook. Zoomed or in overview, the seams follow the camera.
 - Test: `scenarios/flip-split.sh`.
 
-## Navigation rules added with plan 04 (see `docs/plans/04-navigation-review.md`)
+## Navigation rules added with plan 04
 
 - **`Navigator::reveal(id, preferWiden=false)`** replaced `ensureVisible`. A target outside the frame slides the frame the minimum distance per axis at the same size (stretching only on an axis where the target is longer than the frame) and re-frames the leaves inside with `record=false`, so history isn't flooded. Only `windowAdded` passes `preferWiden`: a new neighbour widens the frame to include both when the result stays within `WIDEN_LIMIT` (2.2) times the current area, else it slides. Used by activation, spawn, move, restore, flip, `focusDirection` and `cyclePanel`. `slideTo` uses `m_entries` rects, never mix them with `frameLeaves`/`focusLayout` rects (no metrics).
 - **Close redistribution:** `closeView` calls `detachView(..., true)`, so a closed window's share goes back to every sibling in proportion (`removeNode(..., keepProportions)`). Hide, restore and `floatPanel` still absorb into the next sibling, because `restoreTargetFor` records `share = own/(own+nb)`. The cross-canvas transfer in `multicanvas.cpp` goes through `closeView` too and follows the new rule.
@@ -325,7 +325,7 @@ Drop/hover animation (2026-10-21): `frameChanged` now also runs while a drag ses
 - **Dropped (E3):** a float's initial size still comes from the fixed `{0.2.., 0.15.., 0.6, 0.65}` rect. `w->frameGeometry()` at `windowAdded` is KWin's placeholder (1000x718 for every window in the nested harness), not the client's size, so sizing from the client needs the first commit instead.
 - **Open (E4):** `dockAtPointer` samples `effects->cursorPos()` in `windowAdded`. Whether the cursor moves between the window being announced and being drawn is unverified on the real compositor; the nested harness can't show it.
 
-## Plan 05: polish and safety (2026-10-21; `docs/plans/05-polish-and-safety.md`)
+## Plan 05: polish and safety (2026-10-21)
 
 - **Theme.** `effect/theme.{h,cpp}` + `theme_tokens.h` derive the overlay colours from the Plasma scheme (KConfigWatcher on kdeglobals) when `followTheme` is on; QML only uses `theme.*` tokens (`tests/check_qml_colors.sh` enforces it). Every overlay scene is made by `KrellisCanvas::makeScene(file)` with `required property QtObject theme`. `D-Bus dumpTheme` prints `THEME follow=.. dark=.. surface=.. text=.. accent=..`.
 - **Toasts.** `KrellisCanvas::toast(text)` (`toast.qml`, driven from `updateToast()` in the frame loop, 180/1400/220 ms). No-op with `toasts` off. `KrellisEffect::toast` targets `current()`.

@@ -139,7 +139,7 @@ cmake -S . -B build-core -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build-core && ctest --test-dir build-core --output-on-failure
 ```
 
-The effect and the settings module need the KWin development files (`-DKRELLIS_BUILD_EFFECT=ON`). Scenario scripts in `scenarios/` drive the effect inside a nested KWin that never touches your session; `tools/nested.sh` runs one. [`AGENTS.md`](AGENTS.md) describes the architecture, the harness, and the many gotchas. Design notes are in [`docs/plans`](docs/plans) and [`docs/dev`](docs/dev).
+The effect and the settings module need the KWin development files (`-DKRELLIS_BUILD_EFFECT=ON`). Scenario scripts in `scenarios/` drive the effect inside a nested KWin that never touches your session; `tools/nested.sh` runs one. [`AGENTS.md`](AGENTS.md) describes the architecture, the harness, and the many gotchas.
 
 ## Credits
 
