@@ -69,15 +69,38 @@ private slots:
         QCOMPARE(d.root->weights[0], 1.0);
         QCOMPARE(d.root->weights[1], 3.0);
     }
-    void dockBesideNonSiblingNeighbour()
+    void steppingIntoATallTileLandsUnderOrOverIt()
     {
+        // b is 500x600 (tall): a, level with the column's middle, goes underneath, not beside.
         auto root = makeSplit("r", Axis::X, {P("a"), makeSplit("s", Axis::Y, {P("b"), P("c")}, {3, 1})});
         bool moved = false;
         auto d = moveInDirection(docOf(root), "a", Edge::Right, metrics(), &moved);
         QVERIFY(moved);
         QCOMPARE(panelsOf(d.root).size(), size_t(3));
         const auto e = layoutRects(d.root);
-        QVERIFY(e.at("a").rect.x >= e.at("b").rect.x + e.at("b").rect.w - 1e-9);
+        QVERIFY(e.at("a").rect.y >= e.at("b").rect.y + e.at("b").rect.h - 1e-9);
+        // Coming from the top half it lands above.
+        auto top = makeSplit("r", Axis::X, {makeSplit("l", Axis::Y, {P("a"), P("z")}), P("t")});
+        d = moveInDirection(docOf(top), "a", Edge::Right, metrics(), &moved);
+        const auto f = layoutRects(d.root);
+        QVERIFY(f.at("a").rect.y + f.at("a").rect.h <= f.at("t").rect.y + 1e-9);
+    }
+    void steppingIntoAWideTileLandsBesideIt()
+    {
+        // t is 1000x400 (wide): moving down into it, a docks on the side it came from, beside t.
+        auto root = makeSplit("r", Axis::Y, {makeSplit("row", Axis::X, {P("a"), P("b")}), P("t")});
+        bool moved = false;
+        auto d = moveInDirection(docOf(root), "a", Edge::Bottom, metrics(), &moved);
+        QVERIFY(moved);
+        const auto e = layoutRects(d.root);
+        QVERIFY(e.at("a").rect.x + e.at("a").rect.w <= e.at("t").rect.x + 1e-9);
+        // Moving along the long side enters through the near edge: w1 is 500x400, a steps right into it.
+        auto row = makeSplit("r", Axis::X, {P("a"), makeSplit("s", Axis::Y, {P("w1"), P("w2")})});
+        d = moveInDirection(docOf(row), "a", Edge::Right, metrics(), &moved);
+        QVERIFY(moved);
+        const auto f = layoutRects(d.root);
+        QVERIFY(f.at("a").rect.x + f.at("a").rect.w <= f.at("w1").rect.x + 1e-9);
+        QVERIFY(f.at("a").rect.y + f.at("a").rect.h <= f.at("w2").rect.y + 1e-9);
     }
     void poppingOutOfAColumn()
     {
