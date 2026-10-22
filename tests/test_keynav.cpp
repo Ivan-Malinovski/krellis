@@ -59,11 +59,21 @@ private slots:
         QCOMPARE(neighbourInDirection(e, "x", Edge::Top), std::string("t"));
         QCOMPARE(neighbourInDirection(e, "t", Edge::Bottom), std::string("x"));
     }
-    void siblingsAreNotSwapped()
+    void aLoneParTradesPlaces()
     {
-        // b is 750x800 (tall): a, level with its middle, goes under it rather than trading places.
+        // a and b are all there is to their split: moving toward the other swaps them, slot sizes stay.
         bool moved = false;
-        auto d = moveInDirection(docOf(makeSplit("r", Axis::X, {P("a"), P("b")}, {1, 3})), "a", Edge::Right, metrics(), &moved);
+        auto d = moveInDirection(docOf(makeSplit("r", Axis::Y, {P("a"), P("b")}, {1, 3})), "b", Edge::Top, metrics(), &moved);
+        QVERIFY(moved);
+        const auto e = layoutRects(d.root);
+        QVERIFY(e.at("b").rect.y < e.at("a").rect.y);
+        QCOMPARE(e.at("b").rect.h, 0.25);
+    }
+    void siblingsAmongSeveralAreNotSwapped()
+    {
+        // b is 750x800 (tall) in a three-way split: a, level with its middle, goes under it.
+        bool moved = false;
+        auto d = moveInDirection(docOf(makeSplit("r", Axis::X, {P("a"), P("b"), P("c")}, {1, 3, 1})), "a", Edge::Right, metrics(), &moved);
         QVERIFY(moved);
         const auto e = layoutRects(d.root);
         QVERIFY(e.at("a").rect.y >= e.at("b").rect.y + e.at("b").rect.h - 1e-9);

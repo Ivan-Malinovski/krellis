@@ -100,6 +100,17 @@ LayoutDocument moveInDirection(LayoutDocument doc, const std::string &panelId, E
                 return fillVacancy(*vacated, neighbour, panel);
             }
         }
+        // Two tiles that are all there is to their split trade places, keeping the slot sizes.
+        if (const NodePtr pair = parentSplit(doc.root, panelId);
+            pair && pair->axis == axis && pair->children.size() == 2 && pair->children[before ? 0 : 1] != panel
+            && pair->children[before ? 0 : 1]->id == neighbour) {
+            auto swapped = std::make_shared<Node>(*pair);
+            std::swap(swapped->children[0], swapped->children[1]);
+            doc.root = replaceNode(doc.root, pair->id, swapped);
+            if (moved)
+                *moved = true;
+            return doc;
+        }
         const Edge landing = landingEdge(self->rect, entries.at(neighbour).rect, dir, metrics);
         doc = removePanel(std::move(doc), panelId, true);
         doc = insertPanel(std::move(doc), panel, DockTarget::beside(neighbour, landing));
