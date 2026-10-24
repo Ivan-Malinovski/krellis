@@ -330,7 +330,7 @@ void KrellisEffect::transfer(EffectWindow *w, KrellisCanvas *target)
     source->flightRect(w, *tracked, from, opacity);
     const bool hidden = w->isMinimized();
     source->detachWindow(w);
-    target->windowAdded(w);
+    target->windowAdded(w, true);
     if (hidden) target->minimizedChanged(w);
     else {
         target->startFlight(w, KrellisCanvas::FlightKind::Glide, from, {}, opacity);
@@ -655,6 +655,17 @@ QVariantList KrellisEffect::helpGroups() const
 bool KrellisEffect::handleKey(const KeyboardKeyEvent &e)
 {
     trackChord(e);
+    // Shift floats a dragged window, and pressing or releasing it must count at once, not on the next pointer motion
+    // (a held-still drag would otherwise show no change). This runs before the native-move early return below.
+    {
+        bool shift = e.modifiers.testFlag(Qt::ShiftModifier);
+        if (e.key == Qt::Key_Shift) shift = e.state != KeyboardKeyState::Released;
+        for (const auto &canvas : m_canvases) {
+            if (canvas->m_shiftHeld == shift) continue;
+            canvas->m_shiftHeld = shift;
+            if (canvas->m_session) canvas->moveDrag(canvas->m_windowPointer);
+        }
+    }
     if (auto *active = effects->activeWindow(); active && (active->isUserMove() || active->isUserResize())) {
         if (e.key == Qt::Key_Escape && e.state == KeyboardKeyState::Pressed)
             if (auto *canvas = owner(active); canvas && canvas->m_resize) canvas->m_resize->decision = false;

@@ -908,9 +908,12 @@ void KrellisCanvas::dockAtSpawn(const NodePtr &panel)
     }
 }
 
-void KrellisCanvas::windowAdded(EffectWindow *w)
+void KrellisCanvas::windowAdded(EffectWindow *w, bool alreadyJudged)
 {
-    if (!manageable(w) || trackedFor(w) || stowedFor(w))
+    // A window handed over from another canvas was judged when it first appeared. Judging it again mid-move is
+    // unsafe: a float has keepAbove set and KWin can report no decoration for a moment while it changes output,
+    // which reads as an "undecorated, always on top" overlay and would drop a window that was just detached.
+    if (!w || w->isDeleted() || (!alreadyJudged && !manageable(w)) || trackedFor(w) || stowedFor(w))
         return;
     if (m_resize) finishResize(false);
     const auto rule = rulesFor(w);

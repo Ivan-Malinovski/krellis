@@ -180,7 +180,7 @@ public Q_SLOTS:
     void simDragEnd(bool commit);
 
 private Q_SLOTS:
-    void windowAdded(KWin::EffectWindow *w);
+    void windowAdded(KWin::EffectWindow *w, bool alreadyJudged = false);
     void windowClosed(KWin::EffectWindow *w);
     void windowActivated(KWin::EffectWindow *w);
     void minimizedChanged(KWin::EffectWindow *w);
