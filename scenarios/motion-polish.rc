@@ -1,0 +1,9 @@
+[General]
+glide=true
+map=false
+bar=false
+flyTo=true
+spawnTarget=end
+followTheme=false
+toasts=false
+whichKey=false

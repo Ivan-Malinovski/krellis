@@ -21,7 +21,7 @@ if(KRELLIS_BUILD_KCM)
 endif()
 configure_file(metadata.json.in ${CMAKE_CURRENT_BINARY_DIR}/metadata.json @ONLY)
 configure_file(krellis.qrc.in ${CMAKE_CURRENT_BINARY_DIR}/${KRELLIS_ID}.qrc @ONLY)
-add_library(krellis MODULE native_resize.cpp krellis_effect.cpp multicanvas.cpp surface_input.cpp view_rules.cpp persistence.cpp palette.cpp pin.cpp tabs.cpp session_store.cpp theme.cpp boot_guard.cpp ${CMAKE_CURRENT_BINARY_DIR}/${KRELLIS_ID}.qrc)
+add_library(krellis MODULE motion_overlay.cpp native_resize.cpp krellis_effect.cpp multicanvas.cpp surface_input.cpp view_rules.cpp persistence.cpp palette.cpp pin.cpp tabs.cpp session_store.cpp theme.cpp boot_guard.cpp ${CMAKE_CURRENT_BINARY_DIR}/${KRELLIS_ID}.qrc)
 target_include_directories(krellis PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 # The plugin only loads into the KWin it was built against (see core/kwin_match.h); the source directory is named in
 # the notification that tells the user to rebuild.

@@ -165,9 +165,8 @@ Rect Navigator::cameraFor(const Rect &frame) const
 
 namespace {
 constexpr double FLIGHT_FAR = 1.5;        // jumps beyond this many camera widths (or heights) fly
-constexpr double FLIGHT_PAD = 0.12;       // the zoomed-out view leaves this margin around both frames
-constexpr double FLIGHT_SETTLE = 0.08;    // zoomed out "enough" within this share of its size
-constexpr double FLIGHT_MAX_MS = 300;     // ...or after this long
+constexpr double FLIGHT_MS = 620;         // shallow, continuous travel rather than a zoom-out pause
+constexpr double FLIGHT_LIFT = 0.55;      // at most 55% wider than the larger endpoint
 constexpr double FLIGHT_MIN_GAP_MS = 150; // auto-repeat steps don't each start a flight
 Point centre(const Rect &r) { return {r.x + r.w / 2, r.y + r.h / 2}; }
 }
@@ -187,29 +186,12 @@ void Navigator::retarget()
     const bool fly = m_host.flyTo() && !m_host.reducedMotion() && (std::abs(a.x - b.x) > FLIGHT_FAR * from.w || std::abs(a.y - b.y) > FLIGHT_FAR * from.h)
         && (now <= 0 || now - m_lastFlightMs >= FLIGHT_MIN_GAP_MS);
     if (fly) {
-        Rect mid = unite(from, target);
-        const Point vp = m_host.viewport();
-        if (vp.x > 0 && vp.y > 0) { // widen to the viewport's aspect so the whole span is visible
-            const double aspect = vp.x / vp.y;
-            if (mid.w / mid.h < aspect) {
-                const double w = mid.h * aspect;
-                mid.x -= (w - mid.w) / 2;
-                mid.w = w;
-            } else {
-                const double h = mid.w / aspect;
-                mid.y -= (h - mid.h) / 2;
-                mid.h = h;
-            }
-        }
-        mid.x -= mid.w * FLIGHT_PAD / 2;
-        mid.y -= mid.h * FLIGHT_PAD / 2;
-        mid.w *= 1 + FLIGHT_PAD;
-        mid.h *= 1 + FLIGHT_PAD;
         m_pending = target;
-        m_flightMid = mid;
+        m_flightFrom = from;
+        m_flightMid = from;
         m_flightStartMs = now;
         m_lastFlightMs = now;
-        m_camera.target = mid;
+        m_camera.target = from;
         m_host.schedule();
         return;
     }
@@ -228,16 +210,23 @@ void Navigator::tick(double, double nowMs)
         m_pending.reset();
         return;
     }
-    const Rect &v = m_camera.value;
-    const double off = std::max({std::abs(v.x - m_flightMid.x), std::abs(v.y - m_flightMid.y),
-                                 std::abs(v.w - m_flightMid.w), std::abs(v.h - m_flightMid.h)});
-    const double size = std::max(m_flightMid.w, m_flightMid.h);
-    const bool settled = off < FLIGHT_SETTLE * size, late = nowMs - m_flightStartMs >= FLIGHT_MAX_MS;
-    if (settled || late) {
-        m_camera.target = *m_pending;
+    const double t = std::clamp((nowMs - m_flightStartMs) / FLIGHT_MS, 0.0, 1.0);
+    const double travel = t * t * (3 - 2 * t);
+    const Rect dest = *m_pending;
+    const Point a = centre(m_flightFrom), b = centre(dest);
+    const double arc = 4 * t * (1 - t) * FLIGHT_LIFT;
+    const double w = m_flightFrom.w + (dest.w - m_flightFrom.w) * travel
+        + std::max(m_flightFrom.w, dest.w) * arc;
+    const double h = m_flightFrom.h + (dest.h - m_flightFrom.h) * travel
+        + std::max(m_flightFrom.h, dest.h) * arc;
+    m_flightMid = {a.x + (b.x - a.x) * travel - w / 2,
+                   a.y + (b.y - a.y) * travel - h / 2, w, h};
+    m_camera.target = m_flightMid; // RectSpring keeps its velocity, including when a flight is interrupted.
+    if (t >= 1) {
+        m_camera.target = dest;
         m_pending.reset();
-        m_host.schedule();
     }
+    m_host.schedule();
 }
 
 void Navigator::focus(std::string id, bool record)

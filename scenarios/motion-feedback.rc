@@ -1,0 +1,10 @@
+[General]
+glide=false
+flyTo=false
+landMs=200
+map=false
+bar=false
+spawnTarget=end
+followTheme=false
+toasts=false
+whichKey=false

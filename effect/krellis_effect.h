@@ -336,6 +336,17 @@ private:
     void moveDrag(QPointF pointer);
     void endDrag(bool commit);
     void updateSlot(double dt);
+    void updateMotionOverlay(double dt);
+    std::unique_ptr<class OffscreenQuickScene> m_motionOverlay;
+    QStringList m_motionIds;
+    bool m_motionBusy = false;
+    std::string m_keyMovePanel;
+    bool m_keyMoveHeld = false;
+    double m_keyMoveReleased = -1000;
+    double m_liftAmount = 0;
+    std::string m_landingPanel, m_liftPanel;
+    double m_landingStart = -1000, m_rewindStart = -1000;
+    std::set<std::string> m_rewindPanels;
     bool fillVacancyFor(const krellis::NodePtr &panel, const std::optional<QPointF> &cursor);
     TRect screenRect(const std::string &panel) const;
     TRect sizingCamera() const;
@@ -475,6 +486,8 @@ private:
     std::unique_ptr<class OffscreenQuickScene> m_slot;
     bool m_overlaysCovered = false; // a fullscreen window is up: the overlay scenes are hidden, they would draw over it
     double m_slotOpacity = 0;
+    std::optional<TRect> m_slotRect; // visual-only interpolation; never feeds window geometry
+    quint64 m_resizeRequests = 0; // actual native moveResize requests, for diagnostics
     // Action toast: text, the frame-clock time it started, and whether it replaces a visible one.
     std::unique_ptr<class OffscreenQuickScene> m_toast;
     QString m_toastText;
@@ -646,6 +659,7 @@ public Q_SLOTS:
     void simPinch(double scale, double x, double y);
     void simPinchEnd();
     void simKey(int qtKey, bool press);
+    void simShortcut(const QString &action);
     void simText(const QString &text);
     void toggleFloat(int index);
     void toggleDock(int index);
@@ -735,6 +749,19 @@ private:
     bool handleResizeKey(const KeyboardKeyEvent &e);
     bool m_grabDecoration = false;
     QPointF m_decorPosition;
+    friend class KrellisKeySpy;
+    void observeMoveKey(const KeyboardKeyEvent &e);
+    void startMoveShortcut(QAction *action, const QString &direction);
+    void stopMoveRepeat();
+    bool stepMoveRepeat();
+    std::unique_ptr<class KrellisKeySpy> m_keySpy;
+    QTimer *m_moveRepeatTimer = nullptr;
+    int m_shortcutKey = 0, m_moveKey = 0;
+    bool m_shortcutDown = false;
+    Qt::KeyboardModifiers m_shortcutMods, m_shortcutPhysicalMods, m_moveMods;
+    quint64 m_keyPressSerial = 0, m_consumedMovePress = 0;
+    QString m_moveDirection;
+    QPointer<EffectWindow> m_moveWindow;
     void registerShortcuts();
     void trackChord(const KeyboardKeyEvent &e);
     void showHint();

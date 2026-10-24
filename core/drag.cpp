@@ -309,6 +309,25 @@ void DragSession::retarget()
             next = bar;
         } else {
             auto edge = floatMove ? overlayEdge(p, screen) : dropEdge(point, hoveredWorld, m_host.bodyTabs() ? 0.28 : 0.5);
+            // Keep a body half until the other half wins by eight screen pixels.
+            // Seams and title strips are resolved separately and remain immediately reachable.
+            if (edge && !floatMove && !m_host.bodyTabs() && m_candidate
+                && m_candidate->kind == DropTarget::Kind::Dock && !m_candidate->spec.seam
+                && m_candidate->spec.id == hovered && *edge != m_candidate->spec.edge) {
+                const Rect r = m_host.toScreen(hoveredWorld);
+                const double x = (p.x - r.x) / r.w, y = (p.y - r.y) / r.h;
+                auto distance = [&](Edge e) {
+                    switch (e) {
+                    case Edge::Left: return x;
+                    case Edge::Right: return 1 - x;
+                    case Edge::Top: return y;
+                    case Edge::Bottom: return 1 - y;
+                    }
+                    return 1.0;
+                };
+                if ((distance(m_candidate->spec.edge) - distance(*edge)) * std::min(r.w, r.h) < 8)
+                    edge = m_candidate->spec.edge;
+            }
             DropTarget t;
             bool take = true;
             if (edge) {
@@ -657,7 +676,11 @@ void DragSession::apply(const std::optional<DropTarget> &next, double nowMs)
     }
     m_layoutTargets = restingLayout();
     m_dropLabel.clear();
-    auto setSlotFrom = [&](const Rect &world) { previous[DROP_SLOT] = m_host.panelScreen(world); };
+    auto setSlotFrom = [&](const Rect &world) {
+        // Once open, morph from the painted slot instead of restarting from a collapsed edge.
+        if (!m_target || m_target->kind == DropTarget::Kind::Float || !previous.count(DROP_SLOT))
+            previous[DROP_SLOT] = m_host.panelScreen(world);
+    };
     using K = DropTarget::Kind;
     if (next && next->kind == K::Tab) {
         std::optional<Rect> world;

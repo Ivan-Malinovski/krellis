@@ -83,7 +83,7 @@ private slots:
         QVERIFY(nav.flying());
         const Rect dest = *nav.pendingTarget();
         QVERIFY(qAbs(dest.x - 7.0 / 8) < 1e-9);
-        QVERIFY(cam.target.x <= 0 && cam.target.x + cam.target.w >= 1 - 1e-9); // the whole span
+        QVERIFY(sameRect(cam.target, cam.value)); // starts from the current view without a jump
         double now = 2000;
         double widest = 0;
         for (int i = 0; i < 200 && nav.flying(); ++i) {
@@ -94,7 +94,8 @@ private slots:
         }
         QVERIFY(!nav.flying());
         QVERIFY(sameRect(cam.target, dest));
-        QVERIFY(widest > dest.w * 2);
+        QVERIFY(widest > dest.w * 1.15);
+        QVERIFY(widest < dest.w * 1.6); // long travel never zooms out to the whole layout
         for (int i = 0; i < 400; ++i)
             cam.step(0.016);
         QVERIFY(sameRect(cam.value, dest, 1e-3));

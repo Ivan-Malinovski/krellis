@@ -35,15 +35,18 @@ public:
 class LayoutTween
 {
 public:
-    void begin(std::map<std::string, Rect> from, double nowMs);
-    bool step(double nowMs, double durationMs = Motion::layoutMs);
+    void begin(std::map<std::string, Rect> from, double nowMs, double durationMs = Motion::layoutMs);
+    bool step(double nowMs, double durationMs = -1);
     void stop();
     bool active() const { return progress < 1; }
     Rect apply(const std::string &id, const Rect &target) const;
 
 private:
     std::map<std::string, Rect> from;
-    double start = 0, progress = 1;
+    double start = 0, progress = 1, duration = Motion::layoutMs, now = 0;
+    struct Sample { Rect value, velocity; double time; };
+    mutable std::map<std::string, Sample> samples;
+    std::map<std::string, Rect> initialVelocity;
 };
 
 /// CSS cubic-bezier timing function.

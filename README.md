@@ -18,6 +18,7 @@ The aim is to stay mouse-first without giving up keyboard friendliness or floati
 
 - **Tiled layout on an infinite canvas.** Windows dock into rows and columns; a camera zooms and pans over them, with spring physics when `glide` is on. One canvas per monitor.
 - **Drag to re-dock.** Drop on the left, right, top or bottom of a window to split just that tile in half. Drop in the gap between tiles to share space across their row or column, or on a screen edge to dock there. The title strip accepts tabs. Shift-drag a title bar to float it.
+- **Motion and depth.** Drag shadows, accent outlines, moving drop highlights and brief landing/undo feedback animate independently of `glide`, without continuously resizing apps. Small tiles gain app icons and title labels as you zoom out, with boundaries for saved views. Optional layout glides preserve momentum; `flyTo` adds shallow camera arcs. For heavy apps, keep `glide` off: repeated client resizing during glides can make dragging and rearranging stutter. With `glide=false`, `landMs=0` also makes decoration feedback immediate.
 - **Floating windows.** Float any window, or switch to floating-first mode where new windows float and only edge and corner drops tile. Floats snap to screen edges and corners.
 - **Keyboard movement and focus.** Move the focused tile through the layout with Meta+arrows (or Meta+A/S/D/F), focus neighbours with Meta+Ctrl+arrows, resize with the arrow keys. A tile at the edge of a monitor moves on to the next monitor.
 - **Quick jump.** Meta+/ opens a palette: type part of a window title, app or saved view and go straight there.
@@ -108,6 +109,8 @@ Krellis registers its shortcuts as KDE global shortcuts, so you can change any o
 | Meta+Alt+Z / Meta+Alt+Shift+Z | Undo / redo a layout edit |
 | **Meta+Alt+Escape** | **Turn Krellis off** |
 
+Holding a move shortcut (Meta+arrows or Meta+A/S/D/F, including custom bindings) moves once immediately, waits 320 ms, then repeats every 150 ms. The selected tile stays outlined through the hold and fades after release. Releasing the shortcut or a modifier, changing focus, or pressing another key stops the repeat.
+
 Holding Meta+Alt shows the full cheat sheet.
 
 Moving a panel: it behaves as if you dropped it in the middle of the neighbour. Beside a wide tile, under or over a tall one. Two tiles that are all there is to their split swap places. At the edge of a monitor the tile moves to the monitor next to it, and when there is none it shrinks by 20%.
@@ -144,7 +147,7 @@ Use the settings module (System Settings → Window Management → Krellis, or t
 | `tabs` | `true` | Tabbed tiles: tab strips, the tab shortcuts, and dropping a window on a tile's title bar tabs it; dropping on its body splits it |
 | `followTheme` | `true` | Overlays use the Plasma colour scheme and accent |
 | `toasts` | `true` | Brief labels on toggles, undo and redo |
-| `flyTo` | `false` | Long camera jumps zoom out, pan and zoom in (needs `glide`) |
+| `flyTo` | `false` | Distant camera jumps follow a continuous, shallow zoom arc (needs `glide`) |
 | `whichKey` | `true` | Holding Meta+Alt shows the cheat sheet (`whichKeyDelayMs`, default 400) |
 | `tileMinWidth`, `tileMinHeight` | `1` | Pixel minimum of a tile for apps without a rule |
 | `iconBelow` | `0` | Tiles narrower than this show an icon instead of the live window; 0 keeps windows live at any size |

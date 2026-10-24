@@ -10,6 +10,7 @@
 #include <QTimer>
 #include <KGlobalAccel>
 #include <QAction>
+#include "input_event_spy.h"
 #include <chrono>
 #include "shortcut_help.h"
 #include "boot_guard.h"
@@ -17,6 +18,17 @@
 #include <algorithm>
 
 namespace KWin {
+
+// Global shortcuts run before the effect input filter. Observe releases before
+// filtering so a consumed shortcut release can never leave our timer running.
+class KrellisKeySpy : public InputEventSpy
+{
+public:
+    explicit KrellisKeySpy(KrellisEffect *effect) : m_effect(effect) {}
+    void keyboardKey(KeyboardKeyEvent *event) override { m_effect->observeMoveKey(*event); }
+private:
+    KrellisEffect *m_effect;
+};
 
 // Compile stamp so a running compositor can be told apart from the installed file (see tools/live.sh).
 static const char kBuildStamp[] = "build " __DATE__ " " __TIME__; // ASCII so tools can grep the .so
@@ -64,6 +76,7 @@ KrellisEffect::KrellisEffect()
             }
     });
     connect(effects, &EffectsHandler::windowActivated, this, [this](EffectWindow *w) {
+        if (m_moveWindow && w != m_moveWindow) stopMoveRepeat();
         if (owner(w)) m_selectedOutput = nullptr;
         scratchActivated(w);
     });
@@ -78,6 +91,14 @@ KrellisEffect::KrellisEffect()
     auto *timer = new QTimer(this);
     connect(timer, &QTimer::timeout, this, &KrellisEffect::syncOutputs);
     timer->start(100);
+    m_moveRepeatTimer = new QTimer(this);
+    m_moveRepeatTimer->setSingleShot(true);
+    m_moveRepeatTimer->setTimerType(Qt::PreciseTimer);
+    connect(m_moveRepeatTimer, &QTimer::timeout, this, [this] {
+        if (stepMoveRepeat()) m_moveRepeatTimer->start(150);
+    });
+    m_keySpy = std::make_unique<KrellisKeySpy>(this);
+    input()->installInputEventSpy(m_keySpy.get());
     registerShortcuts();
     m_input = std::make_unique<KrellisInput>(this);
     input()->installInputEventFilter(m_input.get());
@@ -89,6 +110,8 @@ KrellisEffect::~KrellisEffect()
 {
     krellisBootClean();
     m_shuttingDown = true;
+    m_moveRepeatTimer->stop();
+    m_keySpy.reset();
     m_saveTimer->stop();
     m_restoreTimer->stop();
     disconnect(effects, nullptr, this, nullptr);
@@ -918,6 +941,83 @@ void KrellisEffect::groupDirection(const QString &direction)
     const auto dir = parseDirection(direction);
     if (auto *canvas = dir ? current() : nullptr) canvas->groupWithNeighbour(*dir);
 }
+void KrellisEffect::observeMoveKey(const KeyboardKeyEvent &e)
+{
+    if (e.state == KeyboardKeyState::Repeated) return;
+    const auto mods = e.modifiers & (Qt::MetaModifier | Qt::AltModifier | Qt::ControlModifier | Qt::ShiftModifier);
+    if (m_moveKey && (e.key == m_moveKey || mods != m_moveMods || e.state == KeyboardKeyState::Pressed))
+        stopMoveRepeat();
+    if (e.state == KeyboardKeyState::Pressed) {
+        m_shortcutDown = true;
+        m_shortcutKey = e.key;
+        m_shortcutPhysicalMods = mods;
+        m_shortcutMods = e.modifiersRelevantForGlobalShortcuts;
+        ++m_keyPressSerial;
+    } else if (e.key == m_shortcutKey || mods != m_shortcutPhysicalMods) {
+        m_shortcutDown = false;
+    }
+}
+
+void KrellisEffect::startMoveShortcut(QAction *action, const QString &direction)
+{
+    // Match the user's actual binding, including remapped alternatives. Delayed
+    // global-shortcut notifications after release still perform a tap, never a hold.
+    bool matches = false;
+    for (const auto &chord : KGlobalAccel::self()->shortcut(action))
+        if (chord.count() == 1 && chord[0] == QKeyCombination(m_shortcutMods, Qt::Key(m_shortcutKey))) matches = true;
+    if (!matches || m_consumedMovePress == m_keyPressSerial) return;
+    m_consumedMovePress = m_keyPressSerial;
+    stopMoveRepeat();
+    m_moveKey = m_shortcutKey;
+    m_moveMods = m_shortcutPhysicalMods;
+    m_moveDirection = direction;
+    m_moveWindow = effects->activeWindow();
+    if (stepMoveRepeat()) {
+        if (m_shortcutDown) m_moveRepeatTimer->start(320);
+        else stopMoveRepeat();
+    }
+}
+
+void KrellisEffect::stopMoveRepeat()
+{
+    if (m_moveRepeatTimer) m_moveRepeatTimer->stop();
+    m_moveKey = 0;
+    m_moveWindow = nullptr;
+    for (const auto &canvas : m_canvases) if (canvas->m_keyMoveHeld) {
+        canvas->m_keyMoveHeld = false;
+        canvas->m_keyMoveReleased = canvas->m_nowMs;
+        canvas->schedule();
+    }
+}
+
+bool KrellisEffect::stepMoveRepeat()
+{
+    auto *canvas = owner(m_moveWindow);
+    if (!m_moveKey || !canvas || effects->activeWindow() != m_moveWindow || effects->isScreenLocked()
+        || (waylandServer() && waylandServer()->isKeyboardShortcutsInhibited())
+        || m_resizeMode || canvas->capturesKeys() || canvas->m_session
+        || canvas->m_drag != KrellisCanvas::Drag::None || canvas->m_nav.gestureActive()
+        || m_moveWindow->isUserMove() || m_moveWindow->isUserResize()) {
+        stopMoveRepeat();
+        return false;
+    }
+    moveDirection(m_moveDirection);
+    // A step can carry the same window to another output. Move the outline with it.
+    auto *destination = owner(m_moveWindow);
+    if (!destination) { stopMoveRepeat(); return false; }
+    for (const auto &other : m_canvases) if (other.get() != destination && other->m_keyMoveHeld) {
+        other->m_keyMoveHeld = false;
+        other->m_keyMoveReleased = other->m_nowMs;
+        other->schedule();
+    }
+    if (auto *tracked = destination->trackedFor(m_moveWindow)) {
+        destination->m_keyMovePanel = tracked->panel;
+        destination->m_keyMoveHeld = true;
+        destination->schedule();
+    }
+    return true;
+}
+
 void KrellisEffect::moveDirection(const QString &direction)
 {
     markSessionInteraction();

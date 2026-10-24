@@ -1,0 +1,8 @@
+[General]
+glide=false
+flyTo=false
+landMs=200
+map=false
+spawnTarget=end
+toasts=false
+whichKey=false

@@ -42,7 +42,7 @@ public:
 
     /// Recompute targets after a layout change; the framing follows its views.
     void sync();
-    /// Advance a flight: once the camera has zoomed out far enough, head for the destination.
+    /// Advance the continuous camera arc toward its destination.
     void tick(double dtSeconds, double nowMs);
     bool flying() const { return m_pending.has_value(); }
     const std::optional<Rect> &pendingTarget() const { return m_pending; }
@@ -125,8 +125,8 @@ private:
     std::optional<std::vector<std::string>> m_overviewReturn;
     std::vector<Framing> m_framings;
     bool m_gesture = false;
-    std::optional<Rect> m_pending; // where a flight is heading once it has zoomed out
-    Rect m_flightMid{};            // the camera target while zoomed out
+    std::optional<Rect> m_pending; // destination of the shallow camera arc
+    Rect m_flightFrom{}, m_flightMid{};            // the current point along the camera arc
     double m_flightStartMs = 0, m_lastFlightMs = -1e18;
     double m_minTile = 0; // the smallest tile side, in layout units
 

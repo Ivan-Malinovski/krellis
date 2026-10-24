@@ -13,6 +13,7 @@ struct DHost : DragHost {
     bool bodyTabsOn = true;
     RectMap rects;
     int tweens = 0;
+    RectMap tweenFrom;
     Point vp{1000, 600};
     const LayoutDocument &doc() const override { return document; }
     void setDoc(const LayoutDocument &d) override { document = d; }
@@ -43,7 +44,7 @@ struct DHost : DragHost {
         return m;
     }
     const RectMap &lastRects() const override { return rects; }
-    void beginTween(const RectMap &, double) override { ++tweens; }
+    void beginTween(const RectMap &from, double) override { ++tweens; tweenFrom = from; }
 
     void load(LayoutDocument d)
     {
@@ -67,6 +68,27 @@ class TestDrag : public QObject
 {
     Q_OBJECT
 private slots:
+    void bodyHalfHysteresisAndSlotContinuity()
+    {
+        DHost h;
+        h.bodyTabsOn = false;
+        h.load(three());
+        DragSession d(h, "A", "", {100, 300});
+        d.move({750, 300}, 0);
+        d.tick(200);
+        QCOMPARE(d.target()->spec.edge, Edge::Left);
+        // Source removal leaves B and C each half the width. Tiny motion across
+        // C's centre should keep the chosen half, then a deliberate move switches it.
+        d.move({751, 300}, 210);
+        QCOMPARE(d.candidate()->spec.edge, Edge::Left);
+        const Rect paintedSlot{650, 20, 120, 560};
+        h.rects[DROP_SLOT] = paintedSlot;
+        d.move({780, 300}, 220);
+        QCOMPARE(d.candidate()->spec.edge, Edge::Right);
+        d.tick(400);
+        QCOMPARE(d.target()->spec.edge, Edge::Right);
+        QCOMPARE(h.tweenFrom.at(DROP_SLOT), paintedSlot);
+    }
     void belowThresholdIsAClick()
     {
         DHost h;

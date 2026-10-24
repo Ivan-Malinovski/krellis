@@ -53,6 +53,9 @@ KrellisCanvas::KrellisCanvas(LogicalOutput *output)
     loadRules();
     connect(effects, &EffectsHandler::windowClosed, this, &KrellisCanvas::windowClosed);
     connect(effects, &EffectsHandler::windowActivated, this, &KrellisCanvas::windowActivated);
+    connect(effects, &EffectsHandler::stackingOrderChanged, this, [this] {
+        if (m_motionOverlay) schedule(); // refresh label occlusion when a covering window is raised
+    });
     connect(effects, &EffectsHandler::windowAdded, this, [this](EffectWindow *w) { watch(w); });
     for (EffectWindow *w : effects->stackingOrder())
         watch(w);
@@ -127,6 +130,8 @@ void KrellisCanvas::prepareUnload()
     m_popups.clear();
     m_closing.clear();
     m_slot.reset();
+    m_slotRect.reset();
+    m_motionOverlay.reset();
     m_marquee.reset();
     m_drawerTabs.reset();
     m_toast.reset();
@@ -302,7 +307,14 @@ void KrellisEffect::registerShortcuts()
         QList<QKeySequence> chords{b.keys};
         if (!b.extra.isEmpty()) chords << b.extra;
         KGlobalAccel::self()->setGlobalShortcut(a, chords);
-        connect(a, &QAction::triggered, this, [this, slot = b.slot] { hideHint(); (this->*slot)(); });
+        connect(a, &QAction::triggered, this, [this, a, slot = b.slot] {
+            hideHint();
+            if (slot == &KrellisEffect::moveLeft) startMoveShortcut(a, QStringLiteral("left"));
+            else if (slot == &KrellisEffect::moveRight) startMoveShortcut(a, QStringLiteral("right"));
+            else if (slot == &KrellisEffect::moveUp) startMoveShortcut(a, QStringLiteral("up"));
+            else if (slot == &KrellisEffect::moveDown) startMoveShortcut(a, QStringLiteral("down"));
+            else (this->*slot)();
+        });
     }
 }
 
@@ -354,6 +366,11 @@ void KrellisEffect::syncPinShortcut()
 void KrellisCanvas::watch(EffectWindow *w)
 {
     if (w->window()) {
+        connect(w->window(), &Window::frameGeometryChanged, this, [this] {
+            // A final client configure can land after the animation clock has stopped.
+            // Unmanaged covering windows matter too; refresh without polling at idle.
+            if (m_motionOverlay && !m_applyingRest) schedule();
+        });
         connect(w->window(), &Window::interactiveMoveResizeStepped, this, [this, w](const RectF &geometry) {
             resizeStepped(w, geometry);
         });
@@ -807,11 +824,20 @@ void KrellisCanvas::applyRest(bool stepping)
             && (std::abs(window->frameGeometry().width() - t.requested->width()) > 1
                 || std::abs(window->frameGeometry().height() - t.requested->height()) > 1))
             continue;
-        if (!t.requested || !(*t.requested == target)) t.requestedMs = m_nowMs;
+        const bool repeated = t.requested && *t.requested == target;
+        if (!repeated) t.requestedMs = m_nowMs;
         t.requested = target;
         if (!m_glide) schedule(); // repaint when the patience window ends, even if the client never commits
-        if (window->moveResizeGeometry() != target)
+        const auto actual = window->moveResizeGeometry();
+        // Wayland clients can round a fractional request (e.g. 414.67 to 415).
+        // Do not send that identical request again on every feedback/drag frame.
+        const bool rounded = repeated && std::abs(actual.x() - target.x()) <= 1
+            && std::abs(actual.y() - target.y()) <= 1 && std::abs(actual.width() - target.width()) <= 1
+            && std::abs(actual.height() - target.height()) <= 1;
+        if (actual != target && !rounded) {
+            ++m_resizeRequests;
             window->moveResize(target);
+        }
     }
 }
 
@@ -1514,7 +1540,7 @@ void KrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
     m_overlaysCovered = std::any_of(m_windows.begin(), m_windows.end(), [](const Tracked &t) { return t.window->isFullScreen() && !t.window->isMinimized(); });
     if (m_overlaysCovered && m_paletteOn) closePalette(); // it would sit hidden over a window that keeps the keyboard
     updatePins();
-    for (auto *scene : {&m_bar, &m_map, &m_tileScene, &m_drawerTabs, &m_tabStrips, &m_slot, &m_toast, &m_sheet, &m_palette, &m_marquee})
+    for (auto *scene : {&m_bar, &m_map, &m_tileScene, &m_drawerTabs, &m_tabStrips, &m_slot, &m_motionOverlay, &m_toast, &m_sheet, &m_palette, &m_marquee})
         if (*scene) (*scene)->setVisible(!m_overlaysCovered);
     m_layerTarget = layerShown() ? 1 : 0;
     if (m_layerDim != m_layerTarget) {
@@ -1588,11 +1614,12 @@ void KrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
             updateBar();
         }
         updateTiles(dt);
+        updateMotionOverlay(dt);
         updateMap();
         updateDrawerTabs();
         updateTabStrips();
         const bool tilesMoving = std::any_of(m_tiles.begin(), m_tiles.end(), [](const auto &t) { return std::abs(t.second.velocity) > 0.001 || std::abs(t.second.target - t.second.amount) > 0.0001; });
-        m_animating = tilesMoving || areaProgress < 1 || springing || (m_map && !m_map->rootItem()->property("settled").toBool()) || tweening || !m_flights.empty() || !m_popups.empty() || !m_closing.empty() || m_session || m_slot || m_marquee || m_nav.flying() || m_toastBusy || m_sheetBusy || m_paletteBusy || m_layerDim != m_layerTarget || (!m_glide && layoutAwaitingLanding()) || !m_landings.empty();
+        m_animating = m_motionBusy || tilesMoving || areaProgress < 1 || springing || (m_map && !m_map->rootItem()->property("settled").toBool()) || tweening || !m_flights.empty() || !m_popups.empty() || !m_closing.empty() || m_session || m_slot || m_marquee || m_nav.flying() || m_toastBusy || m_sheetBusy || m_paletteBusy || m_layerDim != m_layerTarget || (!m_glide && layoutAwaitingLanding()) || !m_landings.empty();
     }
 }
 
@@ -2298,14 +2325,18 @@ void KrellisCanvas::endDrag(bool commit)
     for (const auto &kv : out.from)
         if (const auto w = fromScreenRect(kv.second))
             from[kv.first] = *w;
-    if (m_glide) m_tween.begin(from, m_nowMs);
+    if (m_glide) m_tween.begin(from, m_nowMs, 240);
+    m_landingPanel = out.committed && commit ? out.liftedId : std::string();
+    m_landingStart = m_nowMs;
     relayout(false);
     refreshRects();
     // A window that ends up floating glides from the card it was drawn as.
     if (const auto lifted = out.from.find(out.liftedId); lifted != out.from.end() && floatScreen(out.liftedId))
         for (const auto &t : m_windows)
-            if (t.panel == out.liftedId)
+            if (t.panel == out.liftedId) {
                 startFlight(t.window, FlightKind::Glide, {lifted->second.x + m_area.x(), lifted->second.y + m_area.y(), lifted->second.w, lifted->second.h}, {});
+                if (m_glide) m_flights.at(t.window).duration = 240;
+            }
     schedule();
     if (commit && moving && m_transfer && m_output && !QRectF(QRect(m_output->geometry())).contains(m_windowPointer))
         m_transfer(moving, m_windowPointer);
@@ -2355,11 +2386,31 @@ void KrellisCanvas::updateSlot(double dt)
                 }
                 m_slot->setGeometry(Rect(m_area.toAlignedRect()));
             }
+            if (!m_slotRect) {
+                m_slotRect = r;
+                if (!m_glide && m_landMs > 0 && m_session->target()
+                    && m_session->target()->kind == DropTarget::Kind::Dock) {
+                    // Open a new highlight from the chosen edge. Only this overlay
+                    // interpolates: clients already have their final preview sizes.
+                    const auto edge = m_session->target()->spec.edge;
+                    if (edge == krellis::Edge::Left || edge == krellis::Edge::Right) {
+                        m_slotRect->x = edge == krellis::Edge::Left ? r.x : r.x + r.w - 2;
+                        m_slotRect->w = 2;
+                    } else {
+                        m_slotRect->y = edge == krellis::Edge::Top ? r.y : r.y + r.h - 2;
+                        m_slotRect->h = 2;
+                    }
+                }
+            }
+            if (!m_glide && m_landMs > 0) {
+                *m_slotRect = lerpRect(*m_slotRect, r, 1 - std::exp(-dt / 0.035));
+                if (sameRectEps(*m_slotRect, r, 0.2)) m_slotRect = r;
+            } else m_slotRect = r;
             QQuickItem *item = m_slot->rootItem();
-            item->setProperty("slotX", r.x - m_area.x());
-            item->setProperty("slotY", r.y - m_area.y());
-            item->setProperty("slotW", r.w);
-            item->setProperty("slotH", r.h);
+            item->setProperty("slotX", m_slotRect->x - m_area.x());
+            item->setProperty("slotY", m_slotRect->y - m_area.y());
+            item->setProperty("slotW", m_slotRect->w);
+            item->setProperty("slotH", m_slotRect->h);
         }
     }
     if (!m_slot)
@@ -2369,6 +2420,7 @@ void KrellisCanvas::updateSlot(double dt)
     if (!world && !snap && m_slotOpacity < 0.01) {
         const Rect g = m_slot->geometry();
         m_slot.reset();
+        m_slotRect.reset();
         m_slotOpacity = 0;
         effects->addRepaint(Region(g));
         return;
@@ -2403,8 +2455,27 @@ bool KrellisCanvas::undoRedo(bool redo)
     std::set<std::string> fromNow; // scratch windows belong to the scratchpad, not to the edit history
     for (const auto &t : m_windows)
         if (scratchWindow(t.window)) fromNow.insert(t.panel);
+    const auto oldRects = m_rects;
+    std::map<EffectWindow *, TRect> before;
+    for (const auto &t : m_windows)
+        if (const auto r = visualRect(t.window)) before[t.window] = *r;
     m_doc = krellis::reconcile(entry->doc, m_doc, fromNow);
     relayout(true);
+    m_rewindPanels.clear();
+    m_rewindStart = m_nowMs;
+    for (const auto &t : m_windows) {
+        const auto previous = before.find(t.window);
+        if (previous == before.end()) continue;
+        const auto *old = oldRects.find(t.panel);
+        const auto *next = m_rects.find(t.panel);
+        const auto floating = floatScreen(t.panel);
+        const bool changed = floating ? !sameRectEps(previous->second, *floating, 1)
+            : (!old || !next || !sameRectEps(old->rect, next->rect));
+        if (!changed) continue;
+        m_rewindPanels.insert(t.panel);
+        // Tiled moves use LayoutTween. Float transitions need an explicit screen flight.
+        if (floating || !old) startFlight(t.window, FlightKind::Glide, previous->second, {});
+    }
     updateDock();
     applyRest();
     toast(QStringLiteral("%1: %2").arg(redo ? QStringLiteral("Redid") : QStringLiteral("Undid"), QString::fromStdString(entry->label)));
@@ -2872,6 +2943,19 @@ QString KrellisCanvas::dump()
                      .arg(st.rect.x, 0, 'f', 1).arg(st.rect.y, 0, 'f', 1).arg(st.rect.w, 0, 'f', 1).arg(st.rect.h, 0, 'f', 1).arg(st.tabW, 0, 'f', 1)
                      .arg(QString::fromStdString(st.selected), titles.join(QStringLiteral(" | ")));
     }
+    QVariant labelCount = 0;
+    if (m_motionOverlay && m_motionOverlay->rootItem())
+        QMetaObject::invokeMethod(m_motionOverlay->rootItem(), "labelCount", Q_RETURN_ARG(QVariant, labelCount));
+    lines << QStringLiteral("KEY-MOVE %1 held %2").arg(QString::fromStdString(m_keyMovePanel)).arg(m_keyMoveHeld);
+    lines << QStringLiteral("NATIVE-REQUESTS %1").arg(m_resizeRequests);
+    if (m_slotRect)
+        lines << QStringLiteral("HIGHLIGHT %1,%2 %3x%4")
+                     .arg(m_slotRect->x, 0, 'f', 1).arg(m_slotRect->y, 0, 'f', 1)
+                     .arg(m_slotRect->w, 0, 'f', 1).arg(m_slotRect->h, 0, 'f', 1);
+    lines << QStringLiteral("MOTION lift %1 landing %2 rewind %3 busy %4 scene %5 labels %6 frames %7")
+                 .arg(m_liftAmount, 0, 'f', 2).arg(QString::fromStdString(m_landingPanel))
+                 .arg(m_rewindPanels.size()).arg(m_motionBusy).arg(bool(m_motionOverlay)).arg(labelCount.toInt())
+                 .arg(m_motionOverlay ? m_motionOverlay->rootItem()->property("frames").toList().size() : 0);
     lines << QStringLiteral("HISTORY undo %1 redo %2").arg(m_history.size()).arg(m_history.redoSize());
     if (m_sheetWanted || m_sheet)
         lines << QStringLiteral("WHICHKEY %1 opacity %2").arg(m_sheetWanted ? "shown" : "hiding").arg(m_sheetOpacity, 0, 'f', 2);
@@ -3058,7 +3142,14 @@ void KrellisEffect::simKey(int qtKey, bool press)
     }
     m_simMods.setFlag(flag, press);
     e.modifiers = m_simMods;
+    e.modifiersRelevantForGlobalShortcuts = m_simMods;
+    observeMoveKey(e);
     handleKey(e);
+}
+
+void KrellisEffect::simShortcut(const QString &action)
+{
+    if (auto *a = findChild<QAction *>(action)) a->trigger();
 }
 
 void KrellisEffect::simText(const QString &text)

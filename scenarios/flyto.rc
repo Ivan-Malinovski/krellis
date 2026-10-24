@@ -5,3 +5,4 @@ flyTo=true
 followTheme=false
 toasts=false
 whichKey=false
+spawnTarget=end

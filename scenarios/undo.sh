@@ -5,7 +5,8 @@ exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
 call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
-layout() { call dump | grep -E "^p[0-9]+ " | sed -E 's/ opacity.*//' | sort; }
+# Compare layout rectangles, not asynchronous client geometry (which can differ by subpixels).
+layout() { call dump | grep -E "^p[0-9]+ " | sed -E 's/ frame.*//' | sort; }
 hist() { call dump | sed -n 's/^HISTORY //p'; }
 check() { if [ "$2" = "$3" ]; then echo "PASS $1"; else echo "FAIL $1: got '$2' want '$3'"; fi; }
 differs() { if [ "$2" != "$3" ]; then echo "PASS $1"; else echo "FAIL $1: unchanged"; fi; }

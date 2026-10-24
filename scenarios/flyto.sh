@@ -25,13 +25,13 @@ echo "--- short hop"
 call focusIndex 6 & pid=$!; sample near-on; wait $pid
 sleep 1
 echo "--- flyTo off"
-printf '[General]\nglide=true\nmap=false\nflyTo=false\nfollowTheme=false\ntoasts=false\nwhichKey=false\n' >"$NEST_WORK/config/krellisrc"
+printf '[General]\nglide=true\nmap=false\nflyTo=false\nfollowTheme=false\ntoasts=false\nwhichKey=false\nspawnTarget=end\n' >"$NEST_WORK/config/krellisrc"
 call reloadSettings
 call focusIndex 0; sleep 2.5
 call focusIndex 7 & pid=$!; sample far-off; wait $pid
 verdict() { # name expect(fly|still)
   read -r lo hi <"$NEST_OUT/$1.mm"
-  if [ "$2" = fly ]; then awk "BEGIN{exit !($hi > $lo * 2)}" && echo "PASS $1 zooms out" || echo "FAIL $1: expected a zoom-out ($lo..$hi)"
+  if [ "$2" = fly ]; then awk "BEGIN{exit !($hi > $lo * 1.12 && $hi < $lo * 1.7)}" && echo "PASS $1 zooms out" || echo "FAIL $1: expected a zoom-out ($lo..$hi)"
   else awk "BEGIN{exit !($hi < $lo * 1.2)}" && echo "PASS $1 stays put" || echo "FAIL $1: unexpected zoom-out ($lo..$hi)"; fi
 }
 verdict far-on fly; verdict near-on still; verdict far-off still

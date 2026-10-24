@@ -4,6 +4,7 @@
     <file alias="tiles.qml">@CMAKE_CURRENT_SOURCE_DIR@/tiles.qml</file>
     <file alias="minimap.qml">@CMAKE_CURRENT_SOURCE_DIR@/minimap.qml</file>
     <file alias="drawertabs.qml">@CMAKE_CURRENT_SOURCE_DIR@/drawertabs.qml</file>
+    <file alias="motion_overlay.qml">@CMAKE_CURRENT_SOURCE_DIR@/motion_overlay.qml</file>
     <file alias="slot.qml">@CMAKE_CURRENT_SOURCE_DIR@/slot.qml</file>
     <file alias="marquee.qml">@CMAKE_CURRENT_SOURCE_DIR@/marquee.qml</file>
     <file alias="toast.qml">@CMAKE_CURRENT_SOURCE_DIR@/toast.qml</file>

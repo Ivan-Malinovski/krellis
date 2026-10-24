@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Held move shortcuts now step immediately, pause for 320 ms, then repeat every 150 ms with a persistent outline on the moving tile. Release, focus changes and other key presses stop the repeat; duplicate system repeat notifications do not accelerate it. Custom shortcut bindings use the same behavior.
+
+- Fixed repeated resize requests during static drag previews when a Wayland client rounded a fractional tile size. A rounded result within one pixel no longer causes Krellis to resend the identical request every frame.
+
+- Dragged windows gain an animated shadow and accent outline. Landing feedback fades in 180 ms; optional layout glides settle drops in 240 ms; open drop slots morph from their current position when the target changes. Body-half selection tolerates small pointer movements near a boundary. Lift, landing, undo and moving drop highlights animate with `glide` off, without continuously resizing apps. `landMs=0` together with `glide=false` makes decoration feedback immediate.
+- Interrupted layout glides preserve their velocity and turn smoothly toward the new arrangement. Undo/redo briefly highlights the windows it moves (220 ms); with `glide` on, floating transitions also animate.
+- Zooming out reveals app icons and title labels on small tiles, plus named boundaries for saved views. Labels follow the painted geometry and are clipped behind covering windows.
+- With `flyTo=true` and `glide=true`, distant jumps use a continuous, shallow camera arc rather than zooming out to encompass the entire journey. Nearby jumps remain direct.
+
 - Dropping on a window now splits only that tile into halves, including drops deep inside its body. Dropping in the gap between tiles still shares space across the row or column. The title strip still accepts tabs.
 - Fixed: a window floated with Shift and dragged to another monitor could vanish from Krellis (never tiled again until it was closed and reopened). Handing a window to another monitor judged it a second time, and a floating window that KWin briefly reports as undecorated looked like an always-on-top overlay. Windows that are already managed are no longer re-judged when they move between monitors.
 - Pressing Shift in the middle of a drag now floats the window straight away, without moving the pointer (and releasing it undoes that). Before, the key was only noticed on the next pointer motion, so pressing it while holding still seemed to do nothing.
