@@ -90,6 +90,7 @@ KrellisCanvas::~KrellisCanvas() = default;
 void KrellisCanvas::prepareUnload()
 {
     m_unloading = true;
+    for (const auto &t : m_windows) t.window->setData(WindowForceBlurRole, QVariant());
     for (const auto &t : m_windows) effects->setElevatedWindow(t.window, false);
     for (const auto &t : m_stowed) effects->setElevatedWindow(t.window, false);
     m_dragTabView.clear();
@@ -407,8 +408,35 @@ bool KrellisCanvas::manageable(EffectWindow *w)
 {
     // A window that opens already fullscreen (Spectacle's region overlay, a game, a slideshow) is meant to cover the
     // screen, not to take a tile; windows that go fullscreen later are already tracked and unaffected.
+    // Plasma's own shell windows (the panel edit toolbar and its settings, the widget explorer, desktop settings) are
+    // part of the desktop, not applications: they must keep the places the shell gives them.
+    if (w && w->window()) {
+        const QString app = appId(w);
+        if (app == QLatin1String("org.kde.plasmashell") || app == QLatin1String("plasmashell"))
+            return false;
+    }
     return w && !w->isFullScreen() && !(w->window() && w->window()->inherits("KWin::LayerShellV1Window")) && w->isNormalWindow() && !w->isDeleted() && !w->isSpecialWindow() && !w->isPopupWindow()
-        && !w->isOnScreenDisplay() && !w->isNotification();
+        && !w->isOnScreenDisplay() && !w->isNotification() && !leftAlone(w);
+}
+
+bool KrellisCanvas::leftAlone(EffectWindow *w)
+{
+    // Small helper windows are not part of the layout: a wallet or password prompt, a "you are sharing this window"
+    // bar, a dialog that never declared its parent. Tiling stretches them to a tile they were never meant to fill.
+    // Each test below is about how the client asked to be shown, never about its name, so unknown apps are covered.
+    const auto *window = w ? w->window() : nullptr;
+    if (!window)
+        return false;
+    const char *why = nullptr;
+    if (window->isTransient() || w->isModal()) why = "transient";
+    else if (!window->isResizable()) why = "fixed size"; // min == max: a tile cannot resize it anyway
+    else if (window->skipTaskbar()) why = "skips the taskbar"; // not an application window
+    else if (!w->hasDecoration() && w->keepAbove()) why = "undecorated, always on top"; // overlays and share bars
+    else if (!w->hasDecoration() && w->isSkipSwitcher()) why = "undecorated, skips the switcher";
+    else if (!w->hasDecoration() && std::min(w->width(), w->height()) < 120) why = "undecorated strip"; // Wayland has no always-on-top hint, so a share bar is only recognisable by its shape
+    if (why)
+        qCDebug(krellisLog) << "leaving alone" << appId(w) << w->caption() << why;
+    return why;
 }
 
 KrellisCanvas::Tracked *KrellisCanvas::trackedFor(EffectWindow *w)
@@ -1575,6 +1603,10 @@ void KrellisCanvas::prePaintWindow(RenderView *view, EffectWindow *w, WindowPreP
 {
     if (visualRect(w)) {
         data.setTransformed();
+        // KWin's blur skips any transformed window unless it is forced; the camera makes every tile one, and blur
+        // handles the translation and scale itself.
+        if (!w->data(WindowForceBlurRole).toBool()) // setData signals every call; this runs each frame
+            w->setData(WindowForceBlurRole, true);
         if (m_flights.count(w) || w->isPopupWindow())
             data.setTranslucent();
         if (const auto *t = trackedFor(w))

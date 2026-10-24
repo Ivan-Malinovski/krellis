@@ -269,6 +269,7 @@ private:
     void adoptDrag(EffectWindow *w, QPointF pointer, const QRectF &startGeometry);
     int activeIndex() const;
     static bool manageable(EffectWindow *w);
+    static bool leftAlone(EffectWindow *w);
     // A scratch window is a floating overlay that the scratchpad shortcut shows and hides: marked at run time or by a rule.
     bool scratchWindow(EffectWindow *w) const;
     // Turn the docked window into a centred overlay float. False when it can't (nothing left to tile, or not docked).
