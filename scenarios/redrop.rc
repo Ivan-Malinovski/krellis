@@ -1,4 +1,4 @@
-# redrop drops a window in the middle of a tile, which tabs it when tabs are on; it tests column weights, not tabs.
+# Keep a predictable row for returning a window to its original seam.
 [General]
 glide=true
 map=false
@@ -6,3 +6,4 @@ followTheme=false
 toasts=false
 whichKey=false
 tabs=false
+spawnTarget=end

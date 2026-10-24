@@ -130,8 +130,8 @@ private slots:
         QVERIFY(d.move({680, 300}, 0));
         QVERIFY(d.candidate());
         QCOMPARE(int(d.candidate()->kind), int(DropTarget::Kind::Dock));
-        // Same-axis edges resolve to the parent's seam before C (the tile edge is a seam insert).
-        QVERIFY(d.candidate()->spec.seam.has_value() || d.candidate()->spec.id == "C");
+        QVERIFY(!d.candidate()->spec.seam);
+        QCOMPARE(d.candidate()->spec.id, std::string("C"));
         // Release commits immediately, before the settle delay expires.
         auto out = d.end(true, 20);
         QVERIFY(out.committed);
@@ -141,6 +141,90 @@ private slots:
         QCOMPARE(order[0], std::string("B"));
         QCOMPARE(order[1], std::string("A"));
         QCOMPARE(order[2], std::string("C"));
+    }
+    void bodyDropOnlySplitsTarget_data()
+    {
+        QTest::addColumn<bool>("vertical");
+        QTest::addColumn<int>("side");
+        for (bool vertical : {false, true})
+            for (Edge edge : {Edge::Left, Edge::Right, Edge::Top, Edge::Bottom})
+                QTest::newRow(qPrintable(QString("%1-%2").arg(vertical).arg(int(edge)))) << vertical << int(edge);
+    }
+    void bodyDropOnlySplitsTarget()
+    {
+        QFETCH(bool, vertical);
+        QFETCH(int, side);
+        const Edge edge = Edge(side);
+        DHost h;
+        h.bodyTabsOn = false;
+        auto doc = three();
+        auto root = std::make_shared<Node>(*doc.root);
+        root->axis = vertical ? Axis::Y : Axis::X;
+        root->weights = {0.2, 0.5, 0.3};
+        doc.root = root;
+        // A separate floating source leaves the tiled layout unchanged on pickup.
+        doc = floatPanel(doc, makePanel("D", {"d"}, "d"), {0.1, 0.1, 0.2, 0.2}, FloatingLayer::Overlay);
+        h.load(doc);
+        const auto before = layoutRects(doc.root);
+        const Rect target = before.at("B").rect;
+        Point p{target.x + target.w / 2, target.y + target.h / 2};
+        if (edge == Edge::Left) p.x = target.x + target.w * 0.13;
+        if (edge == Edge::Right) p.x = target.x + target.w * 0.87;
+        if (edge == Edge::Top) p.y = target.y + target.h * 0.13;
+        if (edge == Edge::Bottom) p.y = target.y + target.h * 0.87;
+        DragSession d(h, "D", "", {20, 20});
+        QVERIFY(d.move({p.x * h.vp.x, p.y * h.vp.y}, 0));
+        QVERIFY(d.candidate());
+        QCOMPARE(d.candidate()->kind, DropTarget::Kind::Dock);
+        QVERIFY(!d.candidate()->spec.seam);
+        QCOMPARE(d.candidate()->spec.edge, edge);
+        d.tick(200);
+        const DropRects expected = dropRects(target, edge);
+        QVERIFY(sameRect(d.layoutTargets().at("B"), expected.remaining));
+        QVERIFY(sameRect(d.layoutTargets().at(DROP_SLOT), expected.slot));
+        auto out = d.end(true, 250);
+        QVERIFY(out.committed);
+        const auto after = layoutRects(out.next.root);
+        QVERIFY(sameRect(after.at("A").rect, before.at("A").rect));
+        QVERIFY(sameRect(after.at("C").rect, before.at("C").rect));
+        QVERIFY(sameRect(after.at("B").rect, expected.remaining));
+        QVERIFY(sameRect(after.at("D").rect, expected.slot));
+    }
+    void centreBodyDropSplitsEvenWhenOrderIsUnchanged()
+    {
+        DHost h;
+        h.bodyTabsOn = false;
+        h.load(three());
+        DragSession d(h, "A", "", {100, 300});
+        // Deep inside the left half of B, beyond the old edge band.
+        QVERIFY(d.move({480, 300}, 0));
+        QVERIFY(d.candidate());
+        QCOMPARE(d.candidate()->kind, DropTarget::Kind::Dock);
+        QVERIFY(!d.candidate()->spec.seam);
+        QCOMPARE(d.candidate()->spec.edge, Edge::Left);
+        auto out = d.end(true, 10);
+        QVERIFY(out.committed);
+        const auto rects = layoutRects(out.next.root);
+        QCOMPARE(rects.at("A").rect.w, 0.25);
+        QCOMPARE(rects.at("B").rect.w, 0.25);
+        QCOMPARE(rects.at("C").rect.w, 0.5);
+    }
+    void gapDropSharesSpaceAcrossTheSplit()
+    {
+        DHost h;
+        h.bodyTabsOn = false;
+        h.load(three());
+        DragSession d(h, "A", "", {100, 300});
+        QVERIFY(d.move({667, 300}, 0));
+        QVERIFY(d.candidate());
+        QVERIFY(d.candidate()->spec.seam);
+        d.tick(200);
+        QCOMPARE(d.layoutTargets().at(DROP_SLOT).w, 1.0 / 3);
+        auto out = d.end(true, 250);
+        QVERIFY(out.committed);
+        const auto rects = layoutRects(out.next.root);
+        for (const auto *id : {"A", "B", "C"})
+            QVERIFY(std::abs(rects.at(id).rect.w - 1.0 / 3) < 1e-9);
     }
     void roundTripsUnderAndBackKeepWidths()
     {

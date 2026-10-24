@@ -308,12 +308,14 @@ void DragSession::retarget()
         if (bar) {
             next = bar;
         } else {
-            auto edge = floatMove ? overlayEdge(p, screen) : dropEdge(point, hoveredWorld);
+            auto edge = floatMove ? overlayEdge(p, screen) : dropEdge(point, hoveredWorld, m_host.bodyTabs() ? 0.28 : 0.5);
             DropTarget t;
-            bool take = true; // a tile body that does not take tabs leaves the drop without a target
+            bool take = true;
             if (edge) {
                 t.kind = DropTarget::Kind::Dock;
-                t.spec = tileDropTarget(m_dropBase, hovered, *edge);
+                // A body drop shares only this tile's space. Gap drops below use the whole split's seam.
+                t.spec.id = hovered;
+                t.spec.edge = *edge;
             } else if (floatMove) {
                 t.kind = DropTarget::Kind::Float;
             } else if (m_host.bodyTabs()) {
@@ -971,8 +973,8 @@ DragOutcome DragSession::end(bool commit, double nowMs)
     } else if (target->kind == K::Dock) {
         next = without;
         next.root = applyDockTarget(without.root, target->spec, m_lifted, uid("split"));
-        // Dropping a window back where it came from changes nothing, so keep its original sizes.
-        if (m_inDoc && !m_fromFloat && sameShape(m_origin.root, next.root, m_lifted->id, m_lifted->id))
+        // Returning to the original seam keeps its sizes; a body drop intentionally halves the target.
+        if (target->spec.seam && m_inDoc && !m_fromFloat && sameShape(m_origin.root, next.root, m_lifted->id, m_lifted->id))
             next.root = m_origin.root;
     } else {
         const FloatingLayer floatLayer = m_fromFloat == FloatingLayer::Overlay ? FloatingLayer::Overlay : layer;

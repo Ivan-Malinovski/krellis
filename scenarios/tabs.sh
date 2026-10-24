@@ -100,6 +100,8 @@ drag_tile 960 400
 echo "after middle drop: $(panels) strips $(strips)"
 check "a middle drop does not tab" "$(strips)" 0
 check "the dropped tile is still a tile" "$(npanels)" 3
+# Body drops now split the target. Restore the fixture before the independent title-strip checks.
+call undo; sleep 1.2
 echo "--- right under the title band is the split-above zone"
 read -r ox oy ow oh <<<"$(rectof p1)"
 call simDragStart 0 "$(awk -v x="$ox" -v w="$ow" 'BEGIN{printf "%d", x + w/2}')" "$(awk -v y="$oy" 'BEGIN{printf "%d", y + 10}')" >/dev/null

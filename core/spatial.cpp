@@ -237,7 +237,7 @@ MaximizeResult maximizeTransition(const Entries &entries, const std::string &roo
     return {id, next};
 }
 
-std::optional<Edge> dropEdge(Point point, const Rect &rect)
+std::optional<Edge> dropEdge(Point point, const Rect &rect, double band)
 {
     if (rect.w <= 0 || rect.h <= 0)
         return std::nullopt;
@@ -247,7 +247,7 @@ std::optional<Edge> dropEdge(Point point, const Rect &rect)
         return std::nullopt;
     std::pair<Edge, double> edges[] = {{Edge::Left, x}, {Edge::Right, 1 - x}, {Edge::Top, y}, {Edge::Bottom, 1 - y}};
     std::stable_sort(std::begin(edges), std::end(edges), [](auto &a, auto &b) { return a.second < b.second; });
-    if (edges[0].second <= 0.28)
+    if (edges[0].second <= band)
         return edges[0].first;
     return std::nullopt;
 }

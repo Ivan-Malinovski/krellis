@@ -17,7 +17,7 @@ The aim is to stay mouse-first without giving up keyboard friendliness or floati
 ## Features
 
 - **Tiled layout on an infinite canvas.** Windows dock into rows and columns; a camera zooms and pans over them, with spring physics when `glide` is on. One canvas per monitor.
-- **Drag to re-dock.** Drop a window on another one to split it, on a screen edge to dock there, or on a seam between tiles. Shift-drag a title bar to float it.
+- **Drag to re-dock.** Drop on the left, right, top or bottom of a window to split just that tile in half. Drop in the gap between tiles to share space across their row or column, or on a screen edge to dock there. The title strip accepts tabs. Shift-drag a title bar to float it.
 - **Floating windows.** Float any window, or switch to floating-first mode where new windows float and only edge and corner drops tile. Floats snap to screen edges and corners.
 - **Keyboard movement and focus.** Move the focused tile through the layout with Meta+arrows (or Meta+A/S/D/F), focus neighbours with Meta+Ctrl+arrows, resize with the arrow keys. A tile at the edge of a monitor moves on to the next monitor.
 - **Quick jump.** Meta+/ opens a palette: type part of a window title, app or saved view and go straight there.
@@ -141,7 +141,7 @@ Use the settings module (System Settings → Window Management → Krellis, or t
 | `glide` | `false` | Spring camera and animated layout changes. Off, windows go straight to their new rectangles and play a short move-and-scale (`landMs`, default 200 ms) |
 | `scratchpad` | `false` | The scratch layer and its shortcuts |
 | `pin` | `false` | Pin shortcut (Meta+Shift+P) and the corner thumbnails |
-| `tabs` | `true` | Tabbed tiles: tab strips, the tab shortcuts, and dropping a window on a tile's title bar tabs it (the middle of a tile does not) |
+| `tabs` | `true` | Tabbed tiles: tab strips, the tab shortcuts, and dropping a window on a tile's title bar tabs it; dropping on its body splits it |
 | `followTheme` | `true` | Overlays use the Plasma colour scheme and accent |
 | `toasts` | `true` | Brief labels on toggles, undo and redo |
 | `flyTo` | `false` | Long camera jumps zoom out, pan and zoom in (needs `glide`) |

@@ -9,17 +9,13 @@ for n in A B C; do
 done
 sleep 1
 echo "--- start"; call dump | grep -E "^p|ORDER"
-echo "--- lift B and move around, no drop target change"
-call simDragStart 1 640 400
-for x in 640 700 500 640; do call simDragMove $x 300; sleep 0.05; done
-sleep 0.4; call dump | grep -E "DRAG|SLOT|^p"
-echo "--- release in place"
-call simDragEnd true; sleep 1.2; call dump | grep -E "^p|ORDER"
-echo "--- lift B, drop on the A|B seam (x=~330 after collapse)"
-call simDragStart 1 640 400
-for x in 600 500 400 330; do call simDragMove $x 400; sleep 0.05; done
-sleep 0.4; call dump | grep -E "DRAG|SLOT"
-call simDragEnd true; sleep 1.2; call dump | grep -E "^p|ORDER"
+echo "--- lift B and return to each of its original seams"
+for seam in 427 853; do
+  call simDragStart 1 640 400
+  call simDragMove "$seam" 400
+  sleep 0.4; call dump | grep -E "DRAG|SLOT|^p"
+  call simDragEnd true; sleep 1.2; call dump | grep -E "^p|ORDER"
+done
 widths=$(call dump | grep -oE "^p[0-9] .* frame [0-9.,]+ [0-9]+" | awk '{print $NF}' | sort -u | tr '\n' ' ')
 echo "widths after drop: $widths"
 case "$widths" in "415 ") echo "OK all columns unchanged"; rc=0;; *) echo "FAIL columns resized"; rc=1;; esac

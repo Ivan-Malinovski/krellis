@@ -1,0 +1,9 @@
+[General]
+glide=true
+tabs=true
+map=false
+followTheme=false
+toasts=false
+whichKey=false
+spawnTarget=end
+peek=0

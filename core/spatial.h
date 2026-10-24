@@ -65,7 +65,8 @@ struct DockTargetSpec {
     int boundary = 0;
 };
 
-std::optional<Edge> dropEdge(Point point, const Rect &rect);
+// Nearest edge within a normalized band; 0.5 covers the entire body.
+std::optional<Edge> dropEdge(Point point, const Rect &rect, double band = 0.28);
 // Side a window opened at `point` takes in the tile `rect` (pixel size widthPx x heightPx): the nearby edge if the
 // point is close to one, otherwise the nearer half of the tile's longer side (a square counts as wide).
 Edge pointerSpawnEdge(Point point, const Rect &rect, double widthPx, double heightPx);
