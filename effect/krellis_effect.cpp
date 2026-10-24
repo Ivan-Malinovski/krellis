@@ -1983,7 +1983,7 @@ bool KrellisCanvas::handleAxis(const PointerAxisEvent &e, bool titleBar)
         return false;
     // Scrolling zooms one column and row at a time: with Alt or Meta held on a notched wheel (Ctrl is left to
     // the apps, which zoom their contents with it), with Ctrl+Alt on anything, or with nothing held over a
-    // title bar.
+    // title bar or the gap between two tiles.
     const bool chord = (e.modifiers & GESTURE_MODS) == GESTURE_MODS;
     const bool keyWheel = (e.modifiers & (Qt::AltModifier | Qt::MetaModifier)) && e.source == PointerAxisSource::Wheel;
     if (!chord && !keyWheel && !titleBar)
@@ -2589,7 +2589,7 @@ void KrellisCanvas::flipActive()
 
 // The gap between two siblings, as the split that holds them and the index of the first. The gap is
 // 2 * GAP wide; a couple of pixels more are allowed so a click that just misses it still counts.
-bool KrellisCanvas::seamAt(QPointF pos, std::string *split, int *index) const
+bool KrellisCanvas::seamAt(QPointF pos, std::string *split, int *index, QPointF *snapped, bool *sideBySide) const
 {
     if (m_session || m_resize || !m_doc.root) return false;
     const TRect &cam = m_camera.value;
@@ -2609,6 +2609,8 @@ bool KrellisCanvas::seamAt(QPointF pos, std::string *split, int *index) const
             if (std::abs(along - seam) <= reach && across >= lo && across <= hi) {
                 *split = node->id;
                 *index = int(i);
+                if (sideBySide) *sideBySide = x;
+                if (snapped) *snapped = x ? QPointF(seam, pos.y()) : QPointF(pos.x(), seam);
                 return true;
             }
         }
@@ -2617,6 +2619,18 @@ bool KrellisCanvas::seamAt(QPointF pos, std::string *split, int *index) const
         return false;
     };
     return walk(m_doc.root);
+}
+
+std::optional<QPointF> KrellisCanvas::seamScrollPoint(QPointF pos, bool otherSide) const
+{
+    std::string split;
+    int index = 0;
+    QPointF seam;
+    bool sideBySide = false;
+    if (overUi(pos) || !seamAt(pos, &split, &index, &seam, &sideBySide)) return std::nullopt;
+    // Sitting exactly on the boundary is a tie between the two tiles; step off it so one of them wins.
+    const double nudge = otherSide ? -1 : 1;
+    return sideBySide ? QPointF(seam.x() + nudge, seam.y()) : QPointF(seam.x(), seam.y() + nudge);
 }
 
 void KrellisCanvas::stashActive()

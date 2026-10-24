@@ -106,6 +106,9 @@ public:
     bool handleButton(const PointerButtonEvent &e);
     bool handleMotion(const PointerMotionEvent &e);
     bool handleAxis(const PointerAxisEvent &e, bool titleBar = false);
+    // The gap between two tiles: scrolling there zooms, like a title bar. Returns the pointer snapped onto the seam and
+    // nudged 1 px to the right/lower tile (the left/upper one when `otherSide`), which is the tile a zoom step favours.
+    std::optional<QPointF> seamScrollPoint(QPointF pos, bool otherSide) const;
     bool handleKey(const KeyboardKeyEvent &e);
     void pinch(double scaleSinceLast, QPointF at, QPointF delta);
     void endPinch();
@@ -403,7 +406,7 @@ private:
     QString m_hoverKey, m_pressKey, m_barSignature;
     bool m_mapOn = false, m_pressBar = false;
     bool m_swallowMiddle = false; // a middle press flipped a seam: its release is ours too
-    bool seamAt(QPointF pos, std::string *split, int *index) const;
+    bool seamAt(QPointF pos, std::string *split, int *index, QPointF *snapped = nullptr, bool *sideBySide = nullptr) const;
     // Dragging a square on the minimap frames the tiles it touches.
     bool m_mapDragging = false;
     QPointF m_mapAnchor;

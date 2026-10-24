@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Scroll on the gap between two tiles to zoom**, with no key held and whatever the windows are (Brave and other apps that draw their own title bar included). Scroll in narrows the frame toward the tile on the right or lower side of the gap, scroll out widens it; hold Shift to favour the left or upper tile instead. Scrolling over a window is still left to the app.
 - Small helper windows no longer take a tile or get resized: fixed-size windows (password and polkit prompts such as the one `pkexec` shows, the wallet prompt), windows with a parent or that skip the taskbar, and undecorated always-on-top or thin strips (screen-sharing "you are sharing" bars) keep their own size and place. Decided from how the window asks to be shown, not from its name; a small, ordinary, resizable window still tiles. The journal line `leaving alone <app> <title> <reason>` says why.
 - Plasma's own windows (the panel edit toolbar and panel settings, the widget explorer) are never tiled, so editing panels no longer fights the layout.
 - Windows keep KWin's background blur. Krellis draws every tile transformed, which made KWin's blur effect skip them; tiles now carry the force-blur flag, so translucent windows (Kvantum, Kitty, Dolphin) blur what is behind them again.

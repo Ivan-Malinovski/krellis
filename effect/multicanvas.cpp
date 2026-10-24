@@ -557,13 +557,21 @@ bool KrellisEffect::handleAxis(const PointerAxisEvent &e)
     }
     if (pinUnder(e.position)) return true;
     auto *canvas = canvasAt(e.position);
-    // Scrolling over a server-side title bar zooms without any key held.
+    // Scrolling over a server-side title bar or a gap between tiles zooms without any key held.
     bool titleBar = false;
     if (canvas && !m_clientGrab) {
         if (const auto hit = surfaceHit(e.position); hit && hit->decoration && !hit->inert && hit->canvas == canvas
             && hit->window->window())
             titleBar = hit->mapped.y() < hit->window->window()->clientGeometry().top();
     }
+    // The gap between two tiles belongs to nobody, so it scrolls too (and works for windows with no title bar). It
+    // favours the right/lower tile; Shift favours the left/upper one.
+    if (canvas && !m_clientGrab && !titleBar)
+        if (const auto seam = canvas->seamScrollPoint(e.position, e.modifiers & Qt::ShiftModifier)) {
+            auto onSeam = e;
+            onSeam.position = *seam;
+            return canvas->handleAxis(onSeam, true) || surfaceAxis(e);
+        }
     return (canvas && canvas->handleAxis(e, titleBar)) || surfaceAxis(e);
 }
 // Follows Meta and Alt (and Shift/Ctrl, which cancel the hold) from the key stream. Never consumes anything.

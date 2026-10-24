@@ -120,6 +120,7 @@ Moving a panel: it behaves as if you dropped it in the middle of the neighbour. 
 |---|---|
 | Alt / Meta + scroll | Zoom a column and row |
 | Scroll on a title bar | Zoom |
+| Scroll on the gap between two tiles | Zoom to the tile on its right/lower side (Shift: left/upper); works on any window, including ones with their own title bar |
 | Ctrl+Alt + drag | Pan |
 | Meta + drag | Zoom to a rectangle |
 | Drag a square on the minimap | Zoom to the tiles it touches |
