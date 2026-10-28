@@ -222,6 +222,7 @@ void KrellisEffect::syncOutputs()
         canvas->setPinOn(m_pinOn);
         canvas->setTabsOn(m_tabsOn);
         canvas->m_glide = m_glide;
+        canvas->configureAnimations(m_hyprland, m_windowAnimation);
         canvas->m_landMs = m_landMs;
         canvas->m_iconBelow = m_iconBelow;
         canvas->m_tileMinimum = m_tileMinimum;
@@ -290,7 +291,8 @@ void KrellisEffect::syncOutputs()
 KrellisCanvas *KrellisEffect::owner(EffectWindow *w) const
 {
     for (const auto &canvas : m_canvases)
-        if (canvas->trackedFor(w) || canvas->stowedFor(w) || canvas->m_closing.count(w))
+        if (canvas->trackedFor(w) || canvas->stowedFor(w) || canvas->m_closing.count(w)
+            || canvas->m_closed.count(w)) // closed, animation over, still alive: the owner must hide it, not the chain draw it
             return canvas.get();
     if (w && w->isPopupWindow()) {
         auto *parent = w->transientFor();
@@ -1131,7 +1133,9 @@ void KrellisEffect::applySettings(const krellis::config::Settings &settings)
     m_peekPx = settings.peek;
     m_mapPinned = settings.mapPinned;
     m_showMap = settings.map;
-    m_glide = settings.glide;
+    m_hyprland = settings.animationProfile == QLatin1String("hyprland");
+    m_windowAnimation = settings.windowAnimation;
+    m_glide = settings.glide && !m_hyprland; // the presentation profile never enables resize/camera glides
     m_landMs = settings.landMs;
     m_iconBelow = settings.iconBelow;
     m_tileMinimum = {double(settings.tileMinWidth), double(settings.tileMinHeight)};
@@ -1167,6 +1171,7 @@ void KrellisEffect::applySettings(const krellis::config::Settings &settings)
         canvas->setPinOn(m_pinOn);
         canvas->setTabsOn(m_tabsOn);
         canvas->m_glide = m_glide;
+        canvas->configureAnimations(m_hyprland, m_windowAnimation);
         canvas->m_landMs = m_landMs;
         canvas->m_iconBelow = m_iconBelow;
         canvas->m_tileMinimum = m_tileMinimum;

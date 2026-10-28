@@ -83,6 +83,32 @@ private slots:
         QVERIFY(DOCK_EASE(0.5) > 0.75); // fast start, long settle
         QVERIFY(DOCK_EASE(0.2) < DOCK_EASE(0.4));
     }
+    void hyprlandCurvesHaveIndependentClocks()
+    {
+        // Evaluate the two parametric cubics at t=.5: known x/y pairs.
+        QVERIFY(std::abs(HyprlandMotion::ease(.33125) - .875) < .0001);
+        QVERIFY(std::abs(HyprlandMotion::fade(.59375) - .6875) < .0001);
+        QCOMPARE(HyprlandMotion::ease(-1), 0.0);
+        QCOMPARE(HyprlandMotion::fade(2), 1.0);
+        // Opening is fully opaque while its geometry is still settling.
+        QCOMPARE(HyprlandMotion::fade(200 / HyprlandMotion::fadeInMs), 1.0);
+        QVERIFY(HyprlandMotion::ease(200 / HyprlandMotion::inMs) < 1);
+        // The named Hyprland curve differs from the polynomial used by Trellis.
+        QVERIFY(std::abs(HyprlandMotion::ease(.25) - easeOutQuint(.25)) > .01);
+    }
+    void hyprlandWindowStyles()
+    {
+        const Rect output{1280, -300, 1280, 800};
+        const Rect window{1400, -200, 400, 200};
+        QCOMPARE(HyprlandMotion::collapsed(window, output, "popin"), (Rect{1426, -187, 348, 174}));
+        QCOMPARE(HyprlandMotion::collapsed(window, output, "gnomed"), (Rect{1400, -100, 400, 0}));
+        QCOMPARE(HyprlandMotion::collapsed(window, output, "slide"), (Rect{1400, -500, 400, 200}));
+        QCOMPARE(HyprlandMotion::collapsed({1300, 0, 100, 100}, output, "slide"), (Rect{1200, 0, 100, 100}));
+        QCOMPARE(HyprlandMotion::collapsed({2450, 0, 100, 100}, output, "slide"), (Rect{2550, 0, 100, 100}));
+        QCOMPARE(HyprlandMotion::collapsed({1800, 380, 100, 100}, output, "slide"), (Rect{1800, 500, 100, 100}));
+        // Small cards never grow when collapsed.
+        QCOMPARE(HyprlandMotion::collapsed({0, 0, 3, 4}, output, "popin"), (Rect{0, 0, 3, 4}));
+    }
 
 private:
     static double MotionLayoutMs() { return Motion::layoutMs; }

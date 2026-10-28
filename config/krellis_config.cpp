@@ -60,6 +60,10 @@ Settings load(const QString &file)
     s.map = c.value(QStringLiteral("map"), s.map).toBool();
     s.mapPinned = c.value(QStringLiteral("mapPinned"), s.mapPinned).toBool();
     s.glide = c.value(QStringLiteral("glide"), s.glide).toBool();
+    if (c.value(QStringLiteral("animationProfile")).toString() == QLatin1String("hyprland"))
+        s.animationProfile = QStringLiteral("hyprland");
+    const QString style = c.value(QStringLiteral("windowAnimation")).toString();
+    if (style == QLatin1String("slide") || style == QLatin1String("gnomed")) s.windowAnimation = style;
     s.scratchpad = c.value(QStringLiteral("scratchpad"), s.scratchpad).toBool();
     s.pin = c.value(QStringLiteral("pin"), s.pin).toBool();
     s.tabs = c.value(QStringLiteral("tabs"), s.tabs).toBool();
@@ -88,6 +92,8 @@ bool save(const Settings &s, const QString &file)
     c.setValue(QStringLiteral("map"), s.map);
     c.setValue(QStringLiteral("mapPinned"), s.mapPinned);
     c.setValue(QStringLiteral("glide"), s.glide);
+    c.setValue(QStringLiteral("animationProfile"), s.animationProfile);
+    c.setValue(QStringLiteral("windowAnimation"), s.windowAnimation);
     c.setValue(QStringLiteral("scratchpad"), s.scratchpad);
     c.setValue(QStringLiteral("pin"), s.pin);
     c.setValue(QStringLiteral("tabs"), s.tabs);

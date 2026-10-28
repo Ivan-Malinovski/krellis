@@ -1,0 +1,15 @@
+[General]
+animationProfile=hyprland
+glide=false
+map=false
+peek=0
+spawnTarget=end
+followTheme=false
+toasts=false
+whichKey=false
+
+[ViewRules]
+org.kde.plasma.emojier\placement=floating
+org.kde.plasma.emojier\allowSide=false
+org.kde.plasma.emojier\allowStage=false
+org.kde.plasma.emojier\allowFloating=true

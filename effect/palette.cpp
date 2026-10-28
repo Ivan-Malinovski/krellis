@@ -166,7 +166,7 @@ void KrellisCanvas::updatePalette(double dt)
     if (!m_paletteOn && m_paletteOpacity <= 0) {
         const Rect g = m_palette->geometry();
         m_palette.reset();
-        effects->addRepaint(Region(g));
+        repaintRegion(Region(g));
         return;
     }
     QQuickItem *item = m_palette->rootItem();
@@ -186,11 +186,11 @@ void KrellisCanvas::updatePalette(double dt)
         item->setProperty("first", m_paletteFirst);
         item->setProperty("total", int(m_paletteRanked.size()));
         m_paletteDirty = false;
-        effects->addRepaint(Region(m_palette->geometry()));
+        repaintRegion(Region(m_palette->geometry()));
     }
     if (m_paletteOpacity != before) {
         item->setProperty("paletteOpacity", m_paletteOpacity);
-        effects->addRepaint(Region(m_palette->geometry()));
+        repaintRegion(Region(m_palette->geometry()));
     }
     m_paletteBusy = !m_paletteOn || m_paletteOpacity < 1;
 }

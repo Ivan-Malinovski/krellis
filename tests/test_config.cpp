@@ -39,6 +39,7 @@ private Q_SLOTS:
         Settings s;
         s.closeFocus = false; s.floatFirst = true; s.shakeFloat = false; s.spawnTarget = SpawnTarget::Focused; s.peek = 12; s.map = false; s.mapPinned = true; s.glide = true; s.landMs = 90; s.iconBelow = 40; s.tileMinWidth = 320; s.tileMinHeight = 200; s.scratchpad = true; s.pin = true; s.tabs = false;
         s.followTheme = false; s.toasts = false; s.flyTo = true; s.whichKey = false; s.whichKeyDelayMs = 750;
+        s.animationProfile = "hyprland"; s.windowAnimation = "slide";
         QVERIFY(save(s, file));
         QCOMPARE(load(file), s);
         QVERIFY(!Settings{}.scratchpad);
@@ -89,6 +90,22 @@ private Q_SLOTS:
     {
         QTemporaryDir dir;
         QCOMPARE(load(dir.filePath("nothing")), Settings{});
+    }
+    void animationProfilesAndInvalidValues()
+    {
+        QTemporaryDir dir;
+        const QString file = dir.filePath("krellisrc");
+        QCOMPARE(Settings{}.animationProfile, QString("trellis"));
+        for (const QString &style : {QString("popin"), QString("slide"), QString("gnomed")}) {
+            Settings s;
+            s.animationProfile = "hyprland"; s.windowAnimation = style;
+            QVERIFY(save(s, file));
+            QCOMPARE(load(file), s);
+        }
+        QVERIFY(saveValue("animationProfile", "unknown", file));
+        QVERIFY(saveValue("windowAnimation", "invalid", file));
+        QCOMPARE(load(file).animationProfile, QString("trellis"));
+        QCOMPARE(load(file).windowAnimation, QString("popin"));
     }
     void liveToggleIsReadBack()
     {

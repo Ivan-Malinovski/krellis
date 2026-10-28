@@ -2,6 +2,7 @@
 # Verify replacements capture actual paint geometry and opacity, not layout targets.
 set -euo pipefail
 exec >"$NEST_OUT/log.txt" 2>&1
+trap 'echo "FAIL interrupted-flight scenario exited unexpectedly"' ERR
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
 call() { qdbus6 org.kde.KWin /Krellis org.kde.kwin.KWin.KrellisEffect."$@"; }
@@ -72,7 +73,13 @@ assert max(abs(a-b) for a,b in zip(paint,source)) < 160,(paint,source)
 assert max(abs(a-b) for a,b in zip(target,source)) > 15,(target,source)
 # Closing a glide retains its visual source, rather than its layout target.
 closing=next(l for l in (root/'close.txt').read_text().splitlines() if l.startswith('CLOSING interrupt-alpha'))
-source=values(closing,'from'); previous=values(row('preclose'),'FLY')
+source=values(closing,'from'); previous_row=row('preclose')
+# visualRect may aspect-fit a tiled glide. The raw FLY rectangle is then
+# different from what was painted, and cannot be the expected close capture.
+size=re.search('drawn '+number+'x'+number,previous_row)
+position=re.search('drawnpos '+number+','+number,previous_row)
+assert size and position,previous_row
+previous=tuple(map(float,position.groups()+size.groups()))
 assert max(abs(a-b) for a,b in zip(source,previous)) < 130,(source,previous)
 hidden=next(l for l in (root/'hidden-close.txt').read_text().splitlines() if l.startswith('CLOSING interrupt-beta'))
 assert 0.1 < opacity(hidden,'baseOpacity') < .95,hidden

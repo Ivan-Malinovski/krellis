@@ -305,7 +305,7 @@ void KrellisCanvas::updateTabStrips()
     computeStrips();
     if (m_strips.empty()) {
         if (m_tabStrips) {
-            effects->addRepaint(Region(m_tabStrips->geometry()));
+            repaintRegion(Region(m_tabStrips->geometry()));
             m_tabStrips.reset();
         }
         m_tabStripsSignature.clear();
@@ -336,7 +336,7 @@ void KrellisCanvas::updateTabStrips()
     if (signature == m_tabStripsSignature) return;
     m_tabStripsSignature = signature;
     m_tabStrips->rootItem()->setProperty("strips", list);
-    effects->addRepaint(Region(m_tabStrips->geometry()));
+    repaintRegion(Region(m_tabStrips->geometry()));
 }
 
 std::optional<KrellisCanvas::TabHit> KrellisCanvas::tabAt(QPointF p) const

@@ -33,7 +33,7 @@ void KrellisCanvas::updateMotionOverlay(double dt)
     m_motionBusy = m_liftAmount != liftTarget || landing > 0 || rewind > 0 || (!m_keyMoveHeld && keyMove > 0);
     if (!dragging && m_liftAmount == 0 && detail == 0 && landing == 0 && rewind == 0 && keyMove == 0) {
         if (m_motionOverlay) {
-            effects->addRepaint(Region(m_motionOverlay->geometry()));
+            repaintRegion(Region(m_motionOverlay->geometry()));
             m_motionOverlay.reset();
             m_motionIds.clear();
         }

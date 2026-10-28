@@ -143,6 +143,8 @@ Use the settings module (System Settings → Window Management → Krellis, or t
 | `map` | `true` | Minimap available |
 | `mapPinned` | `false` | Keep the minimap out instead of sliding it off the edge |
 | `glide` | `false` | Spring camera and animated layout changes. Off, windows go straight to their new rectangles and play a short move-and-scale (`landMs`, default 200 ms) |
+| `animationProfile` | `trellis` | `hyprland` selects window animations based on Hyprland 0.54's preset, with destination-only app resizing. It overrides `glide`, `landMs` and `flyTo`; the camera moves directly |
+| `windowAnimation` | `popin` | Hyprland opening/closing style: `popin` (87%), `slide` (nearest output edge), or `gnomed` (vertical collapse) |
 | `scratchpad` | `false` | The scratch layer and its shortcuts |
 | `pin` | `false` | Pin shortcut (Meta+Shift+P) and the corner thumbnails |
 | `tabs` | `true` | Tabbed tiles: tab strips, the tab shortcuts, and dropping a window on a tile's title bar tabs it; dropping on its body splits it |
@@ -152,6 +154,20 @@ Use the settings module (System Settings → Window Management → Krellis, or t
 | `whichKey` | `true` | Holding Meta+Alt shows the cheat sheet (`whichKeyDelayMs`, default 400) |
 | `tileMinWidth`, `tileMinHeight` | `1` | Pixel minimum of a tile for apps without a rule |
 | `iconBelow` | `0` | Tiles narrower than this show an icon instead of the live window; 0 keeps windows live at any size |
+
+Choose **Animation profile → Hyprland** in the settings module to try the new window animations. It works with `glide=false`: applications receive their destination size once, and their available contents are scaled while the painted window moves. Geometry and opacity have independent curves and durations. A slow client can still visibly change its contents when its new buffer arrives; this is not a guarantee of identical rendering or frame pacing to Hyprland. Workspace transitions, animated Hyprland borders/shadows, and newer spring presets are not included. See [the animation reference and limits](docs/hyprland-animations.md).
+
+Animations update the canvas for the output being rendered, and ordinary animation repaints target that output. Cross-monitor flights repaint both sides until landing. The Hyprland profile skips native geometry scans while only the painted rectangle is animating; changing a destination, moving the camera, or changing a drag preview still refreshes client geometry.
+
+For example, to keep KDE's Emoji Selector floating and prevent docking it by shortcut or drag, add this rule (or set the same placement permissions in the settings module):
+
+```ini
+[ViewRules]
+org.kde.plasma.emojier\placement=floating
+org.kde.plasma.emojier\allowSide=false
+org.kde.plasma.emojier\allowStage=false
+org.kde.plasma.emojier\allowFloating=true
+```
 
 ## Safety
 

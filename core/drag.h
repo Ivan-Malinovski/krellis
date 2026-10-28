@@ -107,7 +107,8 @@ public:
     /// Pointer moved (screen space). Returns true once the drag is active.
     bool move(Point pointer, double nowMs);
     /// Advance timers: applies the settled candidate after 150 ms.
-    void tick(double nowMs);
+    // True when a pending drop target is applied (its preview geometry changed).
+    bool tick(double nowMs);
     /// Release or cancel. Release expresses intent immediately, even before the hover delay expires.
     DragOutcome end(bool commit, double nowMs);
 

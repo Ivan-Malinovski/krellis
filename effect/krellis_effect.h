@@ -30,6 +30,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <deque>
 #include <set>
 #include <vector>
 
@@ -265,6 +266,7 @@ private:
         std::optional<RectF> requested; // last frame applyRest asked for
         double requestedMs = 0;          // when, on the canvas clock
         std::optional<TRect> lastDrawn;  // rect paintWindow last drew it at
+        std::optional<TRect> motionTarget; // last presentation destination; unrelated to client configure acknowledgements
     };
     // True while the window's frame is where applyRest put it. A camera can place a neighbour past the
     // output edge; KWin then reports an output change that is ours, not a user transfer.
@@ -359,6 +361,10 @@ private:
     // tweened: request the sizes of the running layout tween instead of the final ones, so clients really
     // resize through the animation and their contents are never scaled.
     void applyRest(bool stepping = false);
+    void configureAnimations(bool hyprland, const QString &style);
+    void syncWindowMotion(Tracked &tracked);
+    void repaintCanvas();
+    void repaintRegion(const Region &logicalRegion);
     void updateDock();
     TRect chipRect(EffectWindow *w) const;
     enum class FlightKind { Appear, Hide, Restore, Glide };
@@ -370,6 +376,8 @@ private:
         std::optional<EffectWindowVisibleRef> ref;
         std::optional<RectF> nativeRestore;
         double fromOpacity = 1;
+        bool hyprland = false; // captured so a settings reload cannot change an active flight's curve
+        double fadeStart = 0, fadeFrom = 1, fadeMs = krellis::HyprlandMotion::fadeInMs;
     };
     void startFlight(EffectWindow *w, FlightKind kind, TRect from, TRect to, double opacity = 1);
     bool flightRect(EffectWindow *w, const Tracked &t, TRect &rect, double &opacity) const;
@@ -380,6 +388,7 @@ private:
     krellis::History m_history;
     int m_editDepth = 0;
     static double realMs();
+    double animationNow(bool hyprland) const { return hyprland ? realMs() : m_nowMs; }
     void commitEdit(const char *label, const krellis::LayoutDocument &before, const krellis::LayoutDocument &next, const std::string &key = {});
     // Records the document as it was on entry, if it differs on exit. Nested scopes leave the recording to the outermost.
     class EditScope
@@ -408,6 +417,8 @@ private:
     std::vector<Tracked> m_windows;
     AnimationClock m_clock;
     double m_nowMs = 0;
+    quint64 m_framePasses = 0, m_restPasses = 0, m_motionPasses = 0;
+    std::optional<TRect> m_restCamera; // Hyprland destinations only need refreshing after the camera changes
     bool m_animating = false;
     int m_counter = 0;
     QRectF m_area;
@@ -479,6 +490,8 @@ private:
     struct Landing { TRect from; double start; };
     std::map<EffectWindow *, Landing> m_landings;
     bool m_glide = false; // our own animations (camera spring, layout tween, appear/close/popup); off = windows jump straight to their final rects
+    bool m_hyprland = false;
+    QString m_windowAnimation = QStringLiteral("popin");
     bool m_shakeFloat = true;     // loaded from krellisrc; a shake of the dragged window floats it
     bool m_shakeLatched = false;  // this drag has been shaken: it floats like a Shift-drag until released
     krellis::ShakeDetector m_shake;
@@ -561,8 +574,12 @@ private:
         double start;
         double opacity = 1;
         EffectWindowVisibleRef visible;
+        bool hyprland = false;
+        TRect to;
     };
     std::map<EffectWindow *, Closing> m_closing;
+    std::set<EffectWindow *> m_closed; // windows whose close we animated, until KWin destroys them: another effect may hold one past our animation
+    TRect closingRect(const Closing &closing, double *opacity) const;
 };
 
 // One effect-chain participant, owning an independent state machine per output.
@@ -809,6 +826,8 @@ private:
     bool m_shakeFloatOn = true;
     bool m_toastsOn = true, m_flyToOn = false; // loaded from krellisrc; mirrored into every canvas
     bool m_glide = false; // loaded from krellisrc ([General] glide, default off); mirrored into every canvas
+    bool m_hyprland = false;
+    QString m_windowAnimation = QStringLiteral("popin");
 };
 
 } // namespace KWin

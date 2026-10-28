@@ -174,15 +174,37 @@ KCM.SimpleKCM {
 
             Kirigami.Separator { Kirigami.FormData.isSection: true; Kirigami.FormData.label: i18n("Motion") }
 
+            QQC2.ComboBox {
+                Kirigami.FormData.label: i18n("Animation profile:")
+                model: [i18n("Trellis"), i18n("Hyprland")]
+                currentIndex: kcm.animationProfile === "hyprland" ? 1 : 0
+                onActivated: kcm.animationProfile = currentIndex === 1 ? "hyprland" : "trellis"
+            }
+            QQC2.ComboBox {
+                Kirigami.FormData.label: i18n("Window opening and closing:")
+                visible: kcm.animationProfile === "hyprland"
+                model: [i18n("Pop in (87%)"), i18n("Slide from nearest edge"), i18n("Vertical collapse")]
+                currentIndex: ["popin", "slide", "gnomed"].indexOf(kcm.windowAnimation)
+                onActivated: kcm.windowAnimation = ["popin", "slide", "gnomed"][currentIndex]
+            }
+            QQC2.Label {
+                visible: kcm.animationProfile === "hyprland"
+                Layout.fillWidth: true
+                Layout.preferredWidth: Kirigami.Units.gridUnit * 18
+                Layout.maximumWidth: Kirigami.Units.gridUnit * 24
+                wrapMode: Text.WordWrap
+                text: i18n("Hyprland animates window geometry and fades separately. Apps resize once per destination; the camera moves directly. Window contents may scale during the transition.")
+            }
             QQC2.CheckBox {
                 Kirigami.FormData.label: i18n("Animations:")
+                enabled: kcm.animationProfile !== "hyprland"
                 text: i18n("Smooth camera and layout animations")
                 checked: kcm.glide
                 onToggled: kcm.glide = checked
             }
             RowLayout {
                 Kirigami.FormData.label: i18n("Window landing:")
-                enabled: !kcm.glide
+                enabled: !kcm.glide && kcm.animationProfile !== "hyprland"
                 QQC2.SpinBox {
                     from: 0; to: 1000; stepSize: 25
                     value: kcm.landMs
@@ -203,7 +225,7 @@ KCM.SimpleKCM {
             QQC2.CheckBox {
                 Kirigami.FormData.label: i18n("Long jumps:")
                 text: i18n("Zoom out and back in when focus jumps far")
-                enabled: kcm.glide
+                enabled: kcm.glide && kcm.animationProfile !== "hyprland"
                 checked: kcm.flyTo
                 onToggled: kcm.flyTo = checked
             }

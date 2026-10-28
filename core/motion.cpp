@@ -147,4 +147,41 @@ std::function<double(double)> cubicBezier(double x1, double y1, double x2, doubl
 
 const std::function<double(double)> DOCK_EASE = cubicBezier(0.2, 0.75, 0.2, 1);
 
+namespace HyprlandMotion {
+// Window styles/preset adapted from Hyprland v0.54.0 (vaxerski, 2022-2026).
+// BSD-3-Clause notice: LICENSES/Hyprland-BSD-3-Clause.txt.
+double ease(double progress)
+{
+    static const auto curve = cubicBezier(.23, 1, .32, 1);
+    return curve(progress);
+}
+
+double fade(double progress)
+{
+    static const auto curve = cubicBezier(.5, .5, .75, 1);
+    return curve(progress);
+}
+
+Rect collapsed(const Rect &rect, const Rect &output, const std::string &style)
+{
+    if (style == "gnomed") return {rect.x, rect.y + rect.h / 2, rect.w, 0};
+    if (style == "slide") {
+        // Nearest output edge, with Hyprland's bottom/left/right/top tie order.
+        const double cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
+        const double top = cy - output.y, right = output.x + output.w - cx;
+        const double bottom = output.y + output.h - cy, left = cx - output.x;
+        const double nearest = std::min({top, right, bottom, left});
+        Rect off = rect;
+        if (bottom == nearest) off.y = output.y + output.h;
+        else if (left == nearest) off.x -= rect.w;
+        else if (right == nearest) off.x += rect.w;
+        else off.y = output.y - rect.h;
+        return off;
+    }
+    const double width = std::min(rect.w, std::max(5.0, rect.w * .87));
+    const double height = std::min(rect.h, std::max(5.0, rect.h * .87));
+    return {rect.x + (rect.w - width) / 2, rect.y + (rect.h - height) / 2, width, height};
+}
+} // namespace HyprlandMotion
+
 } // namespace krellis

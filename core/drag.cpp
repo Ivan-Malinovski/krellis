@@ -537,13 +537,15 @@ void DragSession::settle(const std::optional<DropTarget> &next, double nowMs)
     m_targetDeadline = nowMs + SettleMs;
 }
 
-void DragSession::tick(double nowMs)
+bool DragSession::tick(double nowMs)
 {
     m_now = nowMs;
     if (m_targetDeadline && nowMs >= *m_targetDeadline) {
         m_targetDeadline.reset();
         apply(m_candidate, nowMs);
+        return true;
     }
+    return false;
 }
 
 std::optional<Rect> DragSession::worldOf(const std::string &id) const

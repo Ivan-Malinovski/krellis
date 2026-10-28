@@ -18,6 +18,16 @@ double easeOutQuint(double t);
 Rect lerpRect(const Rect &a, const Rect &b, double t);
 bool sameRectEps(const Rect &a, const Rect &b, double eps = 1e-9);
 
+// Hyprland v0.54.0 example preset. Geometry and alpha have independent clocks.
+// These are screen-space presentation animations, independent of client resizing.
+namespace HyprlandMotion {
+inline constexpr double moveMs = 479, inMs = 410, outMs = 149;
+inline constexpr double fadeInMs = 173, fadeOutMs = 146;
+double ease(double progress); // Bézier (.23,1,.32,1), not the polynomial easeOutQuint
+double fade(double progress); // Bézier (.5,.5,.75,1)
+Rect collapsed(const Rect &rect, const Rect &output, const std::string &style);
+}
+
 /// A spring over a rect. Deterministic: step(dtSeconds).
 class RectSpring
 {

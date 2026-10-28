@@ -21,6 +21,8 @@ struct Settings
     bool map = true;              // the minimap is available (it tucks itself away at the screen edge)
     bool mapPinned = false;       // the minimap stays out instead of sliding off the edge
     bool glide = false;           // our own animations; off = windows jump to their final rects
+    QString animationProfile = QStringLiteral("trellis"); // trellis | hyprland (window presentation, no resize glides)
+    QString windowAnimation = QStringLiteral("popin");    // Hyprland open/close style: popin | slide | gnomed
     bool scratchpad = false;      // the scratch layer (Meta+G) and its minimap footer; off until asked for
     bool pin = false;             // Meta+Shift+P pins a tile to the corner while it is out of view; off until asked for
     bool tabs = true;             // windows can be grouped into tabbed tiles; off disables it and splits tabbed tiles apart

@@ -3,6 +3,7 @@
 #include "effect/effecthandler.h"
 #include "core/rendertarget.h"
 #include "core/renderviewport.h"
+#include "core/output.h"
 #include "opengl/glframebuffer.h"
 #include "opengl/glutils.h"
 #include <QDBusConnection>
@@ -10,6 +11,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QColor>
+#include <QElapsedTimer>
 #include <array>
 #include <cmath>
 #include <vector>
@@ -49,11 +51,14 @@ public:
         if (!m_enabled) { GLFramebuffer::popFramebuffer(); return; }
         ++m_frames;
         for (auto &probe : m_points) {
+            if (screen && !QRectF(screen->geometry()).contains(probe.point)) continue;
+            ++probe.samples;
             const auto point = viewport.mapToRenderTarget(probe.point);
             unsigned char pixel[4]{};
             glReadPixels(qRound(point.x()), target.size().height() - 1 - qRound(point.y()), 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
             const int r=pixel[0], g=pixel[1], b=pixel[2];
             probe.last = {r,g,b};
+            if (m_history) probe.history.push_back({m_clock.elapsed(), r, g, b});
             if (probe.blink) {
                 if (r>180 && g>180 && b<70) probe.seen |= 1;
                 else if (r>180 && b>180 && g<70) probe.seen |= 2;
@@ -73,20 +78,33 @@ public Q_SLOTS:
         }
         m_enabled=!m_points.empty(); return m_enabled;
     }
+    // Every sampled pixel of every presented frame, with its time: lets a scenario see a colour come back.
+    bool history(bool on) { m_history = on && m_allowed; m_clock.start(); for (auto &p : m_points) p.history.clear(); return m_history; }
+    QString historyJson() const {
+        QJsonArray points;
+        for (const auto &p : m_points) {
+            QJsonArray rows;
+            for (const auto &h : p.history) rows.append(QJsonArray{double(h.t), h.r, h.g, h.b});
+            points.append(rows);
+        }
+        return QString::fromUtf8(QJsonDocument(points).toJson(QJsonDocument::Compact));
+    }
     bool watchBlack(bool on) { m_watch = on; m_watchFrames = m_blackFrames = 0; m_maxBlack = 0; return m_allowed && on; }
     QString blackStats() const {
         return QString::fromUtf8(QJsonDocument(QJsonObject{{"frames", m_watchFrames}, {"blackFrames", m_blackFrames}, {"maxBlack", m_maxBlack}}).toJson(QJsonDocument::Compact));
     }
     QString stats() const {
         QJsonArray rows;
-        for (const auto &p : m_points) rows.append(QJsonObject{{"bad",p.bad},{"seen",p.seen},{"last",QJsonArray{p.last[0],p.last[1],p.last[2]}}});
+        for (const auto &p : m_points) rows.append(QJsonObject{{"bad",p.bad},{"seen",p.seen},{"samples",p.samples},{"last",QJsonArray{p.last[0],p.last[1],p.last[2]}}});
         return QString::fromUtf8(QJsonDocument(QJsonObject{{"frames",m_frames},{"points",rows}}).toJson(QJsonDocument::Compact));
     }
 private:
-    struct Probe { QPointF point; QColor expected; bool blink; int bad=0,seen=0; std::array<int,3> last{}; };
+    struct Sample { qint64 t; int r, g, b; };
+    struct Probe { QPointF point; QColor expected; bool blink; int bad=0,seen=0; std::array<int,3> last{}; int samples=0; std::vector<Sample> history; };
     std::vector<Probe> m_points;
     int m_frames=0;
-    bool m_allowed=false,m_enabled=false,m_watch=false;
+    bool m_allowed=false,m_enabled=false,m_watch=false,m_history=false;
+    QElapsedTimer m_clock;
     int m_watchFrames=0,m_blackFrames=0;
     double m_maxBlack=0;
 };

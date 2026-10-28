@@ -109,14 +109,15 @@ private slots:
         QCOMPARE(int(d.candidate()->kind), int(DropTarget::Kind::Tab));
         QCOMPARE(d.candidate()->panel, std::string("B"));
         QVERIFY(!d.target()); // not applied yet
-        d.tick(100);
+        QVERIFY(!d.tick(100));
         QVERIFY(!d.target());
-        d.tick(160); // 150 ms settle
+        QVERIFY(d.tick(160)); // 150 ms settle
         QVERIFY(d.target());
         QVERIFY(d.collapsed()); // source collapsed on the first target
         QVERIFY(d.layoutTargets().count(DROP_SLOT));
         QCOMPARE(d.dropLabel(), std::string("Add as tab"));
         QCOMPARE(h.tweens, 1);
+        QVERIFY(!d.tick(200)); // an unchanged preview needs no native geometry refresh
     }
     void onlyTheTitleBandTabsWhenTheBodyDoesNot()
     {

@@ -1,0 +1,12 @@
+[General]
+animationProfile=hyprland
+windowAnimation=popin
+glide=false
+flyTo=false
+landMs=0
+map=false
+peek=0
+spawnTarget=end
+followTheme=false
+toasts=false
+whichKey=false

@@ -43,6 +43,8 @@ class KrellisKcm : public KQuickConfigModule
     Q_PROPERTY(bool pin READ pin WRITE setPin NOTIFY settingsChanged)
     Q_PROPERTY(bool tabs READ tabs WRITE setTabs NOTIFY settingsChanged)
     Q_PROPERTY(bool glide READ glide WRITE setGlide NOTIFY settingsChanged)
+    Q_PROPERTY(QString animationProfile READ animationProfile WRITE setAnimationProfile NOTIFY settingsChanged)
+    Q_PROPERTY(QString windowAnimation READ windowAnimation WRITE setWindowAnimation NOTIFY settingsChanged)
     Q_PROPERTY(int landMs READ landMs WRITE setLandMs NOTIFY settingsChanged)
     Q_PROPERTY(int tileMinWidth READ tileMinWidth WRITE setTileMinWidth NOTIFY settingsChanged)
     Q_PROPERTY(int tileMinHeight READ tileMinHeight WRITE setTileMinHeight NOTIFY settingsChanged)
@@ -71,6 +73,8 @@ public:
     bool pin() const { return m_current.pin; }
     bool tabs() const { return m_current.tabs; }
     bool glide() const { return m_current.glide; }
+    QString animationProfile() const { return m_current.animationProfile; }
+    QString windowAnimation() const { return m_current.windowAnimation; }
     int landMs() const { return int(m_current.landMs); }
     int tileMinWidth() const { return m_current.tileMinWidth; }
     int tileMinHeight() const { return m_current.tileMinHeight; }
@@ -91,6 +95,8 @@ public:
     void setPin(bool v) { edit([&] { m_current.pin = v; }); }
     void setTabs(bool v) { edit([&] { m_current.tabs = v; }); }
     void setGlide(bool v) { edit([&] { m_current.glide = v; }); }
+    void setAnimationProfile(const QString &v) { edit([&] { m_current.animationProfile = v == QLatin1String("hyprland") ? v : QStringLiteral("trellis"); }); }
+    void setWindowAnimation(const QString &v) { edit([&] { m_current.windowAnimation = v == QLatin1String("slide") || v == QLatin1String("gnomed") ? v : QStringLiteral("popin"); }); }
     void setLandMs(int v) { edit([&] { m_current.landMs = v; }); }
     void setTileMinWidth(int v) { edit([&] { m_current.tileMinWidth = v; }); }
     void setTileMinHeight(int v) { edit([&] { m_current.tileMinHeight = v; }); }
