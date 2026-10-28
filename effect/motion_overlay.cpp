@@ -30,8 +30,15 @@ void KrellisCanvas::updateMotionOverlay(double dt)
     // Details appear as contents get smaller, rather than switching at a zoom threshold.
     const double spread = std::sqrt(double(std::max(size_t(1), leafIds(m_doc.root).size())));
     const double detail = dragging ? 0 : std::clamp((m_camera.value.w * spread - 1) / 0.8, 0.0, 1.0);
-    m_motionBusy = m_liftAmount != liftTarget || landing > 0 || rewind > 0 || (!m_keyMoveHeld && keyMove > 0);
-    if (!dragging && m_liftAmount == 0 && detail == 0 && landing == 0 && rewind == 0 && keyMove == 0) {
+    // A steady amber outline on tiles that ask for attention; it eases in and out, then costs nothing while it holds.
+    bool urgentSeen = false;
+    for (const auto &t : m_windows)
+        if (isUrgent(t.window) && !t.window->isMinimized() && !t.window->isHidden()) { urgentSeen = true; break; }
+    const double urgentTarget = urgentSeen ? 1 : 0;
+    m_urgentFade = feedback ? m_urgentFade + (urgentTarget - m_urgentFade) * (1 - std::exp(-dt / 0.08)) : urgentTarget;
+    if (std::abs(m_urgentFade - urgentTarget) < 0.005) m_urgentFade = urgentTarget;
+    m_motionBusy = m_liftAmount != liftTarget || landing > 0 || rewind > 0 || (!m_keyMoveHeld && keyMove > 0) || m_urgentFade != urgentTarget;
+    if (!dragging && m_liftAmount == 0 && detail == 0 && landing == 0 && rewind == 0 && keyMove == 0 && m_urgentFade == 0) {
         if (m_motionOverlay) {
             repaintRegion(Region(m_motionOverlay->geometry()));
             m_motionOverlay.reset();
@@ -71,8 +78,9 @@ void KrellisCanvas::updateMotionOverlay(double dt)
         const double flash = !visible ? 0 : t.panel == m_keyMovePanel ? keyMove : t.panel == m_landingPanel ? landing
             : m_rewindPanels.count(t.panel) ? rewind * 0.65 : 0;
         const double label = visible && !floatScreen(t.panel) ? detail * opacity * std::clamp((600 - rect.w) / 300, 0.0, 1.0) : 0;
+        const double urgent = visible && isUrgent(t.window) ? m_urgentFade : 0;
         QVariantList pieces;
-        if (label > 0 || flash > 0) {
+        if (label > 0 || flash > 0 || urgent > 0) {
             QRegion uncovered(QRectF(0, 0, rect.w, rect.h).toAlignedRect());
             bool above = false;
             for (auto *w : stack) {
@@ -97,7 +105,7 @@ void KrellisCanvas::updateMotionOverlay(double dt)
             tile.icon = bytes.isEmpty() ? QStringLiteral("") : QStringLiteral("data:image/png;base64,") + QString::fromLatin1(bytes.toBase64());
         }
         QVariantMap data{{"x", rect.x - m_area.x()}, {"y", rect.y - m_area.y()}, {"w", rect.w}, {"h", rect.h},
-            {"lift", visible && t.panel == m_liftPanel ? m_liftAmount : 0}, {"flash", flash}, {"detail", label}, {"pieces", pieces},
+            {"lift", visible && t.panel == m_liftPanel ? m_liftAmount : 0}, {"flash", flash}, {"urgent", urgent}, {"detail", label}, {"pieces", pieces},
             {"title", t.window->caption()}, {"icon", tile.icon}};
         QMetaObject::invokeMethod(root, "setPanel", Q_ARG(QVariant, int(i)), Q_ARG(QVariant, data));
     }

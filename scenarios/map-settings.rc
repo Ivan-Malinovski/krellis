@@ -1,0 +1,8 @@
+[General]
+glide=true
+map=true
+mapPinned=true
+followTheme=false
+toasts=false
+whichKey=false
+spawnTarget=pointer

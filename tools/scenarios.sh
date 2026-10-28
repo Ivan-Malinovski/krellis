@@ -6,7 +6,7 @@
 #   tools/scenarios.sh -j 4 -k          four at a time; -k keeps the work dirs of passing runs too
 #
 # Per scenario: scenarios/<name>.rc seeds krellisrc (the nested default is only glide=true and a few quiet switches),
-# scenarios/<name>.env can override the seed, set EXPECT=..., or choose NEST_EFFECTS (default krellis).
+# scenarios/<name>.env can override the seed, set EXPECT=..., choose NEST_EFFECTS (default krellis) or NEST_SIZE ("W H", default "1280 800").
 # 'NEST_OUTPUTS=2' in the script's header gives it two outputs.
 #
 # A scenario counts as failed when its log has a FAIL line, when its KWin segfaulted, or when it timed out.
@@ -49,7 +49,7 @@ run_one() {
         export NEST_EFFECTS=krellis
         # scenarios/<name>.env may override the seed (NEST_KRELLISRC=) or set EXPECT=... for a scenario with modes
         if [ -f "scenarios/$n.env" ]; then set -a; . "scenarios/$n.env"; set +a; fi
-        exec timeout "$timeout_s" tools/nested.sh build/root "$NEST_EFFECTS" "scenarios/$n.sh" 1280 800
+        exec timeout "$timeout_s" tools/nested.sh build/root "$NEST_EFFECTS" "scenarios/$n.sh" ${NEST_SIZE:-1280 800}
     ) >"$tmp/$n.out" 2>&1 </dev/null
     local code=$? log="$w/out/log.txt" pass fail segv=0 note=""
     pass=$(grep -cE '^(PASS|ok)' "$log" 2>/dev/null); fail=$(grep -c '^FAIL' "$log" 2>/dev/null)

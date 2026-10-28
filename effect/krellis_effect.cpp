@@ -353,6 +353,18 @@ void KrellisEffect::syncScratchShortcuts()
 }
 
 // Registered on demand: pin is opt-in, so a disabled one does not hold Meta+Shift+P.
+void KrellisEffect::syncUrgentShortcut()
+{
+    if (!m_urgentOn) { qDeleteAll(m_urgentActions); m_urgentActions.clear(); return; }
+    if (!m_urgentActions.isEmpty()) return;
+    auto *a = new QAction(this);
+    a->setObjectName(QStringLiteral("KrellisUrgent"));
+    a->setText(QStringLiteral("Krellis: Jump to Urgent Window"));
+    KGlobalAccel::self()->setGlobalShortcut(a, QKeySequence(Qt::META | Qt::Key_U));
+    connect(a, &QAction::triggered, this, [this] { hideHint(); focusUrgent(); });
+    m_urgentActions << a;
+}
+
 void KrellisEffect::syncPinShortcut()
 {
     if (!m_pinOn) {
@@ -383,6 +395,7 @@ void KrellisCanvas::watch(EffectWindow *w)
         connect(w->window(), &Window::iconChanged, this, [this, w] {
             if (const auto *t = trackedFor(w)) { m_tiles[t->panel].icon = QString(); schedule(); }
         });
+        connect(w->window(), &Window::demandsAttentionChanged, this, [this, w] { urgentChanged(w); });
         connect(w->window(), &Window::captionChanged, this, [this, w] {
             if (trackedFor(w) || stowedFor(w)) { m_barSignature.clear(); updateBar(); updateTabStrips(); schedule(); }
         });
@@ -992,7 +1005,7 @@ void KrellisCanvas::dockAtPointer(const NodePtr &panel)
 
 // Open beside the focused window: on its right, or below it when the tile is taller than wide. Without a docked
 // focused window here (nothing active, a float, another screen) the window goes to the end.
-void KrellisCanvas::dockAtFocused(const NodePtr &panel)
+void KrellisCanvas::dockAtFocused(const NodePtr &panel, bool dwindle)
 {
     if (fillVacancyFor(panel, std::nullopt))
         return;
@@ -1015,13 +1028,17 @@ void KrellisCanvas::dockAtFocused(const NodePtr &panel)
         return;
     }
     const auto edge = entry->rect.w * m_area.width() >= entry->rect.h * m_area.height() ? krellis::Edge::Right : krellis::Edge::Bottom;
-    m_doc.root = applyDockTarget(m_doc.root, krellis::tileDropTarget(entries, from, edge), panel, uid("split"));
+    // Dwindle (Hyprland): always halve the focused tile itself. tileDropTarget would instead add a column to the
+    // parent row when the axes match, so every sibling shrinks; insertBeside on the tile leaves the siblings alone.
+    const auto target = dwindle ? krellis::DockTargetSpec{.id = from, .edge = edge} : krellis::tileDropTarget(entries, from, edge);
+    m_doc.root = applyDockTarget(m_doc.root, target, panel, uid("split"));
 }
 
 void KrellisCanvas::dockAtSpawn(const NodePtr &panel)
 {
     switch (m_spawnTarget) {
     case krellis::config::SpawnTarget::Focused: dockAtFocused(panel); break;
+    case krellis::config::SpawnTarget::Dwindle: dockAtFocused(panel, true); break;
     case krellis::config::SpawnTarget::End: dockAtEnd(panel); break;
     case krellis::config::SpawnTarget::Pointer: dockAtPointer(panel); break;
     }
@@ -1344,9 +1361,10 @@ void KrellisCanvas::updateMap(bool force)
         m[QStringLiteral("focused")] = framed == id;
         m[QStringLiteral("floating")] = false;
         m[QStringLiteral("vacant")] = isVacant(entry.node);
+        m[QStringLiteral("urgent")] = urgentPanel(id);
         m[QStringLiteral("tint")] = QString::fromLatin1(TINTS[i++ % 8]);
         tiles << m;
-        sig << QStringLiteral("%1:%2,%3,%4,%5,%6").arg(QString::fromStdString(id)).arg(r.x, 0, 'f', 3).arg(r.y, 0, 'f', 3).arg(r.w, 0, 'f', 3).arg(r.h, 0, 'f', 3).arg(framed == id) + (isVacant(entry.node) ? QStringLiteral("v") : QString());
+        sig << QStringLiteral("%1:%2,%3,%4,%5,%6").arg(QString::fromStdString(id)).arg(r.x, 0, 'f', 3).arg(r.y, 0, 'f', 3).arg(r.w, 0, 'f', 3).arg(r.h, 0, 'f', 3).arg(framed == id) + (isVacant(entry.node) ? QStringLiteral("v") : QString()) + (urgentPanel(id) ? QStringLiteral("!") : QString());
     }
     for (const auto &f : m_doc.floating) {
         if (std::any_of(m_windows.begin(), m_windows.end(), [&](const Tracked &w) { return w.panel == f.panel->id && scratchWindow(w.window); }))
@@ -1360,14 +1378,18 @@ void KrellisCanvas::updateMap(bool force)
         m[QStringLiteral("h")] = shown.h;
         m[QStringLiteral("focused")] = false;
         m[QStringLiteral("floating")] = true;
+        m[QStringLiteral("urgent")] = urgentPanel(f.panel->id);
         m[QStringLiteral("tint")] = QString::fromLatin1(TINTS[i++ % 8]);
         tiles << m;
-        sig << QStringLiteral("f%1:%2,%3,%4,%5").arg(QString::fromStdString(f.panel->id)).arg(shown.x, 0, 'f', 3).arg(shown.y, 0, 'f', 3).arg(shown.w, 0, 'f', 3).arg(shown.h, 0, 'f', 3);
+        sig << QStringLiteral("f%1:%2,%3,%4,%5").arg(QString::fromStdString(f.panel->id)).arg(shown.x, 0, 'f', 3).arg(shown.y, 0, 'f', 3).arg(shown.w, 0, 'f', 3).arg(shown.h, 0, 'f', 3) + (urgentPanel(f.panel->id) ? QStringLiteral("!") : QString());
     }
     const QVariantMap scratch = m_scratchState ? m_scratchState() : QVariantMap();
     sig << QStringLiteral("s%1,%2,%3,%4,%5").arg(scratch.value(QStringLiteral("enabled")).toBool()).arg(scratch.value(QStringLiteral("count")).toInt()).arg(scratch.value(QStringLiteral("shown")).toBool())
                .arg(scratch.value(QStringLiteral("active")).toBool()).arg(scratch.value(QStringLiteral("canMark")).toBool());
-    const QString signature = sig.join(QLatin1Char(';')) + QStringLiteral("|%1|%2").arg(aspect, 0, 'f', 3).arg(m_hoverKey + (m_floatFirst ? QStringLiteral("F") : QStringLiteral("T")) + (m_mapPinned ? QStringLiteral("P") : QStringLiteral("U")))
+    const QVariantList settingsRows = m_settingsRows ? m_settingsRows() : QVariantList();
+    QString settingsSig;
+    for (const QVariant &row : settingsRows) settingsSig += row.toMap().value(QStringLiteral("on")).toBool() ? QLatin1Char('1') : QLatin1Char('0');
+    const QString signature = sig.join(QLatin1Char(';')) + QStringLiteral("|%1|%2").arg(aspect, 0, 'f', 3).arg(m_hoverKey + (m_floatFirst ? QStringLiteral("F") : QStringLiteral("T")) + settingsSig + (m_mapPinned ? QStringLiteral("P") : QStringLiteral("U")))
         + (m_mapDragging ? QStringLiteral("|%1,%2,%3,%4|%5").arg(m_mapBand.x()).arg(m_mapBand.y()).arg(m_mapBand.width()).arg(m_mapBand.height()).arg(m_mapPicks.size()) : QString());
     if (force || signature != m_mapSignature) {
         m_mapSignature = signature;
@@ -1376,7 +1398,9 @@ void KrellisCanvas::updateMap(bool force)
         item->setProperty("hoverKey", m_hoverKey);
         item->setProperty("stateText", m_nav.overviewing() ? QStringLiteral("Overview") : QStringLiteral("Framed"));
         item->setProperty("floatFirst", m_floatFirst);
+        item->setProperty("settingsRows", settingsRows);
         item->setProperty("pinned", m_mapPinned);
+        item->setProperty("urgentCount", urgentCount());
         item->setProperty("scratchEnabled", scratch.value(QStringLiteral("enabled")));
         item->setProperty("scratchCount", scratch.value(QStringLiteral("count")));
         item->setProperty("scratchShown", scratch.value(QStringLiteral("shown")));
@@ -1451,6 +1475,18 @@ void KrellisCanvas::finishMapSelect(bool commit)
     schedule();
 }
 
+QString KrellisCanvas::spawnLabel() const
+{
+    using krellis::config::SpawnTarget;
+    switch (m_spawnTarget) {
+    case SpawnTarget::Pointer: return QStringLiteral("Opens at pointer");
+    case SpawnTarget::Focused: return QStringLiteral("Opens beside focused");
+    case SpawnTarget::End: return QStringLiteral("Opens at the end");
+    case SpawnTarget::Dwindle: return QStringLiteral("Opens by halving focused");
+    }
+    return {};
+}
+
 void KrellisCanvas::barAction(const QString &key)
 {
     if (key == QLatin1String("overview")) {
@@ -1470,6 +1506,11 @@ void KrellisCanvas::barAction(const QString &key)
     } else if (key == QLatin1String("map:pin")) {
         if (m_togglePin)
             m_togglePin();
+    } else if (key == QLatin1String("map:cog")) {
+        if (m_map) m_map->rootItem()->setProperty("settingsOpen", !m_map->rootItem()->property("settingsOpen").toBool());
+    } else if (key.startsWith(QLatin1String("map:set:"))) {
+        if (m_settingsAction)
+            m_settingsAction(key.mid(8));
     } else if (key == QLatin1String("map:mode")) {
         if (m_toggleMode)
             m_toggleMode();
@@ -3110,6 +3151,10 @@ QString KrellisCanvas::dump()
         lines << QStringLiteral("SCRATCH count %1 shown %2 active %3 enabled %4").arg(s.value("count").toInt()).arg(s.value("shown").toBool()).arg(s.value("active").toBool()).arg(s.value("enabled").toBool());
         lines << QStringLiteral("LAYER dim %1").arg(m_layerDim, 0, 'f', 2);
     }
+    for (const auto &t : m_windows)
+        if (isUrgent(t.window)) lines << QStringLiteral("URGENT %1 fade %2").arg(QString::fromStdString(t.panel)).arg(m_urgentFade, 0, 'f', 2);
+    for (const auto &t : m_stowed)
+        if (isUrgent(t.window)) lines << QStringLiteral("URGENT %1 stowed").arg(QString::fromStdString(t.panel));
     for (const auto &t : m_stowed) {
         const RectF f = t.window->frameGeometry();
         lines << QStringLiteral("TAB %1 %2 '%3' stowed frame %4,%5 %6x%7").arg(QString::fromStdString(t.panel), QString::fromStdString(t.view), t.window->caption())
@@ -3215,6 +3260,20 @@ QString KrellisCanvas::dump()
                          .arg(m_map->size().width()).arg(m_map->size().height())
                          .arg(m_map->rootItem()->width()).arg(m_map->rootItem()->height())
                          .arg(m_map->rootItem()->property("slide").toDouble(), 0, 'f', 2).arg(m_mapPinned);
+        if (m_map) {
+            const QPointF at = m_map->geometry().topLeft();
+            const QRectF cog = m_map->rootItem()->property("cogRect").toRectF().translated(at);
+            lines << QStringLiteral("MAPSET open %1 cog %2,%3 %4x%5").arg(m_map->rootItem()->property("settingsShown").toBool())
+                         .arg(cog.x(), 0, 'f', 1).arg(cog.y(), 0, 'f', 1).arg(cog.width(), 0, 'f', 1).arg(cog.height(), 0, 'f', 1);
+            const QVariantList rows = m_settingsRows ? m_settingsRows() : QVariantList();
+            const QVariantList rects = m_map->rootItem()->property("rowRects").toList();
+            for (int i = 0; i < rects.size(); ++i) {
+                const QRectF r = rects[i].toRectF().translated(at);
+                const QVariantMap row = i < rows.size() ? rows[i].toMap() : QVariantMap{{QStringLiteral("key"), QStringLiteral("more")}, {QStringLiteral("on"), false}};
+                lines << QStringLiteral("MAPSETROW %1 at %2,%3 %4x%5 on %6").arg(row.value(QStringLiteral("key")).toString())
+                             .arg(r.x(), 0, 'f', 1).arg(r.y(), 0, 'f', 1).arg(r.width(), 0, 'f', 1).arg(r.height(), 0, 'f', 1).arg(row.value(QStringLiteral("on")).toBool());
+            }
+        }
         if (m_map)
             for (const auto &f : m_doc.floating) {
                 if (!m_drawers.count(f.panel->id)) continue;

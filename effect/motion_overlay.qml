@@ -18,7 +18,7 @@ Item {
         var item = windows.itemAt(index)
         if (!item) return
         item.x = data.x; item.y = data.y; item.width = data.w; item.height = data.h
-        item.lift = data.lift; item.flash = data.flash; item.detail = data.detail
+        item.lift = data.lift; item.flash = data.flash; item.urgent = data.urgent; item.detail = data.detail
         item.title = data.title; item.icon = data.icon; item.pieces = data.pieces
     }
     Repeater {
@@ -56,6 +56,7 @@ Item {
             required property string modelData
             property real lift: 0
             property real flash: 0
+            property real urgent: 0
             property real detail: 0
             property string title: ""
             property string icon: ""
@@ -92,6 +93,11 @@ Item {
                             anchors.fill: parent
                             radius: 8; color: "transparent"; border.width: 2
                             border.color: Qt.alpha(root.theme.accent, card.flash)
+                        }
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 8; color: "transparent"; border.width: 3
+                            border.color: Qt.alpha(root.theme.warm, card.urgent * 0.9)
                         }
                         Rectangle {
                             opacity: card.detail

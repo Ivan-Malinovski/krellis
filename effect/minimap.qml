@@ -5,7 +5,7 @@ import QtQuick
 Item {
     required property QtObject theme
     id: root
-    property var tiles: []           // [{id, x, y, w, h, focused, floating, vacant, tint}] in 0..1 units
+    property var tiles: []           // [{id, x, y, w, h, focused, floating, vacant, urgent, tint}] in 0..1 units
     property real camX: 0
     property real camY: 0
     property real camW: 1
@@ -14,12 +14,17 @@ Item {
     property bool shown: false
     property string stateText: "Overview"
     property bool floatFirst: false  // the active mode, named in the header
+    property var settingsRows: []    // [{key, label, on}] the common settings the cogwheel panel toggles
+    property bool settingsOpen: false
+    onOpenChanged: if (!open) settingsOpen = false
     property string hoverKey: ""
     property int scratchCount: 0     // scratch windows on any output
     property bool scratchEnabled: false
     property bool scratchShown: false
     property bool scratchActive: false   // the active window is a scratch window
     property bool scratchCanMark: false
+    property int urgentCount: 0      // windows asking for attention, on any tab
+    onUrgentCountChanged: if (urgentCount > 0 && shown) peek.restart() // slide out for a moment so the amber tile is seen
     property bool pinned: false      // stays out instead of sliding off the screen edge
     // Auto-hide: out while the pointer is over it, for a moment after it appears or is left, or while a
     // square is dragged on it. Otherwise only a slim tab shows at the screen edge.
@@ -34,6 +39,18 @@ Item {
     property rect band: Qt.rect(0, 0, 0, 0)   // the square being dragged, in stage pixels
     property bool bandOn: false
     property var picks: []                    // tile ids the square touches
+    readonly property rect cogRect: Qt.rect(card.x + cog.x, card.y + cog.y, cog.width, cog.height)
+    readonly property bool settingsShown: open && settingsOpen && !helpOpen
+    // The panel sits over the card, right-aligned with it; the last row opens the full settings module.
+    readonly property real rowH: 22
+    readonly property real panelH: 30 + (settingsRows.length + 1) * rowH + 8
+    readonly property real panelX: width - edge - cardW
+    readonly property real panelY: height - cardH - 6 - panelH
+    readonly property var rowRects: {
+        var r = []
+        for (var i = 0; i <= settingsRows.length; ++i) r.push(Qt.rect(panelX + 8, panelY + 30 + i * rowH, cardW - 16, rowH))
+        return r
+    }
     readonly property rect stageRect: Qt.rect(card.x + stage.x, card.y + stage.y, stage.width, stage.height)
     readonly property bool helpOpen: open && hoverKey === "map:help"
     readonly property var help: scratchEnabled ? helpAll : helpAll.filter(r => r[0] !== "Meta+G" && r[0] !== "Meta+Shift+G")
@@ -79,7 +96,8 @@ Item {
     // Collapsed, only the tab takes input; open, the card (and the sheet while it is shown), at its final place.
     readonly property rect inputRect: !open ? Qt.rect(width - tab.width + 4, height - tab.height - 8, tab.width - 4, tab.height)
                                             : (helpOpen ? Qt.rect(0, 0, width, height)
-                                                        : Qt.rect(width - edge - cardW, height - cardH, cardW + edge, cardH))
+                                                        : settingsShown ? Qt.rect(panelX, panelY, cardW + edge, height - panelY)
+                                                                        : Qt.rect(width - edge - cardW, height - cardH, cardW + edge, cardH))
 
     function hit(px, py, item) {
         item = item || root
@@ -128,6 +146,58 @@ Item {
         }
     }
 
+    // Common settings, opened by the cogwheel. Rows are toggles (the effect owns the state and the file); the last
+    // one opens the full module. The panel carries its own key so the pointer resting on it keeps the map out.
+    Rectangle {
+        id: settingsPanel
+        visible: root.settingsShown
+        x: root.panelX; y: root.panelY
+        width: root.cardW
+        height: root.panelH
+        radius: 14
+        color: Qt.alpha(theme.surface, 0.95)
+        border.width: 1
+        border.color: Qt.alpha(theme.wash, 0.15)
+        opacity: root.settingsShown ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: 120 } }
+        property string hitKey: "map:settings"
+        Text { x: 12; y: 9; text: "Settings"; color: theme.textSoft; font.pixelSize: 12; font.bold: true }
+        Repeater {
+            model: root.settingsRows
+            Rectangle {
+                required property var modelData
+                required property int index
+                property string hitKey: "map:set:" + modelData.key
+                x: 8; y: 30 + index * root.rowH
+                width: parent.width - 16; height: root.rowH
+                radius: 6
+                color: root.hoverKey === hitKey ? Qt.alpha(theme.wash, 0.14) : "transparent"
+                Text { x: 6; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 52; text: modelData.label; color: theme.text; font.pixelSize: 10; elide: Text.ElideRight }
+                Rectangle {
+                    x: parent.width - 34; anchors.verticalCenter: parent.verticalCenter
+                    width: 28; height: 14; radius: 7
+                    color: modelData.on ? Qt.alpha(theme.accent, 0.45) : Qt.alpha(theme.wash, 0.18)
+                    border.width: 1
+                    border.color: modelData.on ? theme.accent : Qt.alpha(theme.wash, 0.25)
+                    Rectangle {
+                        y: 2; x: modelData.on ? 16 : 2
+                        width: 10; height: 10; radius: 5
+                        color: modelData.on ? theme.accent : theme.textSoft
+                        Behavior on x { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
+                    }
+                }
+            }
+        }
+        Rectangle {
+            property string hitKey: "map:set:more"
+            x: 8; y: 30 + root.settingsRows.length * root.rowH
+            width: parent.width - 16; height: root.rowH
+            radius: 6
+            color: root.hoverKey === hitKey ? Qt.alpha(theme.wash, 0.14) : "transparent"
+            Text { x: 6; anchors.verticalCenter: parent.verticalCenter; text: "All settings…"; color: theme.textSoft; font.pixelSize: 10 }
+        }
+    }
+
     Rectangle {
         id: card
         anchors.bottom: parent.bottom
@@ -153,7 +223,7 @@ Item {
         Rectangle {
             id: mode
             property string hitKey: "map:mode"
-            x: parent.width - 12 - 16 - 6 - 16 - 6 - width
+            x: parent.width - 12 - 16 - 6 - 16 - 6 - 16 - 6 - width
             y: 7
             width: modeText.width + 14
             height: 16
@@ -167,6 +237,32 @@ Item {
                 text: root.floatFirst ? "Floating" : "Tiling"
                 color: theme.text
                 font.pixelSize: 10
+            }
+        }
+
+        // The cogwheel opens the common settings over the card. Click it again, or leave the map, to close it.
+        Rectangle {
+            id: cog
+            property string hitKey: "map:cog"
+            x: parent.width - 12 - 16 - 6 - 16 - 6 - 16
+            y: 7
+            width: 16; height: 16
+            radius: 8
+            color: root.settingsOpen ? Qt.alpha(theme.accent, 0.3) : Qt.alpha(theme.wash, root.hoverKey === "map:cog" ? 0.25 : 0.15)
+            border.width: 1
+            border.color: root.settingsOpen ? theme.accent : Qt.alpha(theme.wash, 0.2)
+            Item {
+                anchors.centerIn: parent
+                width: 10; height: 10
+                readonly property color ink: root.settingsOpen ? theme.accent : theme.textSoft
+                rotation: root.settingsOpen ? 45 : 0
+                Behavior on rotation { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                // Four bars across the middle make eight teeth; the ring and hub sit on top.
+                Repeater {
+                    model: 4
+                    Rectangle { required property int index; anchors.centerIn: parent; width: 10; height: 2; radius: 0.5; color: parent.ink; rotation: index * 45 }
+                }
+                Rectangle { anchors.centerIn: parent; width: 7; height: 7; radius: 3.5; color: theme.surface; border.width: 1.5; border.color: parent.ink }
             }
         }
 
@@ -271,8 +367,8 @@ Item {
                     color: modelData.vacant ? "transparent" : modelData.tint
                     readonly property bool picked: root.bandOn && root.picks.indexOf(modelData.id) >= 0
                     opacity: modelData.vacant ? 0.7 : picked ? 1 : (root.bandOn ? 0.4 : (root.hoverKey === hitKey ? 1 : (modelData.focused ? 0.95 : 0.75)))
-                    border.width: modelData.vacant ? 1 : picked ? 1.5 : (modelData.focused ? 1.5 : 0)
-                    border.color: modelData.vacant ? theme.textDim : theme.tileOutline
+                    border.width: modelData.urgent ? 2 : modelData.vacant ? 1 : picked ? 1.5 : (modelData.focused ? 1.5 : 0)
+                    border.color: modelData.urgent ? theme.warm : modelData.vacant ? theme.textDim : theme.tileOutline
                     Behavior on x { NumberAnimation { duration: 460; easing.type: Easing.OutQuint } }
                     Behavior on y { NumberAnimation { duration: 460; easing.type: Easing.OutQuint } }
                     Behavior on width { NumberAnimation { duration: 460; easing.type: Easing.OutQuint } }
@@ -338,8 +434,8 @@ Item {
         width: 24; height: 44
         radius: 8
         color: root.hoverKey === "map:tab" ? Qt.alpha(theme.surfaceHover, 0.9) : Qt.alpha(theme.surface, 0.7)
-        border.width: 1
-        border.color: Qt.alpha(theme.wash, 0.2)
+        border.width: root.urgentCount > 0 ? 2 : 1
+        border.color: root.urgentCount > 0 ? theme.warm : Qt.alpha(theme.wash, 0.2)
         opacity: root.shown ? 1 - root.slide * 2 : 0
         Text { x: 4; anchors.verticalCenter: parent.verticalCenter; text: "‹"; color: theme.textSoft; font.pixelSize: 18 }
     }

@@ -1,0 +1,10 @@
+[General]
+glide=true
+urgent=true
+map=true
+mapPinned=true
+followTheme=false
+toasts=false
+whichKey=false
+spawnTarget=end
+peek=0

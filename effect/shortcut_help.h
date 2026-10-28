@@ -18,6 +18,7 @@ struct HelpGroup {
 
 inline constexpr HelpRow kHelpNavigate[] = {
     {"KrellisPalette", "Jump to window or view"},
+    {"KrellisUrgent", "Jump to window needing attention"},
     {"KrellisOverview", "Overview"},
     {"KrellisBack", "Back"},
     {"KrellisForward", "Forward"},

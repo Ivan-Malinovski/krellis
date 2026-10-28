@@ -37,7 +37,7 @@ private Q_SLOTS:
         QTemporaryDir dir;
         const QString file = dir.filePath("krellisrc");
         Settings s;
-        s.closeFocus = false; s.floatFirst = true; s.shakeFloat = false; s.spawnTarget = SpawnTarget::Focused; s.peek = 12; s.map = false; s.mapPinned = true; s.glide = true; s.landMs = 90; s.iconBelow = 40; s.tileMinWidth = 320; s.tileMinHeight = 200; s.scratchpad = true; s.pin = true; s.tabs = false;
+        s.closeFocus = false; s.floatFirst = true; s.shakeFloat = false; s.spawnTarget = SpawnTarget::Focused; s.peek = 12; s.map = false; s.mapPinned = true; s.glide = true; s.landMs = 90; s.iconBelow = 40; s.tileMinWidth = 320; s.tileMinHeight = 200; s.scratchpad = true; s.pin = true; s.tabs = false; s.urgent = false;
         s.followTheme = false; s.toasts = false; s.flyTo = true; s.whichKey = false; s.whichKeyDelayMs = 750;
         s.animationProfile = "hyprland"; s.windowAnimation = "slide";
         QVERIFY(save(s, file));
@@ -45,6 +45,7 @@ private Q_SLOTS:
         QVERIFY(!Settings{}.scratchpad);
         QVERIFY(!Settings{}.pin);
         QVERIFY(Settings{}.tabs);
+        QVERIFY(Settings{}.urgent);
         QVERIFY(Settings{}.map);
     }
     void polishSettingsDefaultsAndClamps()
@@ -66,7 +67,7 @@ private Q_SLOTS:
     {
         QTemporaryDir dir;
         const QString file = dir.filePath("krellisrc");
-        for (auto t : {SpawnTarget::Pointer, SpawnTarget::Focused, SpawnTarget::End}) {
+        for (auto t : {SpawnTarget::Pointer, SpawnTarget::Focused, SpawnTarget::End, SpawnTarget::Dwindle}) {
             Settings s;
             s.spawnTarget = t;
             QVERIFY(save(s, file));

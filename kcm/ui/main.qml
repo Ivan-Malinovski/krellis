@@ -85,7 +85,7 @@ KCM.SimpleKCM {
             }
             QQC2.ComboBox {
                 Kirigami.FormData.label: i18n("New tiled windows open:")
-                model: [i18n("Beside the tile under the pointer"), i18n("Beside the focused window"), i18n("At the end of the row")]
+                model: [i18n("Beside the tile under the pointer"), i18n("Beside the focused window"), i18n("At the end of the row"), i18n("Halving the focused tile (dwindle)")]
                 currentIndex: kcm.spawnTarget
                 onActivated: index => kcm.spawnTarget = index
             }
@@ -138,6 +138,22 @@ KCM.SimpleKCM {
                 opacity: 0.7
                 font: Kirigami.Theme.smallFont
                 text: i18n("Marked windows float over the canvas and come and go together. Meta+Shift+G marks the active window; Meta+G is also KWin's Grid View, so free it in Shortcuts first. Off, the shortcuts are released and the minimap has no scratchpad row.")
+            }
+
+            QQC2.CheckBox {
+                Kirigami.FormData.label: i18n("Attention:")
+                text: i18n("Mark windows that ask for attention (Meta+U jumps to one)")
+                checked: kcm.urgent
+                onToggled: kcm.urgent = checked
+            }
+            QQC2.Label {
+                Layout.fillWidth: true
+                Layout.preferredWidth: Kirigami.Units.gridUnit * 18
+                Layout.maximumWidth: Kirigami.Units.gridUnit * 24
+                wrapMode: Text.WordWrap
+                opacity: 0.7
+                font: Kirigami.Theme.smallFont
+                text: i18n("When a window you are not using asks for attention (a chat message, a finished build, a program that may not take focus), it gets an amber outline, an amber tile on the minimap and a first place in the quick-jump list.")
             }
 
             QQC2.CheckBox {

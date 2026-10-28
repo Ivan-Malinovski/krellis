@@ -134,6 +134,15 @@ public:
     bool isPinned(const std::string &panel) const;
     void togglePinActive();
     void setPinOn(bool on); // off drops every pin, thumbnails glide back to their tiles
+    // Urgent windows: KWin's "demands attention" flag (a denied focus request, a chat message, a finished build),
+    // which it clears itself when the window is activated.
+    bool m_urgentOn = true;
+    double m_urgentFade = 0;                  // shared ease of the outline on the visible urgent tiles
+    bool isUrgent(EffectWindow *w) const;     // asking for attention and not the active window
+    bool urgentPanel(const std::string &panel) const;
+    int urgentCount() const;                  // tracked and stowed windows
+    void urgentChanged(EffectWindow *w);      // the flag was raised or cleared
+    void setUrgentOn(bool on);
 
 public Q_SLOTS:
     // D-Bus control (also used by the nested test harness).
@@ -199,6 +208,9 @@ private:
     std::function<void()> m_changed;
     bool m_mapPinned = false;                // the minimap stays out instead of sliding off the edge
     std::function<void()> m_togglePin;
+    std::function<QVariantList()> m_settingsRows;            // [{key, label, on}] shown in the minimap's cogwheel panel
+    std::function<void(const QString &)> m_settingsAction;   // a row clicked there: a setting key, or "more"
+    QString spawnLabel() const;
     // Scratchpad: the effect owns the marks (they follow a window across outputs). Both may be unset.
     std::function<bool(EffectWindow *)> m_markedScratch;
     std::function<void(const QString &)> m_scratchAction; // "toggle" | "mark", from the minimap
@@ -334,7 +346,7 @@ private:
     void dockAtEnd(const krellis::NodePtr &panel);
     void dockAtSpawn(const krellis::NodePtr &panel); // by m_spawnTarget
     void dockAtPointer(const krellis::NodePtr &panel);
-    void dockAtFocused(const krellis::NodePtr &panel);
+    void dockAtFocused(const krellis::NodePtr &panel, bool dwindle = false);
     void startDrag(EffectWindow *w, QPointF pointer, const std::string &viewId = std::string());
     void moveDrag(QPointF pointer);
     void endDrag(bool commit);
@@ -657,7 +669,11 @@ public Q_SLOTS:
     bool mapPinned() const;
     void toggleMap();
     void saveView();
+    QVariantList settingsRows() const;       // the minimap cogwheel panel
+    void settingAction(const QString &key);
+    void toggleSpawnPointer(); // new windows open at the pointer, or by the placement last chosen instead (dwindle at first)
     void pinActive();
+    void focusUrgent(); // jump to the window that asked for attention most recently used first; says so when there is none
     void nextTab();
     void previousTab();
     void splitTab();
@@ -799,6 +815,9 @@ private:
     void syncPinShortcut(); // Meta+Shift+P exists only while pin is enabled
     QList<QAction *> m_pinActions;
     bool m_pinOn = false;
+    void syncUrgentShortcut(); // Meta+U exists only while urgent handling is enabled
+    QList<QAction *> m_urgentActions;
+    bool m_urgentOn = true;
     void syncTabShortcuts(); // the tab chords exist only while tabs are enabled
     QList<QAction *> m_tabActions;
     bool m_tabsOn = false;
@@ -815,6 +834,7 @@ private:
     KrellisCanvas *m_pointerCanvas = nullptr, *m_pinchCanvas = nullptr;
     LogicalOutput *m_selectedOutput = nullptr;
     krellis::config::SpawnTarget m_spawnTarget = krellis::config::SpawnTarget::Pointer; // loaded from krellisrc; mirrored into every canvas
+    krellis::config::SpawnTarget m_spawnBack = krellis::config::SpawnTarget::Dwindle; // what the pill returns to when pointer placement goes off
     double m_peekPx = 40;         // likewise ([General] peek, pixels)
     bool m_closeFocus = true;  // loaded from krellisrc; mirrored into every canvas
     bool m_floatFirst = false; // loaded from krellisrc; mirrored into every canvas

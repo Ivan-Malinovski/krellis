@@ -35,11 +35,12 @@ class KrellisKcm : public KQuickConfigModule
     Q_OBJECT
     Q_PROPERTY(bool closeFocus READ closeFocus WRITE setCloseFocus NOTIFY settingsChanged)
     Q_PROPERTY(bool floatFirst READ floatFirst WRITE setFloatFirst NOTIFY settingsChanged)
-    Q_PROPERTY(int spawnTarget READ spawnTarget WRITE setSpawnTarget NOTIFY settingsChanged) // 0 pointer, 1 focused, 2 end
+    Q_PROPERTY(int spawnTarget READ spawnTarget WRITE setSpawnTarget NOTIFY settingsChanged) // 0 pointer, 1 focused, 2 end, 3 dwindle
     Q_PROPERTY(int peek READ peek WRITE setPeek NOTIFY settingsChanged)
     Q_PROPERTY(bool map READ map WRITE setMap NOTIFY settingsChanged)
     Q_PROPERTY(bool mapPinned READ mapPinned WRITE setMapPinned NOTIFY settingsChanged)
     Q_PROPERTY(bool scratchpad READ scratchpad WRITE setScratchpad NOTIFY settingsChanged)
+    Q_PROPERTY(bool urgent READ urgent WRITE setUrgent NOTIFY settingsChanged)
     Q_PROPERTY(bool pin READ pin WRITE setPin NOTIFY settingsChanged)
     Q_PROPERTY(bool tabs READ tabs WRITE setTabs NOTIFY settingsChanged)
     Q_PROPERTY(bool glide READ glide WRITE setGlide NOTIFY settingsChanged)
@@ -70,6 +71,7 @@ public:
     bool map() const { return m_current.map; }
     bool mapPinned() const { return m_current.mapPinned; }
     bool scratchpad() const { return m_current.scratchpad; }
+    bool urgent() const { return m_current.urgent; }
     bool pin() const { return m_current.pin; }
     bool tabs() const { return m_current.tabs; }
     bool glide() const { return m_current.glide; }
@@ -87,11 +89,12 @@ public:
     int whichKeyDelayMs() const { return m_current.whichKeyDelayMs; }
     void setCloseFocus(bool v) { edit([&] { m_current.closeFocus = v; }); }
     void setFloatFirst(bool v) { edit([&] { m_current.floatFirst = v; }); }
-    void setSpawnTarget(int v) { edit([&] { m_current.spawnTarget = krellis::config::SpawnTarget(std::clamp(v, 0, 2)); }); }
+    void setSpawnTarget(int v) { edit([&] { m_current.spawnTarget = krellis::config::SpawnTarget(std::clamp(v, 0, 3)); }); }
     void setPeek(int v) { edit([&] { m_current.peek = v; }); }
     void setMap(bool v) { edit([&] { m_current.map = v; }); }
     void setMapPinned(bool v) { edit([&] { m_current.mapPinned = v; }); }
     void setScratchpad(bool v) { edit([&] { m_current.scratchpad = v; }); }
+    void setUrgent(bool v) { edit([&] { m_current.urgent = v; }); }
     void setPin(bool v) { edit([&] { m_current.pin = v; }); }
     void setTabs(bool v) { edit([&] { m_current.tabs = v; }); }
     void setGlide(bool v) { edit([&] { m_current.glide = v; }); }

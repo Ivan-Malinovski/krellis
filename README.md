@@ -22,9 +22,10 @@ The aim is to stay mouse-first without giving up keyboard friendliness or floati
 - **Floating windows.** Float any window, or switch to floating-first mode where new windows float and only edge and corner drops tile. Floats snap to screen edges and corners.
 - **Keyboard movement and focus.** Move the focused tile through the layout with Meta+arrows (or Meta+A/S/D/F), focus neighbours with Meta+Ctrl+arrows, resize with the arrow keys. A tile at the edge of a monitor moves on to the next monitor.
 - **Quick jump.** Meta+/ opens a palette: type part of a window title, app or saved view and go straight there.
+- **Urgent windows.** A window you are not using that asks for attention (a chat message, a finished build, a program denied focus) gets an amber outline, an amber tile on the minimap and first place in the quick-jump list, and a toast names it. Meta+U jumps to it. KWin clears the flag when you focus the window. Turn it off with `urgent=false`.
 - **Pin** (opt-in, `pin=true`). Pin a tile and, while it is scrolled out of view, it follows you as a live thumbnail in the corner; click it to jump back.
 - **Tabbed tiles** (on by default, `tabs=false` turns them off). Several windows can share one tile with a tab strip along its top; drop a window on a tile's title bar (the top strip) to tab it, drag a tab, or the bare part of the strip, to pull a window out.
-- **Minimap.** Shows the whole canvas, tucks itself away at the screen edge, and lets you drag a square to zoom to those tiles.
+- **Minimap.** Shows the whole canvas, tucks itself away at the screen edge, and lets you drag a square to zoom to those tiles. The cogwheel in its header opens quick switches for the common settings (including whether new windows open at the pointer).
 - **Saved views, undo and redo** for layout edits, and **session restore**: the layout comes back after a login, matched by app id and window role.
 - **Edge drawers and a scratchpad.** Stash windows in a drawer at a screen edge; mark windows as scratch windows that come and go together with Meta+G (the scratchpad is opt-in).
 - **Per-application rules**: placement, scaling, minimum size, singleton, closability.
@@ -96,6 +97,7 @@ Krellis registers its shortcuts as KDE global shortcuts, so you can change any o
 | Meta+Shift+F | Float / tile panel |
 | Meta+Shift+X | Stash the window in an edge drawer |
 | Meta+Shift+T | Flip stacked / side by side |
+| Meta+U | Jump to the window that is asking for attention (needs `urgent`, on by default) |
 | Meta+Shift+P | Pin panel: show it in the corner while its tile is out of view (needs `pin` enabled) |
 | Meta+PageDown / Meta+PageUp | Next / previous tab in the tile (needs `tabs`, on by default) |
 | Meta+Ctrl+Shift + arrows | Group the focused window into the neighbouring tile as a tab (needs `tabs`, on by default) |
@@ -137,7 +139,7 @@ Use the settings module (System Settings → Window Management → Krellis, or t
 |---|---|---|
 | `closeFocus` | `true` | Closing the focused window focuses its neighbour in the layout |
 | `floatFirst` | `false` | New windows float; drops tile only at screen edges and corners |
-| `spawnTarget` | pointer | Where a new window opens: beside the tile under the pointer, the focused tile, or the end of the row |
+| `spawnTarget` | pointer | Where a new window opens: `pointer` (beside the tile under the pointer), `focused` (beside the focused tile), `dwindle` (halves the focused tile, like Hyprland's dwindle layout), or `end` (the end of the row) |
 | `peek` | `40` | Pixels of neighbouring tiles kept in view around a zoomed framing (0 = off) |
 | `shakeFloat` | `true` | Shaking a window by its title bar while dragging floats it (tiling-first mode; with `floatFirst` a drag floats already) |
 | `map` | `true` | Minimap available |
@@ -146,6 +148,7 @@ Use the settings module (System Settings → Window Management → Krellis, or t
 | `animationProfile` | `trellis` | `hyprland` selects window animations based on Hyprland 0.54's preset, with destination-only app resizing. It overrides `glide`, `landMs` and `flyTo`; the camera moves directly |
 | `windowAnimation` | `popin` | Hyprland opening/closing style: `popin` (87%), `slide` (nearest output edge), or `gnomed` (vertical collapse) |
 | `scratchpad` | `false` | The scratch layer and its shortcuts |
+| `urgent` | `true` | Mark windows that ask for attention, list them first in the palette, and register Meta+U |
 | `pin` | `false` | Pin shortcut (Meta+Shift+P) and the corner thumbnails |
 | `tabs` | `true` | Tabbed tiles: tab strips, the tab shortcuts, and dropping a window on a tile's title bar tabs it; dropping on its body splits it |
 | `followTheme` | `true` | Overlays use the Plasma colour scheme and accent |

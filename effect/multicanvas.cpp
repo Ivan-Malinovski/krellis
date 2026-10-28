@@ -5,6 +5,7 @@
 #include "window.h"
 #include "wayland_server.h"
 #include "wayland/seat.h"
+#include <QProcess>
 #include <QDBusConnection>
 #include <QStandardPaths>
 #include <QTimer>
@@ -220,6 +221,7 @@ void KrellisEffect::syncOutputs()
         canvas->m_peekPx = m_peekPx;
         canvas->m_scratchpad = m_scratchpad;
         canvas->setPinOn(m_pinOn);
+        canvas->setUrgentOn(m_urgentOn);
         canvas->setTabsOn(m_tabsOn);
         canvas->m_glide = m_glide;
         canvas->configureAnimations(m_hyprland, m_windowAnimation);
@@ -247,6 +249,8 @@ void KrellisEffect::syncOutputs()
         canvas->m_mapPinned = m_mapPinned;
         canvas->m_mapOn = m_showMap;
         canvas->m_togglePin = [this] { toggleMapPinned(); };
+        canvas->m_settingsRows = [this] { return settingsRows(); };
+        canvas->m_settingsAction = [this](const QString &key) { settingAction(key); };
         canvas->m_transfer = [this](EffectWindow *w, QPointF point) {
             if (auto *target = canvasAt(point))
                 transfer(w, target);
@@ -481,6 +485,7 @@ void KrellisEffect::togglePalette()
         if (!tracked) return;
         const std::string panel = tracked->panel;
         QStringList detail;
+        if (home->isUrgent(w)) detail << QStringLiteral("needs attention");
         if (w->isMinimized() && !home->scratchWindow(w)) detail << QStringLiteral("hidden");
         if (home->scratchWindow(w)) detail << QStringLiteral("scratchpad");
         else if (home->m_drawers.count(panel)) detail << QStringLiteral("drawer");
@@ -502,8 +507,11 @@ void KrellisEffect::togglePalette()
         items.push_back(std::move(item));
     };
     const auto stack = effects->stackingOrder();
+    // Windows asking for attention come first (they are what the person most likely wants), then the rest by recency.
     for (auto it = stack.rbegin(); it != stack.rend(); ++it)
-        if (*it != active) add(*it);
+        if (auto *home = owner(*it); home && home->isUrgent(*it)) add(*it);
+    for (auto it = stack.rbegin(); it != stack.rend(); ++it)
+        if (*it != active && !(owner(*it) && owner(*it)->isUrgent(*it))) add(*it);
     if (active) add(active);
     for (const auto &c : m_canvases)
         for (const auto &framing : c->m_nav.framings()) {
@@ -795,6 +803,25 @@ void KrellisEffect::cyclePanel(int step) { markSessionInteraction(); if (auto *c
 void KrellisEffect::toggleMaximizeActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleMaximizeActive(); }
 void KrellisEffect::toggleFloatActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleFloatActive(); }
 void KrellisEffect::pinActive() { if (!m_pinOn) return; markSessionInteraction(); if (auto *canvas = current()) canvas->togglePinActive(); }
+void KrellisEffect::focusUrgent()
+{
+    if (!m_urgentOn) return;
+    markSessionInteraction();
+    const auto stack = effects->stackingOrder();
+    for (auto it = stack.rbegin(); it != stack.rend(); ++it) { // recently used first
+        auto *home = owner(*it);
+        if (!home || !home->isUrgent(*it)) continue;
+        EffectWindow *w = *it;
+        m_selectedOutput = home->m_output;
+        if (home->scratchWindow(w)) {
+            m_scratchLast = w;
+            showScratch(scratchWindows());
+        }
+        home->jumpTo(w);
+        return;
+    }
+    if (auto *canvas = current()) canvas->toast(QStringLiteral("Nothing needs attention"));
+}
 void KrellisEffect::stashActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->stashActive(); }
 void KrellisEffect::flipActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->flipActive(); }
 void KrellisEffect::toggleHideActive() { markSessionInteraction(); if (auto *canvas = current()) canvas->toggleHideActive(); }
@@ -1130,6 +1157,7 @@ void KrellisEffect::applySettings(const krellis::config::Settings &settings)
     m_closeFocus = settings.closeFocus;
     m_floatFirst = settings.floatFirst;
     m_spawnTarget = settings.spawnTarget;
+    if (m_spawnTarget != krellis::config::SpawnTarget::Pointer) m_spawnBack = m_spawnTarget;
     m_peekPx = settings.peek;
     m_mapPinned = settings.mapPinned;
     m_showMap = settings.map;
@@ -1158,6 +1186,8 @@ void KrellisEffect::applySettings(const krellis::config::Settings &settings)
     syncScratchShortcuts();
     m_pinOn = settings.pin;
     syncPinShortcut();
+    m_urgentOn = settings.urgent;
+    syncUrgentShortcut();
     m_tabsOn = settings.tabs;
     syncTabShortcuts();
     for (const auto &canvas : m_canvases) {
@@ -1169,6 +1199,7 @@ void KrellisEffect::applySettings(const krellis::config::Settings &settings)
         canvas->m_mapOn = m_showMap;
         canvas->m_scratchpad = m_scratchpad;
         canvas->setPinOn(m_pinOn);
+        canvas->setUrgentOn(m_urgentOn);
         canvas->setTabsOn(m_tabsOn);
         canvas->m_glide = m_glide;
         canvas->configureAnimations(m_hyprland, m_windowAnimation);
@@ -1203,6 +1234,55 @@ void KrellisEffect::setFloatFirst(bool on)
     toast(on ? QStringLiteral("Floating first") : QStringLiteral("Tiling first"));
 }
 void KrellisEffect::toggleFloatFirst() { setFloatFirst(!m_floatFirst); }
+// The cogwheel panel on the minimap: the settings people flip most. Each row is a bare krellisrc key, except
+// "spawn", which is the pointer/other placement pair and goes through toggleSpawnPointer.
+QVariantList KrellisEffect::settingsRows() const
+{
+    const auto row = [](const char *key, const char *label, bool on) {
+        return QVariantMap{{QStringLiteral("key"), QString::fromLatin1(key)}, {QStringLiteral("label"), QString::fromLatin1(label)}, {QStringLiteral("on"), on}};
+    };
+    return {row("spawn", "New windows open at the pointer", m_spawnTarget == krellis::config::SpawnTarget::Pointer),
+            row("urgent", "Flag windows that need attention", m_urgentOn),
+            row("closeFocus", "Focus the neighbour when closing", m_closeFocus),
+            row("shakeFloat", "Shake a dragged window to float it", m_shakeFloatOn),
+            row("toasts", "Brief labels on actions", m_toastsOn)};
+}
+void KrellisEffect::settingAction(const QString &key)
+{
+    if (key == QLatin1String("more")) {
+        QProcess::startDetached(QStringLiteral("kcmshell6"), {QStringLiteral("kcm_krellis")});
+        return;
+    }
+    if (key == QLatin1String("spawn")) {
+        toggleSpawnPointer();
+        return;
+    }
+    const QVariantList rows = settingsRows();
+    for (const QVariant &row : rows) {
+        const QVariantMap r = row.toMap();
+        if (r.value(QStringLiteral("key")).toString() != key) continue;
+        markSessionInteraction();
+        krellis::config::saveValue(key, !r.value(QStringLiteral("on")).toBool());
+        applySettings(krellis::config::load());
+        for (const auto &canvas : m_canvases) canvas->updateMap();
+        return;
+    }
+}
+void KrellisEffect::toggleSpawnPointer()
+{
+    using krellis::config::SpawnTarget;
+    markSessionInteraction();
+    if (m_spawnTarget != SpawnTarget::Pointer) m_spawnBack = m_spawnTarget;
+    m_spawnTarget = m_spawnTarget == SpawnTarget::Pointer ? m_spawnBack : SpawnTarget::Pointer;
+    for (const auto &canvas : m_canvases) {
+        canvas->m_spawnTarget = m_spawnTarget;
+        canvas->updateMap();
+    }
+    const char *name = m_spawnTarget == SpawnTarget::Focused ? "focused" : m_spawnTarget == SpawnTarget::End ? "end"
+        : m_spawnTarget == SpawnTarget::Dwindle ? "dwindle" : "pointer";
+    krellis::config::saveValue(QStringLiteral("spawnTarget"), QString::fromLatin1(name));
+    if (auto *canvas = current()) canvas->toast(canvas->spawnLabel());
+}
 bool KrellisEffect::mapPinned() const { return m_mapPinned; }
 void KrellisEffect::setMapPinned(bool on)
 {

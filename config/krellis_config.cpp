@@ -52,7 +52,8 @@ Settings load(const QString &file)
     s.shakeFloat = c.value(QStringLiteral("shakeFloat"), s.shakeFloat).toBool();
     if (c.contains(QStringLiteral("spawnTarget"))) {
         const QString v = c.value(QStringLiteral("spawnTarget")).toString();
-        s.spawnTarget = v == QLatin1String("focused") ? SpawnTarget::Focused : v == QLatin1String("end") ? SpawnTarget::End : SpawnTarget::Pointer;
+        s.spawnTarget = v == QLatin1String("focused") ? SpawnTarget::Focused : v == QLatin1String("end") ? SpawnTarget::End
+            : v == QLatin1String("dwindle") ? SpawnTarget::Dwindle : SpawnTarget::Pointer;
     } else if (!c.value(QStringLiteral("placeAtPointer"), true).toBool()) {
         s.spawnTarget = SpawnTarget::End; // the key this setting replaced: off meant "at the end"
     }
@@ -65,6 +66,7 @@ Settings load(const QString &file)
     const QString style = c.value(QStringLiteral("windowAnimation")).toString();
     if (style == QLatin1String("slide") || style == QLatin1String("gnomed")) s.windowAnimation = style;
     s.scratchpad = c.value(QStringLiteral("scratchpad"), s.scratchpad).toBool();
+    s.urgent = c.value(QStringLiteral("urgent"), s.urgent).toBool();
     s.pin = c.value(QStringLiteral("pin"), s.pin).toBool();
     s.tabs = c.value(QStringLiteral("tabs"), s.tabs).toBool();
     s.landMs = std::max(0.0, c.value(QStringLiteral("landMs"), s.landMs).toDouble());
@@ -87,7 +89,8 @@ bool save(const Settings &s, const QString &file)
     c.setValue(QStringLiteral("shakeFloat"), s.shakeFloat);
     c.setValue(QStringLiteral("spawnTarget"),
                s.spawnTarget == SpawnTarget::Focused ? QStringLiteral("focused")
-                   : s.spawnTarget == SpawnTarget::End ? QStringLiteral("end") : QStringLiteral("pointer"));
+                   : s.spawnTarget == SpawnTarget::End ? QStringLiteral("end")
+                   : s.spawnTarget == SpawnTarget::Dwindle ? QStringLiteral("dwindle") : QStringLiteral("pointer"));
     c.setValue(QStringLiteral("peek"), s.peek);
     c.setValue(QStringLiteral("map"), s.map);
     c.setValue(QStringLiteral("mapPinned"), s.mapPinned);
@@ -95,6 +98,7 @@ bool save(const Settings &s, const QString &file)
     c.setValue(QStringLiteral("animationProfile"), s.animationProfile);
     c.setValue(QStringLiteral("windowAnimation"), s.windowAnimation);
     c.setValue(QStringLiteral("scratchpad"), s.scratchpad);
+    c.setValue(QStringLiteral("urgent"), s.urgent);
     c.setValue(QStringLiteral("pin"), s.pin);
     c.setValue(QStringLiteral("tabs"), s.tabs);
     c.setValue(QStringLiteral("landMs"), s.landMs);
