@@ -1016,6 +1016,18 @@ void KrellisCanvas::dockAtFocused(const NodePtr &panel, bool dwindle)
     if (from.empty() && !m_lastActivePanel.empty()
         && krellis::locatePanel(m_doc, m_lastActivePanel).where == krellis::PanelLocation::Where::Docked)
         from = m_lastActivePanel;
+    // A focused tile that is out of view (the camera was moved off it) is not what the user is looking at: split the
+    // tile on screen that was used last instead, so the new window does not open next to something hidden.
+    if (!from.empty() && peeking(from)) {
+        const auto stack = effects->stackingOrder();
+        for (auto it = stack.crbegin(); it != stack.crend(); ++it) {
+            const Tracked *t = trackedFor(*it);
+            if (!t || t->window->isMinimized() || peeking(t->panel)) continue;
+            if (krellis::locatePanel(m_doc, t->panel).where != krellis::PanelLocation::Where::Docked) continue;
+            from = t->panel;
+            break;
+        }
+    }
     if (from.empty() || !m_doc.root) {
         dockAtEnd(panel);
         return;
