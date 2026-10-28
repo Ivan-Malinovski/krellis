@@ -1652,6 +1652,11 @@ void KrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp
 {
     double opacity = 1;
     const auto drawn = visualRect(w, &opacity);
+    // A rectangle with no area means "nothing to show", never "paint it as KWin has it". A minimized window has none once
+    // its hide flight is over (the scene can still offer it for a frame, at its restored baseline), and an edge tile
+    // squeezed past the screen edge ends up with a negative width; either way the untransformed window would flash
+    // at full size over the layout.
+    if (drawn && (drawn->w <= 0 || drawn->h <= 0)) return;
     if (!drawn && behindTab(w)) return; // a tab behind another one: it holds the tile's size, not its place in the picture
     if (drawn) {
         const TRect want = *drawn;
