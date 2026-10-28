@@ -36,6 +36,12 @@ KCM.SimpleKCM {
                 onToggled: kcm.floatFirst = checked
             }
             QQC2.CheckBox {
+                Kirigami.FormData.label: i18n("Dragging a window:")
+                text: i18n("Shake it to make it float")
+                checked: kcm.shakeFloat
+                onToggled: kcm.shakeFloat = checked
+            }
+            QQC2.CheckBox {
                 Kirigami.FormData.label: i18n("Closing a window:")
                 text: i18n("Focus its neighbour in the layout")
                 checked: kcm.closeFocus

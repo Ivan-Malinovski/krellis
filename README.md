@@ -17,7 +17,7 @@ The aim is to stay mouse-first without giving up keyboard friendliness or floati
 ## Features
 
 - **Tiled layout on an infinite canvas.** Windows dock into rows and columns; a camera zooms and pans over them, with spring physics when `glide` is on. One canvas per monitor.
-- **Drag to re-dock.** Drop on the left, right, top or bottom of a window to split just that tile in half. Drop in the gap between tiles to share space across their row or column, or on a screen edge to dock there. The title strip accepts tabs. Shift-drag a title bar to float it.
+- **Drag to re-dock.** Drop on the left, right, top or bottom of a window to split just that tile in half. Drop in the gap between tiles to share space across their row or column, or on a screen edge to dock there. The title strip accepts tabs. Shift-drag a title bar to float it, or shake the window (a quick back-and-forth) while dragging.
 - **Motion and depth.** Drag shadows, accent outlines, moving drop highlights and brief landing/undo feedback animate independently of `glide`, without continuously resizing apps. Small tiles gain app icons and title labels as you zoom out, with boundaries for saved views. Optional layout glides preserve momentum; `flyTo` adds shallow camera arcs. For heavy apps, keep `glide` off: repeated client resizing during glides can make dragging and rearranging stutter. With `glide=false`, `landMs=0` also makes decoration feedback immediate.
 - **Floating windows.** Float any window, or switch to floating-first mode where new windows float and only edge and corner drops tile. Floats snap to screen edges and corners.
 - **Keyboard movement and focus.** Move the focused tile through the layout with Meta+arrows (or Meta+A/S/D/F), focus neighbours with Meta+Ctrl+arrows, resize with the arrow keys. A tile at the edge of a monitor moves on to the next monitor.
@@ -139,6 +139,7 @@ Use the settings module (System Settings → Window Management → Krellis, or t
 | `floatFirst` | `false` | New windows float; drops tile only at screen edges and corners |
 | `spawnTarget` | pointer | Where a new window opens: beside the tile under the pointer, the focused tile, or the end of the row |
 | `peek` | `40` | Pixels of neighbouring tiles kept in view around a zoomed framing (0 = off) |
+| `shakeFloat` | `true` | Shaking a window by its title bar while dragging floats it (tiling-first mode; with `floatFirst` a drag floats already) |
 | `map` | `true` | Minimap available |
 | `mapPinned` | `false` | Keep the minimap out instead of sliding it off the edge |
 | `glide` | `false` | Spring camera and animated layout changes. Off, windows go straight to their new rectangles and play a short move-and-scale (`landMs`, default 200 ms) |

@@ -48,6 +48,7 @@ class KrellisKcm : public KQuickConfigModule
     Q_PROPERTY(int tileMinHeight READ tileMinHeight WRITE setTileMinHeight NOTIFY settingsChanged)
     Q_PROPERTY(int iconBelow READ iconBelow WRITE setIconBelow NOTIFY settingsChanged)
     Q_PROPERTY(bool followTheme READ followTheme WRITE setFollowTheme NOTIFY settingsChanged)
+    Q_PROPERTY(bool shakeFloat READ shakeFloat WRITE setShakeFloat NOTIFY settingsChanged)
     Q_PROPERTY(bool toasts READ toasts WRITE setToasts NOTIFY settingsChanged)
     Q_PROPERTY(bool flyTo READ flyTo WRITE setFlyTo NOTIFY settingsChanged)
     Q_PROPERTY(bool whichKey READ whichKey WRITE setWhichKey NOTIFY settingsChanged)
@@ -75,6 +76,7 @@ public:
     int tileMinHeight() const { return m_current.tileMinHeight; }
     int iconBelow() const { return m_current.iconBelow; }
     bool followTheme() const { return m_current.followTheme; }
+    bool shakeFloat() const { return m_current.shakeFloat; }
     bool toasts() const { return m_current.toasts; }
     bool flyTo() const { return m_current.flyTo; }
     bool whichKey() const { return m_current.whichKey; }
@@ -94,6 +96,7 @@ public:
     void setTileMinHeight(int v) { edit([&] { m_current.tileMinHeight = v; }); }
     void setIconBelow(int v) { edit([&] { m_current.iconBelow = v; }); }
     void setFollowTheme(bool v) { edit([&] { m_current.followTheme = v; }); }
+    void setShakeFloat(bool v) { edit([&] { m_current.shakeFloat = v; }); }
     void setToasts(bool v) { edit([&] { m_current.toasts = v; }); }
     void setFlyTo(bool v) { edit([&] { m_current.flyTo = v; }); }
     void setWhichKey(bool v) { edit([&] { m_current.whichKey = v; }); }

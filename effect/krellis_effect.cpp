@@ -2259,6 +2259,8 @@ void KrellisCanvas::userMoveFinished(EffectWindow *w)
 void KrellisCanvas::startDrag(EffectWindow *w, QPointF pointer, const std::string &viewId)
 {
     m_windowPointer = pointer;
+    m_shake.reset();
+    m_shakeLatched = false;
     const Tracked *t = trackedFor(w);
     if (!t) t = stowedFor(w); // a tab in hand is not the one on show
     if (!t || m_session)
@@ -2290,7 +2292,7 @@ void KrellisCanvas::adoptDrag(EffectWindow *w, QPointF pointer, const QRectF &st
 // Holding Shift while dragging floats the window where it is dropped, and keeps a float from docking.
 bool KrellisCanvas::floatModifierHeld() const
 {
-    return m_simForceFloat >= 0 ? m_simForceFloat > 0 : m_shiftHeld;
+    return m_simForceFloat >= 0 ? m_simForceFloat > 0 : (m_shiftHeld || m_shakeLatched);
 }
 
 void KrellisCanvas::moveDrag(QPointF pointer)
@@ -2298,6 +2300,10 @@ void KrellisCanvas::moveDrag(QPointF pointer)
     m_windowPointer = pointer;
     if (!m_session)
         return;
+    // Shaking the window by its title bar floats it, like holding Shift. It is a tiling-mode gesture: with floating
+    // first a drag already floats, and the same inversion would tile it. The latch lasts until the drop.
+    if (m_shakeFloat && !m_floatFirst && !m_shakeLatched && m_shake.feed(pointer.x(), pointer.y(), std::int64_t(realMs())))
+        m_shakeLatched = true;
     m_session->setForceFloat(floatModifierHeld());
     m_session->setFloatFirst(m_floatFirst);
     const QPointF rel = pointer - m_area.topLeft();
@@ -2313,6 +2319,7 @@ void KrellisCanvas::endDrag(bool commit)
     EffectWindow *moving = m_dragWindow;
     const DragOutcome out = m_session->end(commit, m_nowMs);
     m_session.reset(); // from here the document layout is what is shown
+    m_shakeLatched = false;
     m_dragWindow = nullptr;
     m_dragFromKWin = false;
     m_dragTabView.clear();

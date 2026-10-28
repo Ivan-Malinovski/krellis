@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Shake a window to float it.** While dragging a tiled window by its title bar, swing the pointer back and forth (four quick turns of at least 80 px within 0.6 s, along either axis) and it comes out of the layout as a float, exactly as if Shift were held; it stays that way until you drop it. Plain drags and slow wiggles are unaffected. Turn it off with `shakeFloat=false` or in the settings module ("Dragging a window"). It does nothing in floating-first mode, where drags float already.
+- Fixed a brief full-size flash of a window right after its minimize animation, and of an edge tile squeezed toward a drawer: a window with no rectangle to show is no longer painted untransformed.
+
 - Held move shortcuts now step immediately, pause for 320 ms, then repeat every 150 ms with a persistent outline on the moving tile. Release, focus changes and other key presses stop the repeat; duplicate system repeat notifications do not accelerate it. Custom shortcut bindings use the same behavior.
 
 - Fixed repeated resize requests during static drag previews when a Wayland client rounded a fractional tile size. A rounded result within one pixel no longer causes Krellis to resend the identical request every frame.

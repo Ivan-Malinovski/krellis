@@ -226,6 +226,7 @@ void KrellisEffect::syncOutputs()
         canvas->m_iconBelow = m_iconBelow;
         canvas->m_tileMinimum = m_tileMinimum;
         canvas->m_toasts = m_toastsOn;
+        canvas->m_shakeFloat = m_shakeFloatOn;
         canvas->m_flyTo = m_flyToOn;
         canvas->m_nativeMutation = [this](EffectWindow *window, bool automatic) { rememberNative(window, automatic); };
         canvas->m_hiddenNativeRect = [this](EffectWindow *window) -> std::optional<RectF> {
@@ -1136,6 +1137,7 @@ void KrellisEffect::applySettings(const krellis::config::Settings &settings)
     m_tileMinimum = {double(settings.tileMinWidth), double(settings.tileMinHeight)};
     m_theme.setFollow(settings.followTheme);
     m_toastsOn = settings.toasts;
+    m_shakeFloatOn = settings.shakeFloat;
     m_whichKey = settings.whichKey;
     m_chord.setDelay(settings.whichKeyDelayMs);
     if (!m_whichKey && m_chordTimer) hideHint();
@@ -1169,6 +1171,7 @@ void KrellisEffect::applySettings(const krellis::config::Settings &settings)
         canvas->m_iconBelow = m_iconBelow;
         canvas->m_tileMinimum = m_tileMinimum;
         canvas->m_toasts = m_toastsOn;
+        canvas->m_shakeFloat = m_shakeFloatOn;
         canvas->m_flyTo = m_flyToOn;
         canvas->m_nav.sync(); // the peek gutter changes the camera target
         canvas->updateMap();

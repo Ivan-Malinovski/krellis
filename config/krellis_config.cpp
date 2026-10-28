@@ -49,6 +49,7 @@ Settings load(const QString &file)
     Settings s;
     s.closeFocus = c.value(QStringLiteral("closeFocus"), s.closeFocus).toBool();
     s.floatFirst = c.value(QStringLiteral("floatFirst"), s.floatFirst).toBool();
+    s.shakeFloat = c.value(QStringLiteral("shakeFloat"), s.shakeFloat).toBool();
     if (c.contains(QStringLiteral("spawnTarget"))) {
         const QString v = c.value(QStringLiteral("spawnTarget")).toString();
         s.spawnTarget = v == QLatin1String("focused") ? SpawnTarget::Focused : v == QLatin1String("end") ? SpawnTarget::End : SpawnTarget::Pointer;
@@ -79,6 +80,7 @@ bool save(const Settings &s, const QString &file)
     QSettings c(file, QSettings::IniFormat);
     c.setValue(QStringLiteral("closeFocus"), s.closeFocus);
     c.setValue(QStringLiteral("floatFirst"), s.floatFirst);
+    c.setValue(QStringLiteral("shakeFloat"), s.shakeFloat);
     c.setValue(QStringLiteral("spawnTarget"),
                s.spawnTarget == SpawnTarget::Focused ? QStringLiteral("focused")
                    : s.spawnTarget == SpawnTarget::End ? QStringLiteral("end") : QStringLiteral("pointer"));

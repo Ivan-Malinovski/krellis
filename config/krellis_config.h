@@ -15,6 +15,7 @@ struct Settings
 {
     bool closeFocus = true;       // closing the focused window focuses its neighbour in the layout
     bool floatFirst = false;      // new windows float; drops tile only at screen edges and corners
+    bool shakeFloat = true;       // shaking a window by its title bar floats it (tiling-first mode)
     SpawnTarget spawnTarget = SpawnTarget::Pointer; // beside the tile under the cursor | the focused tile | the end of the row
     double peek = 40;             // pixels of neighbouring tiles kept in view around a zoomed framing; 0 = off
     bool map = true;              // the minimap is available (it tucks itself away at the screen edge)

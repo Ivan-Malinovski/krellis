@@ -15,6 +15,7 @@
 #include "keynav.h"
 #include "theme.h"
 #include "chord_hint.h"
+#include "shake.h"
 #include "history.h"
 #include "reconcile.h"
 #include <QTimer>
@@ -478,6 +479,9 @@ private:
     struct Landing { TRect from; double start; };
     std::map<EffectWindow *, Landing> m_landings;
     bool m_glide = false; // our own animations (camera spring, layout tween, appear/close/popup); off = windows jump straight to their final rects
+    bool m_shakeFloat = true;     // loaded from krellisrc; a shake of the dragged window floats it
+    bool m_shakeLatched = false;  // this drag has been shaken: it floats like a Shift-drag until released
+    krellis::ShakeDetector m_shake;
     bool m_shiftHeld = false; // from the latest pointer event; Shift floats a dragged window
     bool floatModifierHeld() const;
     bool m_dragFromKWin = false;
@@ -802,6 +806,7 @@ private:
     krellis::Point m_tileMinimum{1, 1}; // loaded from krellisrc; mirrored into every canvas
     int m_iconBelow = 0;   // loaded from krellisrc ([General] iconBelow); mirrored into every canvas
     double m_landMs = 200; // loaded from krellisrc ([General] landMs); mirrored into every canvas
+    bool m_shakeFloatOn = true;
     bool m_toastsOn = true, m_flyToOn = false; // loaded from krellisrc; mirrored into every canvas
     bool m_glide = false; // loaded from krellisrc ([General] glide, default off); mirrored into every canvas
 };
