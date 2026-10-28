@@ -143,6 +143,9 @@ QList<AppRule> loadRules(const QString &file)
         r.singleton = c.value(QStringLiteral("singleton"), r.singleton).toBool();
         r.closable = c.value(QStringLiteral("closable"), r.closable).toBool();
         r.scratchpad = c.value(QStringLiteral("scratchpad"), r.scratchpad).toBool();
+        r.floatWidth = c.value(QStringLiteral("floatWidth"), r.floatWidth).toInt();
+        r.floatHeight = c.value(QStringLiteral("floatHeight"), r.floatHeight).toInt();
+        r.floatAtPointer = c.value(QStringLiteral("floatAtPointer"), r.floatAtPointer).toBool();
         c.endGroup();
         rules.append(r);
     }
@@ -170,6 +173,9 @@ bool saveRules(const QList<AppRule> &rules, const QString &file)
         c.setValue(QStringLiteral("singleton"), r.singleton);
         c.setValue(QStringLiteral("closable"), r.closable);
         c.setValue(QStringLiteral("scratchpad"), r.scratchpad);
+        c.setValue(QStringLiteral("floatWidth"), r.floatWidth);
+        c.setValue(QStringLiteral("floatHeight"), r.floatHeight);
+        c.setValue(QStringLiteral("floatAtPointer"), r.floatAtPointer);
         c.endGroup();
     }
     c.endGroup();

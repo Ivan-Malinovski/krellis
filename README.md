@@ -172,6 +172,16 @@ org.kde.plasma.emojier\allowStage=false
 org.kde.plasma.emojier\allowFloating=true
 ```
 
+A floating window otherwise opens at 60% × 65% of the screen. Three more rule keys change that for one app: `floatWidth` and `floatHeight` (pixels; 0 or absent on an axis keeps the window's own size) and `floatAtPointer=true` (its top-left corner opens at the pointer, shifted to stay on the screen). To make the Emoji Selector a small popup where you are working:
+
+```ini
+org.kde.plasma.emojier\floatWidth=420
+org.kde.plasma.emojier\floatHeight=480
+org.kde.plasma.emojier\floatAtPointer=true
+```
+
+Wayland gives a compositor no text-caret position for other apps, so the pointer is the closest stand-in.
+
 ## Safety
 
 An effect that crashes takes the compositor down with it, and every Wayland app goes with it. Krellis loads with that in mind:

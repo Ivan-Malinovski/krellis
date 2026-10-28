@@ -11,6 +11,8 @@ struct ViewRules {
     bool side = true, stage = true, floating = true;
     bool singleton = false, closable = true;
     bool scratchpad = false; // a floating overlay summoned and dismissed with the scratchpad shortcut
+    Point floatSize{0, 0};   // size in pixels a new float opens at; 0 on an axis keeps the window's own size, both 0 the default rectangle
+    bool floatAtPointer = false; // a new float opens with its top-left corner at the pointer, shifted to stay inside the screen
     bool allows(ViewPlacement where) const {
         switch (where) {
         case ViewPlacement::Side: return side;

@@ -53,6 +53,13 @@ void KrellisCanvas::loadRules()
         rule.singleton = config.value("singleton", false).toBool();
         rule.closable = config.value("closable", true).toBool();
         rule.scratchpad = config.value("scratchpad", false).toBool();
+        auto size = [&config](const char *name) {
+            bool ok = false;
+            const double v = config.value(name, 0).toDouble(&ok);
+            return ok && std::isfinite(v) && v >= 1 && v <= 16384 ? v : 0.0;
+        };
+        rule.floatSize = {size("floatWidth"), size("floatHeight")};
+        rule.floatAtPointer = config.value("floatAtPointer", false).toBool();
         m_rules[app] = rule;
         config.endGroup();
     }
@@ -78,6 +85,25 @@ ViewRules KrellisCanvas::rulesFor(EffectWindow *w) const
     }
     return rule;
 }
+// A rule's `floatWidth`/`floatHeight` give the size a new float opens at (0 on an axis: the window's own), and
+// `floatAtPointer` puts its top-left corner at the pointer. Without either the default rectangle is used. Either way
+// the rectangle stays inside the area.
+std::optional<TRect> KrellisCanvas::floatSpawnRect(EffectWindow *w, const ViewRules &rule) const
+{
+    if ((rule.floatSize.x <= 0 && rule.floatSize.y <= 0 && !rule.floatAtPointer) || m_area.width() <= 0 || m_area.height() <= 0)
+        return std::nullopt;
+    const QSizeF own = w->frameGeometry().size();
+    const double sw = rule.floatSize.x > 0 ? rule.floatSize.x : own.width();
+    const double sh = rule.floatSize.y > 0 ? rule.floatSize.y : own.height();
+    if (sw <= 0 || sh <= 0) return std::nullopt;
+    const double width = std::min(sw, m_area.width()), height = std::min(sh, m_area.height());
+    QPointF corner = rule.floatAtPointer ? effects->cursorPos() : m_area.center() - QPointF(width / 2, height / 2);
+    corner.setX(std::clamp(corner.x(), m_area.left(), m_area.right() - width));
+    corner.setY(std::clamp(corner.y(), m_area.top(), m_area.bottom() - height));
+    return TRect{(corner.x() - m_area.x()) / m_area.width(), (corner.y() - m_area.y()) / m_area.height(),
+                 width / m_area.width(), height / m_area.height()};
+}
+
 bool KrellisCanvas::layerShown() const
 {
     return std::any_of(m_windows.begin(), m_windows.end(), [this](const Tracked &t) {

@@ -1092,7 +1092,9 @@ void KrellisCanvas::windowAdded(EffectWindow *w, bool alreadyJudged)
     if (placement == krellis::ViewPlacement::Floating) {
         // Successive floats cascade so a new window doesn't hide the one before it.
         const int k = int(m_doc.floating.size()) % 6;
-        m_doc = krellis::floatPanel(m_doc, panel, {0.2 + 0.025 * k, 0.15 + 0.035 * k, 0.6, 0.65}, krellis::FloatingLayer::Overlay);
+        TRect rect{0.2 + 0.025 * k, 0.15 + 0.035 * k, 0.6, 0.65};
+        if (const auto sized = floatSpawnRect(w, rule)) rect = *sized;
+        m_doc = krellis::floatPanel(m_doc, panel, rect, krellis::FloatingLayer::Overlay);
     } else if (placement == krellis::ViewPlacement::Stage) {
         if (const auto stage = krellis::findStage(m_doc.root)) {
             auto updated = std::make_shared<krellis::Node>(*stage);

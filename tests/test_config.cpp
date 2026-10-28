@@ -136,6 +136,7 @@ private Q_SLOTS:
         const QString file = dir.filePath("krellisrc");
         AppRule a; a.app = "org.kde.dolphin"; a.placement = "floating"; a.scaling = "inert"; a.minWidth = 300; a.minHeight = 200;
         a.allowStage = false; a.singleton = true; a.closable = false; a.scratchpad = true;
+        a.floatWidth = 420; a.floatHeight = 480; a.floatAtPointer = true;
         AppRule b; b.app = "mpv";
         QVERIFY(saveRules({a, b}, file));
         QCOMPARE(loadRules(file), (QList<AppRule>{b, a})); // groups come back sorted

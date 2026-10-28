@@ -46,6 +46,8 @@ struct AppRule
     int minWidth = 160, minHeight = 120;
     bool allowSide = true, allowStage = true, allowFloating = true;
     bool singleton = false, closable = true, scratchpad = false;
+    int floatWidth = 0, floatHeight = 0;   // pixels a new float opens at; 0 = the window's own size (both 0: the default rectangle)
+    bool floatAtPointer = false;           // a new float opens with its top-left corner at the pointer
     bool operator==(const AppRule &) const = default;
 };
 

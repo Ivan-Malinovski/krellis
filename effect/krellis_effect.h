@@ -248,6 +248,7 @@ private:
     void detachWindow(EffectWindow *w);
     static QString appId(EffectWindow *w);
     krellis::ViewRules rulesFor(EffectWindow *w) const;
+    std::optional<TRect> floatSpawnRect(EffectWindow *w, const krellis::ViewRules &rule) const; // a rule's size and pointer spot for a new float, as fractions of the area
     void loadRules();
     std::map<QString, krellis::ViewRules> m_rules;
     QString m_rulesFile;
