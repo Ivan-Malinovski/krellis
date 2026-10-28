@@ -1039,7 +1039,11 @@ void KrellisCanvas::dockAtFocused(const NodePtr &panel, bool dwindle)
         dockAtEnd(panel);
         return;
     }
-    const auto edge = entry->rect.w * m_area.width() >= entry->rect.h * m_area.height() ? krellis::Edge::Right : krellis::Edge::Bottom;
+    // Judge the shape by what is on screen: a column that fills the screen is wide however narrow it is in the layout
+    // (hidden neighbours sit beside it), and a new window belongs beside it, not under it.
+    const TRect shown = screenRect(from);
+    const bool wide = shown.w > 0 && shown.h > 0 ? shown.w >= shown.h : entry->rect.w * m_area.width() >= entry->rect.h * m_area.height();
+    const auto edge = wide ? krellis::Edge::Right : krellis::Edge::Bottom;
     // Dwindle (Hyprland): always halve the focused tile itself. tileDropTarget would instead add a column to the
     // parent row when the axes match, so every sibling shrinks; insertBeside on the tile leaves the siblings alone.
     const auto target = dwindle ? krellis::DockTargetSpec{.id = from, .edge = edge} : krellis::tileDropTarget(entries, from, edge);
