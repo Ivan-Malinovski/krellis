@@ -43,6 +43,7 @@ constexpr double CLOSE_MS = 180;
 constexpr double BAR_H = 48;
 constexpr double SteppingPatienceMs = 120; // longest a gliding client may sit on a size request before being asked again
 constexpr double MaxHeldSide = 8192;       // longest side asked of a client held above its tile size
+constexpr double CrossFitMs = 3000; // how long a window that changed output keeps its own aspect while its client catches up (Hyprland profile)
 constexpr double LandingPatienceMs = 300; // longest a stale buffer is drawn at its own size while its client lays out
 }
 
@@ -52,6 +53,8 @@ KrellisCanvas::KrellisCanvas(LogicalOutput *output)
     : m_output(output)
     , m_nav(*this, m_camera)
 {
+    m_cameraResizeTimer.setSingleShot(true);
+    connect(&m_cameraResizeTimer, &QTimer::timeout, this, &KrellisCanvas::finishCameraResize);
     loadRules();
     connect(effects, &EffectsHandler::windowClosed, this, &KrellisCanvas::windowClosed);
     connect(effects, &EffectsHandler::windowDeleted, this, [this](EffectWindow *w) {
@@ -59,7 +62,7 @@ KrellisCanvas::KrellisCanvas(LogicalOutput *output)
     });
     connect(effects, &EffectsHandler::windowActivated, this, &KrellisCanvas::windowActivated);
     connect(effects, &EffectsHandler::stackingOrderChanged, this, [this] {
-        if (m_motionOverlay) schedule(); // refresh label occlusion when a covering window is raised
+        if (m_motionOverlay && m_motionOverlay->opacity() > 0) schedule(); // refresh label occlusion when a covering window is raised
     });
     connect(effects, &EffectsHandler::windowAdded, this, [this](EffectWindow *w) { watch(w); });
     for (EffectWindow *w : effects->stackingOrder())
@@ -98,6 +101,7 @@ KrellisCanvas::~KrellisCanvas() = default;
 void KrellisCanvas::prepareUnload()
 {
     m_unloading = true;
+    m_cameraResizeTimer.stop();
     for (const auto &t : m_windows) t.window->setData(WindowForceBlurRole, QVariant());
     for (const auto &t : m_windows) effects->setElevatedWindow(t.window, false);
     for (const auto &t : m_stowed) effects->setElevatedWindow(t.window, false);
@@ -387,7 +391,7 @@ void KrellisCanvas::watch(EffectWindow *w)
         connect(w->window(), &Window::frameGeometryChanged, this, [this] {
             // A final client configure can land after the animation clock has stopped.
             // Unmanaged covering windows matter too; refresh without polling at idle.
-            if (m_motionOverlay && !m_applyingRest) schedule();
+            if (m_motionOverlay && m_motionOverlay->opacity() > 0 && !m_applyingRest) schedule();
         });
         connect(w->window(), &Window::interactiveMoveResizeStepped, this, [this, w](const RectF &geometry) {
             resizeStepped(w, geometry);
@@ -481,10 +485,69 @@ bool KrellisCanvas::leftAlone(EffectWindow *w)
 
 KrellisCanvas::Tracked *KrellisCanvas::trackedFor(EffectWindow *w)
 {
-    for (auto &t : m_windows)
+    return const_cast<Tracked *>(static_cast<const KrellisCanvas *>(this)->trackedFor(w));
+}
+
+const KrellisCanvas::Tracked *KrellisCanvas::trackedFor(const EffectWindow *w) const
+{
+    if (const auto it = m_windowIndex.find(w); it != m_windowIndex.end())
+        if (it->second < m_windows.size() && m_windows[it->second].window == w)
+            return &m_windows[it->second];
+    for (const auto &t : m_windows)
         if (t.window == w)
             return &t;
     return nullptr;
+}
+
+const KrellisCanvas::Tracked *KrellisCanvas::presentedPanel(const std::string &panel) const
+{
+    if (const auto it = m_panelIndex.find(panel); it != m_panelIndex.end())
+        if (it->second < m_windows.size() && m_windows[it->second].panel == panel)
+            return &m_windows[it->second];
+    for (const auto &t : m_windows)
+        if (t.panel == panel) return &t;
+    return nullptr;
+}
+
+void KrellisCanvas::indexWindows()
+{
+    // Most frames only change presentation. Keep the hash nodes while the
+    // vectors and panel identities still match; validated lookups retain their
+    // scan fallback for synchronous mutations between frame boundaries.
+    bool unchanged = m_windowIndex.size() == m_windows.size()
+        && m_panelIndex.size() == m_windows.size() && m_stowedIndex.size() == m_stowed.size();
+    for (size_t i = 0; unchanged && i < m_windows.size(); ++i) {
+        const auto window = m_windowIndex.find(m_windows[i].window);
+        const auto panel = m_panelIndex.find(m_windows[i].panel);
+        unchanged = window != m_windowIndex.end() && window->second == i
+            && panel != m_panelIndex.end() && panel->second == i;
+    }
+    for (size_t i = 0; unchanged && i < m_stowed.size(); ++i) {
+        const auto window = m_stowedIndex.find(m_stowed[i].window);
+        unchanged = window != m_stowedIndex.end() && window->second == i;
+    }
+    if (unchanged) return;
+    m_windowIndex.clear(); m_panelIndex.clear(); m_stowedIndex.clear();
+    for (size_t i = 0; i < m_windows.size(); ++i) {
+        m_windowIndex.emplace(m_windows[i].window, i);
+        m_panelIndex.emplace(m_windows[i].panel, i);
+    }
+    for (size_t i = 0; i < m_stowed.size(); ++i)
+        m_stowedIndex.emplace(m_stowed[i].window, i);
+}
+
+void KrellisCanvas::cacheVisuals()
+{
+    // Freeze only after this frame's model/camera/native updates, and release at
+    // post-paint. Input and configure callbacks between frames need fresh geometry.
+    m_useFrameVisuals = false;
+    std::erase_if(m_frameVisuals, [this](const auto &entry) { return !trackedFor(entry.first); });
+    for (const auto &t : m_windows) {
+        PaintedGeometry painted;
+        painted.rect = visualRect(t.window, &painted.opacity);
+        m_frameVisuals.insert_or_assign(t.window, painted);
+    }
+    m_useFrameVisuals = true;
 }
 
 KrellisCanvas::Tracked *KrellisCanvas::trackedForPanel(const std::string &panel)
@@ -767,15 +830,15 @@ TRect KrellisCanvas::restRect(const std::string &panel, const TRect *world) cons
     r = belowTabs(panel, r); // a tabbed tile's windows sit under its strip
     // Clients get a sane real size even when the canvas is zoomed far out or in; the paint
     // transform covers the difference.
-    for (const auto &t : m_windows) if (t.panel == panel) {
-        const auto rule = rulesFor(t.window);
+    if (const auto *t = presentedPanel(panel)) {
+        const auto rule = rulesFor(t->window);
         if (rule.scaling != krellis::ViewScaling::None) {
             r.w = std::min(r.w, m_area.width() * 2);
             r.h = std::min(r.h, m_area.height() * 2);
             // A tile smaller than the client can be (the rule's minimum, or what the app itself refuses to go
             // under) asks for the whole tile scaled up evenly, not one axis stretched: the paint transform
             // shrinks it back to the tile, so the contents keep their proportions and fill it.
-            const auto floor = clientMinimum(t.window);
+            const auto floor = clientMinimum(t->window);
             if (r.w > 0 && r.h > 0) {
                 const double up = std::max({1.0, floor.x / r.w, floor.y / r.h});
                 const double cap = std::max(1.0, MaxHeldSide / std::max(r.w, r.h)); // keeps buffers a sane size
@@ -785,7 +848,6 @@ TRect KrellisCanvas::restRect(const std::string &panel, const TRect *world) cons
             r.w = std::max(floor.x, r.w); // only differs from the above when the cap bit
             r.h = std::max(floor.y, r.h);
         }
-        break;
     }
     return r;
 }
@@ -793,6 +855,10 @@ TRect KrellisCanvas::restRect(const std::string &panel, const TRect *world) cons
 void KrellisCanvas::relayout(bool animate)
 {
     if (m_unloading) return;
+    // A structural/work-area edit needs real geometry, even if it interrupts navigation.
+    m_cameraResizeTimer.stop();
+    m_cameraResizePending = false;
+    m_restCamera.reset();
     {
         if (!effects->screens().contains(m_output))
             return;
@@ -837,11 +903,57 @@ void KrellisCanvas::relayout(bool animate)
     schedule();
 }
 
-void KrellisCanvas::applyRest(bool stepping)
+void KrellisCanvas::finishCameraResize()
+{
+    if (m_unloading || !m_cameraResizePending) return;
+    if (!m_restCamera || !sameRectEps(*m_restCamera, sizingCamera())) {
+        applyRest(); // a gesture changed the camera since the last render
+        return;
+    }
+    if (m_nav.gestureActive() || m_camera.moving()) {
+        m_cameraResizeTimer.start(40);
+        return;
+    }
+    m_cameraResizePending = false;
+    m_useFrameVisuals = false;
+    applyRest(false, true);
+    schedule();
+}
+
+void KrellisCanvas::applyRest(bool stepping, bool navigationOnly)
 {
     if (m_unloading) return;
     ++m_restPasses;
-    m_restCamera = sizingCamera();
+    const auto camera = sizingCamera();
+    const bool navigating = m_hyprland && !m_session && !m_resize;
+    const bool changedCamera = navigating && m_restCamera && !sameRectEps(*m_restCamera, camera);
+    m_restCamera = camera;
+    if (!navigationOnly && navigating && (changedCamera || m_cameraResizePending)) {
+        if (changedCamera) {
+            m_useFrameVisuals = false;
+            for (auto &t : m_windows) {
+                syncWindowMotion(t);
+                if (auto flight = m_flights.find(t.window); flight != m_flights.end())
+                    flight->second.cameraNavigation = true;
+            }
+            ++m_cameraChanges;
+            schedule();
+        }
+        if (m_nav.gestureActive() || m_camera.moving()) {
+            m_cameraResizePending = true;
+            m_cameraResizeTimer.start(40);
+            return; // continuous navigation retains buffers until release
+        }
+        // A discrete destination is known now: ask only visible clients once,
+        // then animate their available buffers independently of acknowledgements.
+        m_cameraResizePending = false;
+        m_cameraResizeTimer.stop();
+        navigationOnly = true;
+    }
+    if (!navigating) {
+        m_cameraResizeTimer.stop();
+        m_cameraResizePending = false;
+    }
     QScopedValueRollback<bool> applying(m_applyingRest, true);
     const bool previewing = m_session && m_session->active();
     const auto hidden = [this](const std::string &panel) { // a panel is hidden or somewhere in the layout, so no tree search
@@ -852,6 +964,13 @@ void KrellisCanvas::applyRest(bool stepping)
         Window *window = t.window->window();
         if (!window || t.window->isMinimized() || t.window->isFullScreen() || t.window->isUserMove() || t.window->isUserResize() || hidden(t.panel))
             continue; // a fullscreen window covers its output by KWin's rule, not ours
+        if (navigationOnly) {
+            // Tab contents behind the selected view, thumbnails and offscreen tiles
+            // retain their buffers. Their real geometry is refreshed when needed.
+            const TRect shown = belowTabs(t.panel, screenRect(t.panel));
+            if (list == &m_stowed || pinRect(t.panel) || frameOnly(t.panel)
+                || !QRectF(shown.x, shown.y, shown.w, shown.h).intersects(m_area)) continue;
+        }
         if (m_hyprland && list == &m_windows) syncWindowMotion(t);
         // While a drag previews a drop, the other windows really take their previewed size, so the
         // client redraws crisply instead of being stretched; the lifted one keeps its own.
@@ -896,6 +1015,9 @@ void KrellisCanvas::applyRest(bool stepping)
 void KrellisCanvas::configureAnimations(bool hyprland, const QString &style)
 {
     if (m_hyprland != hyprland) {
+        m_cameraResizeTimer.stop();
+        m_cameraResizePending = false;
+        m_restCamera.reset();
         m_tween.stop();
         m_landings.clear();
         for (auto &t : m_windows) t.motionTarget.reset();
@@ -1043,10 +1165,22 @@ void KrellisCanvas::dockAtFocused(const NodePtr &panel, bool dwindle)
     // (hidden neighbours sit beside it), and a new window belongs beside it, not under it.
     const TRect shown = screenRect(from);
     const bool wide = shown.w > 0 && shown.h > 0 ? shown.w >= shown.h : entry->rect.w * m_area.width() >= entry->rect.h * m_area.height();
-    const auto edge = wide ? krellis::Edge::Right : krellis::Edge::Bottom;
+    auto edge = wide ? krellis::Edge::Right : krellis::Edge::Bottom;
+    // Dwindle follows the pointer like Hyprland's default (force_split=0): the new window takes the half of the tile
+    // the pointer is in, so the left or top half puts it before the tile. A pointer outside the tile counts as the
+    // nearer half. A square tile counts as wide.
+    if (dwindle && m_dwindleSide == krellis::config::DwindleSide::Cursor && shown.w > 0 && shown.h > 0) {
+        const QPointF cursor = effects->cursorPos();
+        if (wide)
+            edge = cursor.x() < shown.x + shown.w / 2 ? krellis::Edge::Left : krellis::Edge::Right;
+        else
+            edge = cursor.y() < shown.y + shown.h / 2 ? krellis::Edge::Top : krellis::Edge::Bottom;
+    }
     // Dwindle (Hyprland): always halve the focused tile itself. tileDropTarget would instead add a column to the
     // parent row when the axes match, so every sibling shrinks; insertBeside on the tile leaves the siblings alone.
-    const auto target = dwindle ? krellis::DockTargetSpec{.id = from, .edge = edge} : krellis::tileDropTarget(entries, from, edge);
+    // The pair stays nested (`nested`) so that closing either window gives its sibling the whole pair's space.
+    const auto target = dwindle ? krellis::DockTargetSpec{.id = from, .edge = edge, .nested = true}
+                                : krellis::tileDropTarget(entries, from, edge);
     m_doc.root = applyDockTarget(m_doc.root, target, panel, uid("split"));
 }
 
@@ -1362,43 +1496,22 @@ void KrellisCanvas::updateMap(bool force)
         return;
     }
     const double aspect = m_area.height() / std::max(1.0, m_area.width());
-    QVariantList tiles;
     QStringList sig;
     const std::string framed = m_nav.framed();
-    int i = 0;
-    for (const auto &[id, entry] : m_nav.entries()) {
-        if (entry.node->kind != Node::Kind::Panel)
-            continue;
-        QVariantMap m;
+    const auto scratchPanel = [this](const std::string &id) {
+        const auto *t = presentedPanel(id);
+        return t && scratchWindow(t->window);
+    };
+    // Camera-only frames do not change the map's tile model. Check the signature
+    // first, and only allocate the QVariant rows when they will be delivered.
+    for (const auto &[id, entry] : m_rects) {
+        if (entry.node->kind != Node::Kind::Panel) continue;
         const TRect r = m_tween.apply(id, entry.rect);
-        m[QStringLiteral("id")] = QString::fromStdString(id);
-        m[QStringLiteral("x")] = r.x;
-        m[QStringLiteral("y")] = r.y;
-        m[QStringLiteral("w")] = r.w;
-        m[QStringLiteral("h")] = r.h;
-        m[QStringLiteral("focused")] = framed == id;
-        m[QStringLiteral("floating")] = false;
-        m[QStringLiteral("vacant")] = isVacant(entry.node);
-        m[QStringLiteral("urgent")] = urgentPanel(id);
-        m[QStringLiteral("tint")] = QString::fromLatin1(TINTS[i++ % 8]);
-        tiles << m;
         sig << QStringLiteral("%1:%2,%3,%4,%5,%6").arg(QString::fromStdString(id)).arg(r.x, 0, 'f', 3).arg(r.y, 0, 'f', 3).arg(r.w, 0, 'f', 3).arg(r.h, 0, 'f', 3).arg(framed == id) + (isVacant(entry.node) ? QStringLiteral("v") : QString()) + (urgentPanel(id) ? QStringLiteral("!") : QString());
     }
     for (const auto &f : m_doc.floating) {
-        if (std::any_of(m_windows.begin(), m_windows.end(), [&](const Tracked &w) { return w.panel == f.panel->id && scratchWindow(w.window); }))
-            continue; // the scratchpad is summoned from the footer, not parked as a tile
-        QVariantMap m;
-        m[QStringLiteral("id")] = QString::fromStdString(f.panel->id);
+        if (scratchPanel(f.panel->id)) continue;
         const TRect shown = drawerMapRect(f.panel->id, f.rect);
-        m[QStringLiteral("x")] = shown.x;
-        m[QStringLiteral("y")] = shown.y;
-        m[QStringLiteral("w")] = shown.w;
-        m[QStringLiteral("h")] = shown.h;
-        m[QStringLiteral("focused")] = false;
-        m[QStringLiteral("floating")] = true;
-        m[QStringLiteral("urgent")] = urgentPanel(f.panel->id);
-        m[QStringLiteral("tint")] = QString::fromLatin1(TINTS[i++ % 8]);
-        tiles << m;
         sig << QStringLiteral("f%1:%2,%3,%4,%5").arg(QString::fromStdString(f.panel->id)).arg(shown.x, 0, 'f', 3).arg(shown.y, 0, 'f', 3).arg(shown.w, 0, 'f', 3).arg(shown.h, 0, 'f', 3) + (urgentPanel(f.panel->id) ? QStringLiteral("!") : QString());
     }
     const QVariantMap scratch = m_scratchState ? m_scratchState() : QVariantMap();
@@ -1410,6 +1523,20 @@ void KrellisCanvas::updateMap(bool force)
     const QString signature = sig.join(QLatin1Char(';')) + QStringLiteral("|%1|%2").arg(aspect, 0, 'f', 3).arg(m_hoverKey + (m_floatFirst ? QStringLiteral("F") : QStringLiteral("T")) + settingsSig + (m_mapPinned ? QStringLiteral("P") : QStringLiteral("U")))
         + (m_mapDragging ? QStringLiteral("|%1,%2,%3,%4|%5").arg(m_mapBand.x()).arg(m_mapBand.y()).arg(m_mapBand.width()).arg(m_mapBand.height()).arg(m_mapPicks.size()) : QString());
     if (force || signature != m_mapSignature) {
+        QVariantList tiles;
+        int i = 0;
+        const auto addTile = [&](const std::string &id, const TRect &r, bool floating, bool vacant) {
+            QVariantMap row{{"id", QString::fromStdString(id)}, {"x", r.x}, {"y", r.y}, {"w", r.w}, {"h", r.h},
+                {"focused", !floating && framed == id}, {"floating", floating}, {"vacant", vacant},
+                {"urgent", urgentPanel(id)}, {"tint", QString::fromLatin1(TINTS[i++ % 8])}};
+            tiles << row;
+        };
+        for (const auto &[id, entry] : m_rects)
+            if (entry.node->kind == Node::Kind::Panel)
+                addTile(id, m_tween.apply(id, entry.rect), false, isVacant(entry.node));
+        for (const auto &f : m_doc.floating)
+            if (!scratchPanel(f.panel->id))
+                addTile(f.panel->id, drawerMapRect(f.panel->id, f.rect), true, false);
         m_mapSignature = signature;
         item->setProperty("aspect", aspect);
         item->setProperty("tiles", tiles);
@@ -1725,6 +1852,8 @@ void KrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
     // KWin calls the effect once per render view. Advancing every canvas on
     // every output did the same model/overlay work again at unrelated refresh rates.
     if (data.view && data.view->logicalOutput() && data.view->logicalOutput() != m_output) return;
+    m_useFrameVisuals = false;
+    indexWindows();
     ++m_framePasses;
     const auto ms = m_clock.tick(data.view).count();
     m_nowMs += double(ms);
@@ -1798,6 +1927,7 @@ void KrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
         }
         std::erase_if(m_landings, [this](const auto &l) { return m_nowMs - l.second.start >= m_landMs; });
         std::erase_if(m_popups, [this](const auto &p) { return m_nowMs - p.second >= APPEAR_MS; });
+        cacheVisuals();
         refreshRects();
         updateSlot(dt);
         updateMarquee(dt);
@@ -1823,6 +1953,7 @@ void KrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
 
 void KrellisCanvas::postPaintScreen()
 {
+    m_useFrameVisuals = false;
     if (m_animating)
         repaintCanvas();
 }
@@ -1831,10 +1962,8 @@ void KrellisCanvas::prePaintWindow(RenderView *view, EffectWindow *w, WindowPreP
 {
     if (visualRect(w)) {
         data.setTransformed();
-        // KWin's blur skips any transformed window unless it is forced; the camera makes every tile one, and blur
-        // handles the translation and scale itself.
-        if (!w->data(WindowForceBlurRole).toBool()) // setData signals every call; this runs each frame
-            w->setData(WindowForceBlurRole, true);
+        // Forced blur is selected in paintWindow, where the actual render
+        // viewport and the final presentation transform are known.
         if (m_flights.count(w) || w->isPopupWindow())
             data.setTranslucent();
         if (const auto *t = trackedFor(w))
@@ -1861,7 +1990,21 @@ void KrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp
     if (!drawn && behindTab(w)) return; // a tab behind another one: it holds the tile's size, not its place in the picture
     if (drawn) {
         const TRect want = *drawn;
-        if (auto *tracked = trackedFor(w)) tracked->lastDrawn = want;
+        if (auto *tracked = trackedFor(w)) tracked->lastDrawn = *drawn;
+        const RectF frame = w->frameGeometry();
+        if (m_hyprland && frame.width() > 0 && frame.height() > 0) {
+            // Include transformed decoration/shadow extents; a frame just outside
+            // the output may still cast a visible shadow. Test the current render
+            // view, not the owner output: transfer flights can cross outputs.
+            const QRectF expanded = w->expandedGeometry();
+            const double sx = want.w / frame.width(), sy = want.h / frame.height();
+            const QRectF bounds(want.x + (expanded.x() - frame.x()) * sx,
+                want.y + (expanded.y() - frame.y()) * sy, expanded.width() * sx, expanded.height() * sy);
+            if (bounds.isValid() && !bounds.intersects(QRectF(vp.renderRect()))) {
+                ++m_cameraCulled;
+                return;
+            }
+        }
         if (const auto *tracked = trackedFor(w))
             if (const auto tile = m_tiles.find(tracked->panel); tile != m_tiles.end())
                 opacity *= 1 - std::clamp(tile->second.amount, 0.0, 1.0);
@@ -1874,7 +2017,6 @@ void KrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp
             data.setBrightness(0.55); // out of focus: the edge is there to be found, not to be read
             data.setSaturation(0.6);
         }
-        const RectF frame = w->frameGeometry();
         if (want.w > 0 && want.h > 0 && frame.width() > 0 && frame.height() > 0) {
             data += QPointF(want.x - frame.x(), want.y - frame.y());
             data *= QVector2D(float(want.w / frame.width()), float(want.h / frame.height()));
@@ -1895,7 +2037,35 @@ void KrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp
         // Not while it slides back in (flight or landing): the clip would cut it down to the sliver at once.
         if (d != m_drawers.end() && !d->second.open && m_drawers.size() > 1 && !m_flights.count(w) && !m_landings.count(w))
             if (const auto slice = drawerSlice(tracked->panel))
-                clipped = region & vp.mapToDeviceCoordinatesAligned(Region(RectF(slice->x, slice->y, slice->w, slice->h).toAlignedRect()));
+                clipped = clipped & vp.mapToDeviceCoordinatesAligned(Region(RectF(slice->x, slice->y, slice->w, slice->h).toAlignedRect()));
+    }
+    if (drawn || m_closing.count(w)) {
+        // KWin 6.7 allocates blur targets for the entire transformed blur
+        // region BEFORE clipping to the output. Deep zoom can turn a mostly
+        // offscreen tile into a huge allocation (and reallocate it every tick).
+        // Keep blur on normal tiles, but let oversized tiles use KWin's usual
+        // transformed-window fallback until they fit again. This also bounds
+        // closing/popup and cross-output presentation, per render viewport.
+        const auto frame = w->frameGeometry();
+        const auto view = vp.renderRect();
+        const double width = frame.width() * std::abs(data.xScale());
+        const double height = frame.height() * std::abs(data.yScale());
+        // Camera presentation changes those allocations every frame even for
+        // ordinary-sized tiles. Restore their blur on the final presented
+        // frame. Popups inherit their parent's navigation state.
+        EffectWindow *owner = w;
+        while (owner->isPopupWindow() && owner->transientFor() && owner->transientFor() != owner)
+            owner = owner->transientFor();
+        const auto flight = m_flights.find(owner);
+        const bool cameraMotion = m_hyprland && (m_nav.gestureActive()
+            || (flight != m_flights.end() && flight->second.cameraNavigation));
+        // Tiny blur regions can also produce zero-sized downsample targets.
+        const bool forceBlur = !cameraMotion && width >= 32 && height >= 32
+            && width <= view.width() * 1.25 && height <= view.height() * 1.25;
+        if (w->data(WindowForceBlurRole).toBool() != forceBlur)
+            w->setData(WindowForceBlurRole, forceBlur);
+    } else if (w->data(WindowForceBlurRole).isValid()) {
+        w->setData(WindowForceBlurRole, QVariant());
     }
     effects->paintWindow(rt, vp, w, mask, clipped, data);
 }
@@ -1954,13 +2124,18 @@ bool KrellisCanvas::layoutAwaitingLanding() const
 
 std::optional<TRect> KrellisCanvas::visualRect(EffectWindow *w, double *opacity) const
 {
+    if (m_useFrameVisuals)
+        if (const auto it = m_frameVisuals.find(w); it != m_frameVisuals.end()) {
+            if (opacity) *opacity = it->second.opacity;
+            return it->second.rect;
+        }
     if (m_closing.count(w)) return std::nullopt;
     if (m_session && m_session->active() && w == m_dragWindow && stowedFor(w)) { // a tab torn out: the one thing of its tile in sight
         if (opacity) *opacity = 1;
         return TRect{m_lifted.x + m_area.x(), m_lifted.y + m_area.y(), m_lifted.w, m_lifted.h};
     }
-    for (const auto &t : m_windows) {
-        if (t.window != w) continue;
+    if (const auto *tracked = trackedFor(w)) {
+        const auto &t = *tracked;
         if (w->isFullScreen()) return std::nullopt; // painted and hit-tested untransformed, as KWin places it
         TRect rect = shownRect(t.panel);
         double alpha = 1;
@@ -1971,7 +2146,24 @@ std::optional<TRect> KrellisCanvas::visualRect(EffectWindow *w, double *opacity)
         if (opacity) *opacity = alpha;
         // This profile scales the available buffer directly. Avoid calculating
         // native minimums and aspect-fit constraints that it never uses.
-        if (m_hyprland) return rect;
+        if (m_hyprland) {
+            // A window carried to another output can change shape (landscape
+            // to portrait), and scaling the old buffer into that tile stretches it several times over until
+            // its client lands. Such a window keeps its own aspect, drawn at the largest uniform scale that
+            // fits. Other transitions use the profile's direct per-axis scaling.
+            const QRectF frame = w->frameGeometry();
+            const bool crossed = t.crossedMs >= 0 && realMs() - t.crossedMs < CrossFitMs;
+            if (crossed && !m_resize && !(m_session && m_session->active() && w == m_dragWindow)
+                && frame.width() > 0 && frame.height() > 0 && rect.w > 0 && rect.h > 0) {
+                const double sx = rect.w / frame.width(), sy = rect.h / frame.height();
+                if (std::abs(sx - sy) > 0.01 * std::max(sx, sy)) {
+                    const double u = std::min(sx, sy);
+                    rect.w = frame.width() * u;
+                    rect.h = frame.height() * u;
+                }
+            }
+            return rect;
+        }
         // Never stretch contents: a window in transit keeps its own aspect and is drawn at the
         // largest uniform scale that fits, anchored top-left, until its client catches up.
         // Zoomed views, live divider drags and floats deliberately fit windows to their rect.
@@ -2375,8 +2567,7 @@ void KrellisCanvas::pinch(double scale, QPointF at, QPointF delta)
 void KrellisCanvas::endPinch()
 {
     m_pinchScale = 1;
-    m_nav.finishGesture();
-    applyRest();
+    finishGesture();
 }
 
 
@@ -3139,11 +3330,16 @@ QString KrellisCanvas::dump()
             lines.back() += QStringLiteral(" client %1,%2 %3x%4").arg(body.x()).arg(body.y()).arg(body.width()).arg(body.height());
         }
         lines.back() += QStringLiteral(" app '%1'").arg(appId(t.window));
+        lines.back() += QStringLiteral(" blur %1").arg(t.window->data(WindowForceBlurRole).toBool());
         double drawnOpacity = 1;
-        if (const auto drawn = visualRect(t.window, &drawnOpacity))
+        if (const auto drawn = visualRect(t.window, &drawnOpacity)) {
             lines.back() += QStringLiteral(" drawn %1x%2").arg(drawn->w, 0, 'f', 1).arg(drawn->h, 0, 'f', 1)
                 + QStringLiteral(" drawnpos %1,%2").arg(drawn->x, 0, 'f', 1).arg(drawn->y, 0, 'f', 1)
                 + QStringLiteral(" opacity %1").arg(drawnOpacity, 0, 'f', 2);
+            const auto buffer = *drawn;
+            lines.back() += QStringLiteral(" buffer %1x%2 bufferpos %3,%4")
+                .arg(buffer.w, 0, 'f', 1).arg(buffer.h, 0, 'f', 1).arg(buffer.x, 0, 'f', 1).arg(buffer.y, 0, 'f', 1);
+        }
         const auto rule = rulesFor(t.window);
         if (rule.scaling == krellis::ViewScaling::Inert) lines.back() += QStringLiteral(" INERT");
         if (rule.scaling == krellis::ViewScaling::None) lines.back() += QStringLiteral(" NO_SCALE");
@@ -3190,6 +3386,8 @@ QString KrellisCanvas::dump()
         QMetaObject::invokeMethod(m_motionOverlay->rootItem(), "labelCount", Q_RETURN_ARG(QVariant, labelCount));
     lines << QStringLiteral("KEY-MOVE %1 held %2").arg(QString::fromStdString(m_keyMovePanel)).arg(m_keyMoveHeld);
     lines << QStringLiteral("NATIVE-REQUESTS %1").arg(m_resizeRequests);
+    lines << QStringLiteral("CAMERA-RESIZE pending %1 changes %2 culled %3")
+                 .arg(m_cameraResizePending).arg(m_cameraChanges).arg(m_cameraCulled);
     lines << QStringLiteral("PAINT-STATS frames %1 rest %2 motion %3").arg(m_framePasses).arg(m_restPasses).arg(m_motionPasses);
     if (m_slotRect)
         lines << QStringLiteral("HIGHLIGHT %1,%2 %3x%4")
@@ -3198,7 +3396,9 @@ QString KrellisCanvas::dump()
     lines << QStringLiteral("MOTION lift %1 landing %2 rewind %3 busy %4 scene %5 labels %6 frames %7")
                  .arg(m_liftAmount, 0, 'f', 2).arg(QString::fromStdString(m_landingPanel))
                  .arg(m_rewindPanels.size()).arg(m_motionBusy).arg(bool(m_motionOverlay)).arg(labelCount.toInt())
-                 .arg(m_motionOverlay ? m_motionOverlay->rootItem()->property("frames").toList().size() : 0);
+                 .arg(m_motionOverlay && m_motionOverlay->opacity() > 0 ? m_motionOverlay->rootItem()->property("frames").toList().size() : 0);
+    lines.back() += QStringLiteral(" builds %1 shown %2").arg(m_motionSceneBuilds)
+        .arg(m_motionOverlay && m_motionOverlay->opacity() > 0 && !m_overlaysCovered);
     lines << QStringLiteral("HISTORY undo %1 redo %2").arg(m_history.size()).arg(m_history.redoSize());
     if (m_sheetWanted || m_sheet)
         lines << QStringLiteral("WHICHKEY %1 opacity %2").arg(m_sheetWanted ? "shown" : "hiding").arg(m_sheetOpacity, 0, 'f', 2);
@@ -3345,7 +3545,13 @@ void KrellisCanvas::stepIn() { m_nav.stepIn(); applyRest(); }
 void KrellisCanvas::back() { m_nav.back(); applyRest(); }
 void KrellisCanvas::forward() { m_nav.forward(); applyRest(); }
 void KrellisCanvas::zoom(double f, double px, double py) { m_nav.zoom(f, {px, py}); }
-void KrellisCanvas::finishGesture() { m_nav.finishGesture(); applyRest(); }
+void KrellisCanvas::finishGesture()
+{
+    m_nav.finishGesture();
+    if (m_hyprland && !m_cameraResizePending && m_restCamera && sameRectEps(*m_restCamera, sizingCamera()))
+        return; // a no-op pinch must not reconfigure stale offscreen geometry
+    applyRest();
+}
 
 bool KrellisEffect::simButton(double x, double y, bool press, int modifiers)
 {

@@ -123,6 +123,12 @@ DragSession::DragSession(DragHost &host, const std::string &panelId, const std::
     m_floating = m_sourceScreen;
     m_grabX = m_sourceScreen.w ? (pointer.x - m_sourceScreen.x) / m_sourceScreen.w : 0.5;
     m_grabY = pointer.y - m_sourceScreen.y;
+    // A window opened under a drag (a browser tearing a tab out) is moved before it is anywhere near the pointer.
+    // Grab it by the middle of its title bar instead of keeping that distance for the whole drag.
+    if (m_grabX < 0 || m_grabX > 1 || m_grabY < 0 || m_grabY > m_sourceScreen.h) {
+        m_grabX = 0.5;
+        m_grabY = std::min(14.0, m_sourceScreen.h / 2);
+    }
 }
 
 bool DragSession::move(Point pointer, double nowMs)

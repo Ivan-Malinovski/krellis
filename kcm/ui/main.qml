@@ -89,6 +89,13 @@ KCM.SimpleKCM {
                 currentIndex: kcm.spawnTarget
                 onActivated: index => kcm.spawnTarget = index
             }
+            QQC2.ComboBox {
+                Kirigami.FormData.label: i18n("Dwindle puts the new window:")
+                visible: kcm.spawnTarget === 3
+                model: [i18n("On the side of the tile the pointer is in"), i18n("Right of the tile, or below it")]
+                currentIndex: kcm.dwindleSide
+                onActivated: index => kcm.dwindleSide = index
+            }
 
             Kirigami.Separator { Kirigami.FormData.isSection: true; Kirigami.FormData.label: i18n("Zoomed view") }
 

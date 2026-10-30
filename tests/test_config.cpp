@@ -37,7 +37,7 @@ private Q_SLOTS:
         QTemporaryDir dir;
         const QString file = dir.filePath("krellisrc");
         Settings s;
-        s.closeFocus = false; s.floatFirst = true; s.shakeFloat = false; s.spawnTarget = SpawnTarget::Focused; s.peek = 12; s.map = false; s.mapPinned = true; s.glide = true; s.landMs = 90; s.iconBelow = 40; s.tileMinWidth = 320; s.tileMinHeight = 200; s.scratchpad = true; s.pin = true; s.tabs = false; s.urgent = false;
+        s.closeFocus = false; s.floatFirst = true; s.shakeFloat = false; s.spawnTarget = SpawnTarget::Focused; s.dwindleSide = DwindleSide::After; s.peek = 12; s.map = false; s.mapPinned = true; s.glide = true; s.landMs = 90; s.iconBelow = 40; s.tileMinWidth = 320; s.tileMinHeight = 200; s.scratchpad = true; s.pin = true; s.tabs = false; s.urgent = false;
         s.followTheme = false; s.toasts = false; s.flyTo = true; s.whichKey = false; s.whichKeyDelayMs = 750;
         s.animationProfile = "hyprland"; s.windowAnimation = "slide";
         QVERIFY(save(s, file));
@@ -86,6 +86,20 @@ private Q_SLOTS:
         QVERIFY(saveValue("spawnTarget", "sideways", old));
         QCOMPARE(load(old).spawnTarget, SpawnTarget::Pointer);
         QVERIFY(Settings{}.spawnTarget == SpawnTarget::Pointer);
+    }
+    void dwindleSideValues()
+    {
+        QTemporaryDir dir;
+        const QString file = dir.filePath("krellisrc");
+        QVERIFY(Settings{}.dwindleSide == DwindleSide::Cursor);
+        for (auto side : {DwindleSide::After, DwindleSide::Cursor}) {
+            Settings s;
+            s.dwindleSide = side;
+            QVERIFY(save(s, file));
+            QCOMPARE(load(file).dwindleSide, side);
+        }
+        QVERIFY(saveValue("dwindleSide", "sideways", file));
+        QVERIFY(load(file).dwindleSide == DwindleSide::Cursor);
     }
     void defaultsWhenMissing()
     {

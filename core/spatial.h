@@ -63,6 +63,7 @@ struct DockTargetSpec {
     Edge edge = Edge::Left;
     std::optional<SplitSeam> seam;
     int boundary = 0;
+    bool nested = false; // a dwindle split: the new window and the target stay a group (Node::nested)
 };
 
 // Nearest edge within a normalized band; 0.5 covers the entire body.

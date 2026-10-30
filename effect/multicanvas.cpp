@@ -218,6 +218,7 @@ void KrellisEffect::syncOutputs()
         canvas->m_closeFocus = m_closeFocus;
         canvas->m_floatFirst = m_floatFirst;
         canvas->m_spawnTarget = m_spawnTarget;
+        canvas->m_dwindleSide = m_dwindleSide;
         canvas->m_peekPx = m_peekPx;
         canvas->m_scratchpad = m_scratchpad;
         canvas->setPinOn(m_pinOn);
@@ -366,6 +367,7 @@ void KrellisEffect::transfer(EffectWindow *w, KrellisCanvas *target)
         target->startFlight(w, KrellisCanvas::FlightKind::Glide, from, {}, opacity);
         target->m_flights.at(w).crossOutput = true;
     }
+    if (auto *arrived = target->trackedFor(w)) arrived->crossedMs = KrellisCanvas::realMs();
     target->updateDock();
 }
 
@@ -1157,6 +1159,7 @@ void KrellisEffect::applySettings(const krellis::config::Settings &settings)
     m_closeFocus = settings.closeFocus;
     m_floatFirst = settings.floatFirst;
     m_spawnTarget = settings.spawnTarget;
+    m_dwindleSide = settings.dwindleSide;
     if (m_spawnTarget != krellis::config::SpawnTarget::Pointer) m_spawnBack = m_spawnTarget;
     m_peekPx = settings.peek;
     m_mapPinned = settings.mapPinned;
@@ -1194,6 +1197,7 @@ void KrellisEffect::applySettings(const krellis::config::Settings &settings)
         canvas->m_closeFocus = m_closeFocus;
         canvas->m_floatFirst = m_floatFirst;
         canvas->m_spawnTarget = m_spawnTarget;
+        canvas->m_dwindleSide = m_dwindleSide;
         canvas->m_peekPx = m_peekPx;
         canvas->m_mapPinned = m_mapPinned;
         canvas->m_mapOn = m_showMap;

@@ -19,6 +19,15 @@ work=${NEST_WORK:-/tmp/krellis-nest}; rm -rf "$work"; mkdir -p "$work/config" "$
   IFS=, read -ra ids <<<"$effects"; for e in "${ids[@]}"; do echo "${e}Enabled=true"; done
   echo "blurEnabled=false"; echo "[Compositing]"; echo "Backend=OpenGL"
 } > "$work/config/kwinrc"
+# Optional read-only SVG decoration assets for rendering/cache regressions.
+# Selecting a plugin here changes only this throwaway compositor's kwinrc.
+if [ -n "${NEST_AURORAE_THEME_DIR:-}" ]; then
+  theme_dir=$(realpath "$NEST_AURORAE_THEME_DIR"); theme_name=$(basename "$theme_dir")
+  [[ -d "$theme_dir" && "$theme_name" =~ ^[[:alnum:]_.-]+$ && "$theme_name" != . && "$theme_name" != .. ]]
+  mkdir -p "$work/data/aurorae/themes"
+  ln -s "$theme_dir" "$work/data/aurorae/themes/$theme_name"
+  printf '\n[org.kde.kdecoration2]\nlibrary=%s\ntheme=__aurorae__svg__%s\n' "${NEST_DECORATION_LIBRARY:-org.kde.kwin.aurorae.v2}" "$theme_name" >> "$work/config/kwinrc"
+fi
 if [ -n "${NEST_KRELLISRC:-}" ]; then cp "$NEST_KRELLISRC" "$work/config/krellisrc"; else printf "[General]\nglide=true\nmap=false\nfollowTheme=false\ntoasts=false\nwhichKey=false\n" >"$work/config/krellisrc"; fi
 # NEST_KDEGLOBALS: a colour scheme for the nested session (theme scenarios); without it the built-in palette is used.
 if [ -n "${NEST_KDEGLOBALS:-}" ]; then cp "$NEST_KDEGLOBALS" "$work/config/kdeglobals"; fi

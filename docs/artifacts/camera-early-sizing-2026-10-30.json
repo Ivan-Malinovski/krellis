@@ -1,0 +1,92 @@
+{
+  "date": "2026-10-30",
+  "purpose": "Replace rejected uniform-cover presentation and half-second discrete resize deferral with the original per-axis presentation and one visible-only native geometry batch at each known destination. Continuous gestures still defer until release.",
+  "measurements": {
+    "early-dolphin-before": [
+      {
+        "windows": 25,
+        "frames": 256,
+        "nativeRequests": 24,
+        "cpuMedianMs": 0.315,
+        "cpuP95Ms": 2.434,
+        "intervalMedianMs": 16.424,
+        "intervalP95Ms": 17.6
+      }
+    ],
+    "early-dolphin-after": [
+      {
+        "windows": 25,
+        "frames": 231,
+        "nativeRequests": 24,
+        "cpuMedianMs": 0.321,
+        "cpuP95Ms": 3.841,
+        "intervalMedianMs": 16.45,
+        "intervalP95Ms": 17.486
+      }
+    ],
+    "early-qt-after": [
+      {
+        "windows": 100,
+        "frames": 235,
+        "nativeRequests": 24,
+        "cpuMedianMs": 0.718,
+        "cpuP95Ms": 2.794,
+        "intervalMedianMs": 16.737,
+        "intervalP95Ms": 17.471
+      }
+    ]
+  },
+  "axes": {
+    "horizontal-axis": {
+      "frames": 9,
+      "points": [
+        {
+          "bad": 0,
+          "last": [
+            255,
+            0,
+            255
+          ],
+          "samples": 9,
+          "seen": 0
+        },
+        {
+          "bad": 0,
+          "last": [
+            255,
+            0,
+            255
+          ],
+          "samples": 9,
+          "seen": 0
+        }
+      ]
+    },
+    "vertical-axis": {
+      "frames": 9,
+      "points": [
+        {
+          "bad": 0,
+          "last": [
+            0,
+            255,
+            255
+          ],
+          "samples": 9,
+          "seen": 0
+        },
+        {
+          "bad": 0,
+          "last": [
+            0,
+            255,
+            255
+          ],
+          "samples": 9,
+          "seen": 0
+        }
+      ]
+    }
+  },
+  "limits": "1280x800 virtual nested KWin. Elapsed frame processing includes driver waits, not GPU-only execution. Before is installed cover build krellis_1030101932. Dolphin uses 25 empty-directory windows. Geometry counts cover eight transitions and exclude spawning/cleanup. Direct per-axis animation can briefly rescale a late client buffer."
+}

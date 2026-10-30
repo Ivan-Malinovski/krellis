@@ -16,7 +16,7 @@ QJsonValue node(const NodePtr &n) {
     if (n->kind == Node::Kind::Panel) { o["kind"]="panel"; o["views"]=ids(n->views); }
     else if (n->kind == Node::Kind::Stage) { o["kind"]="stage"; o["child"]=node(n->child); }
     else {
-        o["kind"]="split"; o["axis"]=n->axis == Axis::X ? "x" : "y";
+        o["kind"]="split"; o["axis"]=n->axis == Axis::X ? "x" : "y"; if (n->nested) o["nested"]=true;
         QJsonArray children, weights;
         for (const auto &c : n->children) children.append(node(c));
         for (double w : n->weights) weights.append(w);
@@ -71,7 +71,7 @@ struct Reader {
         if (cs.isEmpty() || cs.size()!=ws.size() || cs.size()>1024 || (o["axis"]!="x" && o["axis"]!="y")) { valid=false; return nullptr; }
         std::vector<NodePtr> children; std::vector<double> weights;
         for (int i=0;i<cs.size();++i) { auto c=tree(cs[i],depth+1); if (!c) valid=false; children.push_back(c); weights.push_back(number(ws[i],0.000001,1e6)); }
-        return makeSplit(id,o["axis"]=="x"?Axis::X:Axis::Y,children,weights);
+        return makeSplit(id,o["axis"]=="x"?Axis::X:Axis::Y,children,weights,o["nested"].toBool());
     }
 };
 }

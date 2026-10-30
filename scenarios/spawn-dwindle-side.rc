@@ -1,0 +1,7 @@
+[General]
+glide=true
+map=false
+followTheme=false
+toasts=false
+whichKey=false
+spawnTarget=dwindle

@@ -1,0 +1,1772 @@
+{
+  "workload": "14 opaque Kitty windows in one rendering instance, 3440x1440 virtual output, repeated rapid inward/outward wheel bursts; blur disabled",
+  "runs": [
+    {
+      "name": "baseline-long",
+      "path": "/tmp/krellis-scn.y7dwCQ/zoom-burst/out",
+      "phases": [
+        {
+          "name": "burst-0--15.json",
+          "frames": 36,
+          "cpuP95": 2.351,
+          "cpuMax": 12.402351,
+          "gpuTimelineMax": 3.632128
+        },
+        {
+          "name": "burst-0-15.json",
+          "frames": 33,
+          "cpuP95": 2.195,
+          "cpuMax": 101.517525,
+          "gpuTimelineMax": 6.861824
+        },
+        {
+          "name": "burst-1--15.json",
+          "frames": 36,
+          "cpuP95": 1.524,
+          "cpuMax": 13.707504,
+          "gpuTimelineMax": 5.039104
+        },
+        {
+          "name": "burst-1-15.json",
+          "frames": 30,
+          "cpuP95": 3.407,
+          "cpuMax": 78.492767,
+          "gpuTimelineMax": 3.178496
+        },
+        {
+          "name": "burst-10--15.json",
+          "frames": 32,
+          "cpuP95": 2.675,
+          "cpuMax": 12.441651,
+          "gpuTimelineMax": 5.9392
+        },
+        {
+          "name": "burst-10-15.json",
+          "frames": 27,
+          "cpuP95": 2.636,
+          "cpuMax": 67.237359,
+          "gpuTimelineMax": 3.756032
+        },
+        {
+          "name": "burst-11--15.json",
+          "frames": 32,
+          "cpuP95": 1.845,
+          "cpuMax": 13.582944,
+          "gpuTimelineMax": 5.373952
+        },
+        {
+          "name": "burst-11-15.json",
+          "frames": 25,
+          "cpuP95": 2.451,
+          "cpuMax": 116.184771,
+          "gpuTimelineMax": 5.36576
+        },
+        {
+          "name": "burst-12--15.json",
+          "frames": 32,
+          "cpuP95": 2.098,
+          "cpuMax": 12.25136,
+          "gpuTimelineMax": 5.23264
+        },
+        {
+          "name": "burst-12-15.json",
+          "frames": 27,
+          "cpuP95": 2.95,
+          "cpuMax": 73.835335,
+          "gpuTimelineMax": 4.033536
+        },
+        {
+          "name": "burst-13--15.json",
+          "frames": 32,
+          "cpuP95": 2.31,
+          "cpuMax": 13.543124,
+          "gpuTimelineMax": 3.262464
+        },
+        {
+          "name": "burst-13-15.json",
+          "frames": 28,
+          "cpuP95": 2.276,
+          "cpuMax": 72.431432,
+          "gpuTimelineMax": 4.276224
+        },
+        {
+          "name": "burst-14--15.json",
+          "frames": 32,
+          "cpuP95": 1.485,
+          "cpuMax": 13.211694,
+          "gpuTimelineMax": 4.169728
+        },
+        {
+          "name": "burst-14-15.json",
+          "frames": 27,
+          "cpuP95": 4.191,
+          "cpuMax": 71.73851,
+          "gpuTimelineMax": 4.713472
+        },
+        {
+          "name": "burst-15--15.json",
+          "frames": 32,
+          "cpuP95": 1.823,
+          "cpuMax": 14.181836,
+          "gpuTimelineMax": 5.915648
+        },
+        {
+          "name": "burst-15-15.json",
+          "frames": 27,
+          "cpuP95": 2.265,
+          "cpuMax": 84.620872,
+          "gpuTimelineMax": 5.379072
+        },
+        {
+          "name": "burst-16--15.json",
+          "frames": 32,
+          "cpuP95": 1.51,
+          "cpuMax": 13.367424,
+          "gpuTimelineMax": 5.098496
+        },
+        {
+          "name": "burst-16-15.json",
+          "frames": 27,
+          "cpuP95": 2.503,
+          "cpuMax": 75.956881,
+          "gpuTimelineMax": 4.489216
+        },
+        {
+          "name": "burst-17--15.json",
+          "frames": 32,
+          "cpuP95": 2.378,
+          "cpuMax": 12.799142,
+          "gpuTimelineMax": 3.918848
+        },
+        {
+          "name": "burst-17-15.json",
+          "frames": 26,
+          "cpuP95": 1.859,
+          "cpuMax": 91.51624,
+          "gpuTimelineMax": 5.307392
+        },
+        {
+          "name": "burst-18--15.json",
+          "frames": 32,
+          "cpuP95": 1.606,
+          "cpuMax": 12.682372,
+          "gpuTimelineMax": 5.240832
+        },
+        {
+          "name": "burst-18-15.json",
+          "frames": 27,
+          "cpuP95": 2.556,
+          "cpuMax": 78.701318,
+          "gpuTimelineMax": 5.056512
+        },
+        {
+          "name": "burst-19--15.json",
+          "frames": 32,
+          "cpuP95": 1.932,
+          "cpuMax": 13.558624,
+          "gpuTimelineMax": 5.29408
+        },
+        {
+          "name": "burst-19-15.json",
+          "frames": 27,
+          "cpuP95": 2.044,
+          "cpuMax": 74.156276,
+          "gpuTimelineMax": 6.693888
+        },
+        {
+          "name": "burst-2--15.json",
+          "frames": 36,
+          "cpuP95": 2.239,
+          "cpuMax": 13.856075,
+          "gpuTimelineMax": 2.975744
+        },
+        {
+          "name": "burst-2-15.json",
+          "frames": 31,
+          "cpuP95": 1.919,
+          "cpuMax": 74.634958,
+          "gpuTimelineMax": 4.773888
+        },
+        {
+          "name": "burst-20--15.json",
+          "frames": 32,
+          "cpuP95": 1.619,
+          "cpuMax": 13.103003,
+          "gpuTimelineMax": 5.072896
+        },
+        {
+          "name": "burst-20-15.json",
+          "frames": 26,
+          "cpuP95": 2.543,
+          "cpuMax": 94.927118,
+          "gpuTimelineMax": 5.14048
+        },
+        {
+          "name": "burst-21--15.json",
+          "frames": 32,
+          "cpuP95": 3.136,
+          "cpuMax": 12.360941,
+          "gpuTimelineMax": 3.4048
+        },
+        {
+          "name": "burst-21-15.json",
+          "frames": 28,
+          "cpuP95": 2.247,
+          "cpuMax": 72.302531,
+          "gpuTimelineMax": 8.650752
+        },
+        {
+          "name": "burst-22--15.json",
+          "frames": 32,
+          "cpuP95": 1.919,
+          "cpuMax": 12.252451,
+          "gpuTimelineMax": 5.231616
+        },
+        {
+          "name": "burst-22-15.json",
+          "frames": 28,
+          "cpuP95": 2.231,
+          "cpuMax": 71.282359,
+          "gpuTimelineMax": 5.080064
+        },
+        {
+          "name": "burst-23--15.json",
+          "frames": 32,
+          "cpuP95": 1.44,
+          "cpuMax": 11.90388,
+          "gpuTimelineMax": 6.843392
+        },
+        {
+          "name": "burst-23-15.json",
+          "frames": 28,
+          "cpuP95": 2.119,
+          "cpuMax": 75.402329,
+          "gpuTimelineMax": 5.170176
+        },
+        {
+          "name": "burst-24--15.json",
+          "frames": 32,
+          "cpuP95": 1.544,
+          "cpuMax": 12.087871,
+          "gpuTimelineMax": 4.990976
+        },
+        {
+          "name": "burst-24-15.json",
+          "frames": 28,
+          "cpuP95": 1.852,
+          "cpuMax": 72.631522,
+          "gpuTimelineMax": 4.783104
+        },
+        {
+          "name": "burst-25--15.json",
+          "frames": 32,
+          "cpuP95": 1.59,
+          "cpuMax": 12.541761,
+          "gpuTimelineMax": 5.035008
+        },
+        {
+          "name": "burst-25-15.json",
+          "frames": 27,
+          "cpuP95": 2.628,
+          "cpuMax": 80.796683,
+          "gpuTimelineMax": 4.888576
+        },
+        {
+          "name": "burst-26--15.json",
+          "frames": 32,
+          "cpuP95": 1.498,
+          "cpuMax": 11.77834,
+          "gpuTimelineMax": 5.059584
+        },
+        {
+          "name": "burst-26-15.json",
+          "frames": 27,
+          "cpuP95": 2.19,
+          "cpuMax": 72.541461,
+          "gpuTimelineMax": 4.339712
+        },
+        {
+          "name": "burst-27--15.json",
+          "frames": 32,
+          "cpuP95": 2.106,
+          "cpuMax": 13.194594,
+          "gpuTimelineMax": 5.136384
+        },
+        {
+          "name": "burst-27-15.json",
+          "frames": 28,
+          "cpuP95": 2.196,
+          "cpuMax": 74.738377,
+          "gpuTimelineMax": 4.26496
+        },
+        {
+          "name": "burst-28--15.json",
+          "frames": 32,
+          "cpuP95": 1.487,
+          "cpuMax": 12.086211,
+          "gpuTimelineMax": 5.061632
+        },
+        {
+          "name": "burst-28-15.json",
+          "frames": 27,
+          "cpuP95": 3.434,
+          "cpuMax": 70.574816,
+          "gpuTimelineMax": 3.01568
+        },
+        {
+          "name": "burst-29--15.json",
+          "frames": 32,
+          "cpuP95": 1.529,
+          "cpuMax": 12.763382,
+          "gpuTimelineMax": 4.768768
+        },
+        {
+          "name": "burst-29-15.json",
+          "frames": 26,
+          "cpuP95": 2.158,
+          "cpuMax": 98.424757,
+          "gpuTimelineMax": 4.835328
+        },
+        {
+          "name": "burst-3--15.json",
+          "frames": 36,
+          "cpuP95": 1.458,
+          "cpuMax": 16.447891,
+          "gpuTimelineMax": 3.045376
+        },
+        {
+          "name": "burst-3-15.json",
+          "frames": 31,
+          "cpuP95": 1.984,
+          "cpuMax": 102.210377,
+          "gpuTimelineMax": 5.215232
+        },
+        {
+          "name": "burst-4--15.json",
+          "frames": 31,
+          "cpuP95": 2.238,
+          "cpuMax": 14.169626,
+          "gpuTimelineMax": 5.527552
+        },
+        {
+          "name": "burst-4-15.json",
+          "frames": 28,
+          "cpuP95": 3.49,
+          "cpuMax": 77.882375,
+          "gpuTimelineMax": 3.168256
+        },
+        {
+          "name": "burst-5--15.json",
+          "frames": 32,
+          "cpuP95": 3.504,
+          "cpuMax": 12.445681,
+          "gpuTimelineMax": 3.014656
+        },
+        {
+          "name": "burst-5-15.json",
+          "frames": 27,
+          "cpuP95": 2.655,
+          "cpuMax": 70.670447,
+          "gpuTimelineMax": 3.761152
+        },
+        {
+          "name": "burst-6--15.json",
+          "frames": 32,
+          "cpuP95": 2.285,
+          "cpuMax": 12.782642,
+          "gpuTimelineMax": 3.70688
+        },
+        {
+          "name": "burst-6-15.json",
+          "frames": 27,
+          "cpuP95": 3.715,
+          "cpuMax": 71.004968,
+          "gpuTimelineMax": 2.840576
+        },
+        {
+          "name": "burst-7--15.json",
+          "frames": 32,
+          "cpuP95": 1.501,
+          "cpuMax": 15.92478,
+          "gpuTimelineMax": 5.051392
+        },
+        {
+          "name": "burst-7-15.json",
+          "frames": 25,
+          "cpuP95": 4.128,
+          "cpuMax": 110.046496,
+          "gpuTimelineMax": 3.659776
+        },
+        {
+          "name": "burst-8--15.json",
+          "frames": 32,
+          "cpuP95": 1.581,
+          "cpuMax": 13.514214,
+          "gpuTimelineMax": 5.198848
+        },
+        {
+          "name": "burst-8-15.json",
+          "frames": 27,
+          "cpuP95": 2.997,
+          "cpuMax": 70.902549,
+          "gpuTimelineMax": 4.318208
+        },
+        {
+          "name": "burst-9--15.json",
+          "frames": 32,
+          "cpuP95": 1.798,
+          "cpuMax": 12.804233,
+          "gpuTimelineMax": 4.31616
+        },
+        {
+          "name": "burst-9-15.json",
+          "frames": 28,
+          "cpuP95": 2.177,
+          "cpuMax": 81.795785,
+          "gpuTimelineMax": 4.85888
+        }
+      ]
+    },
+    {
+      "name": "baseline-corners",
+      "path": "/tmp/krellis-shared-corners/out",
+      "phases": [
+        {
+          "name": "burst-0--15.json",
+          "frames": 36,
+          "cpuP95": 2.707,
+          "cpuMax": 13.688074,
+          "gpuTimelineMax": 4.21376,
+          "slowestStages": {
+            "paintMs": 0.18357,
+            "postMs": 0.00251,
+            "preMs": 13.347843
+          }
+        },
+        {
+          "name": "burst-0-15.json",
+          "frames": 34,
+          "cpuP95": 3.443,
+          "cpuMax": 91.266999,
+          "gpuTimelineMax": 3.16928,
+          "slowestStages": {
+            "paintMs": 0.160491,
+            "postMs": 0.00284,
+            "preMs": 90.947188
+          }
+        },
+        {
+          "name": "burst-1--15.json",
+          "frames": 36,
+          "cpuP95": 1.434,
+          "cpuMax": 14.174315,
+          "gpuTimelineMax": 4.750336,
+          "slowestStages": {
+            "paintMs": 0.153491,
+            "postMs": 0.00241,
+            "preMs": 13.883064
+          }
+        },
+        {
+          "name": "burst-1-15.json",
+          "frames": 32,
+          "cpuP95": 2.451,
+          "cpuMax": 77.711855,
+          "gpuTimelineMax": 3.979264,
+          "slowestStages": {
+            "paintMs": 0.1501,
+            "postMs": 0.00266,
+            "preMs": 77.409844
+          }
+        },
+        {
+          "name": "burst-2--15.json",
+          "frames": 36,
+          "cpuP95": 1.618,
+          "cpuMax": 13.863625,
+          "gpuTimelineMax": 5.041152,
+          "slowestStages": {
+            "paintMs": 0.151691,
+            "postMs": 0.00249,
+            "preMs": 13.568884
+          }
+        },
+        {
+          "name": "burst-2-15.json",
+          "frames": 31,
+          "cpuP95": 1.811,
+          "cpuMax": 69.167503,
+          "gpuTimelineMax": 4.217856,
+          "slowestStages": {
+            "paintMs": 0.15682,
+            "postMs": 0.00255,
+            "preMs": 68.858552
+          }
+        },
+        {
+          "name": "burst-3--15.json",
+          "frames": 36,
+          "cpuP95": 1.429,
+          "cpuMax": 16.742722,
+          "gpuTimelineMax": 3.00032,
+          "slowestStages": {
+            "paintMs": 3.348638,
+            "postMs": 0.00252,
+            "preMs": 13.274653
+          }
+        },
+        {
+          "name": "burst-3-15.json",
+          "frames": 31,
+          "cpuP95": 2.107,
+          "cpuMax": 72.10195,
+          "gpuTimelineMax": 4.85376,
+          "slowestStages": {
+            "paintMs": 0.14659,
+            "postMs": 0.0026,
+            "preMs": 71.81453
+          }
+        },
+        {
+          "name": "burst-4--15.json",
+          "frames": 33,
+          "cpuP95": 1.53,
+          "cpuMax": 11.82178,
+          "gpuTimelineMax": 5.101568,
+          "slowestStages": {
+            "paintMs": 0.165551,
+            "postMs": 0.00251,
+            "preMs": 11.513529
+          }
+        },
+        {
+          "name": "burst-4-15.json",
+          "frames": 27,
+          "cpuP95": 1.95,
+          "cpuMax": 97.344064,
+          "gpuTimelineMax": 4.635648,
+          "slowestStages": {
+            "paintMs": 0.151641,
+            "postMs": 0.00254,
+            "preMs": 97.040343
+          }
+        }
+      ]
+    },
+    {
+      "name": "baseline-no-corners",
+      "path": "/tmp/krellis-shared-plain/out",
+      "phases": [
+        {
+          "name": "burst-0--15.json",
+          "frames": 36,
+          "cpuP95": 1.144,
+          "cpuMax": 14.026895,
+          "gpuTimelineMax": 0.374784,
+          "slowestStages": {
+            "paintMs": 0.344271,
+            "postMs": 0.00246,
+            "preMs": 13.499174
+          }
+        },
+        {
+          "name": "burst-0-15.json",
+          "frames": 29,
+          "cpuP95": 1.456,
+          "cpuMax": 101.086243,
+          "gpuTimelineMax": 0.320512,
+          "slowestStages": {
+            "paintMs": 0.15633,
+            "postMs": 0.00245,
+            "preMs": 100.761283
+          }
+        },
+        {
+          "name": "burst-1--15.json",
+          "frames": 38,
+          "cpuP95": 1.168,
+          "cpuMax": 14.159645,
+          "gpuTimelineMax": 0.34816,
+          "slowestStages": {
+            "paintMs": 0.17803,
+            "postMs": 0.00234,
+            "preMs": 13.796264
+          }
+        },
+        {
+          "name": "burst-1-15.json",
+          "frames": 30,
+          "cpuP95": 1.725,
+          "cpuMax": 81.344974,
+          "gpuTimelineMax": 0.339968,
+          "slowestStages": {
+            "paintMs": 0.14766,
+            "postMs": 0.00254,
+            "preMs": 81.038143
+          }
+        },
+        {
+          "name": "burst-2--15.json",
+          "frames": 36,
+          "cpuP95": 1.393,
+          "cpuMax": 12.23968,
+          "gpuTimelineMax": 0.331776,
+          "slowestStages": {
+            "paintMs": 0.15634,
+            "postMs": 0.00232,
+            "preMs": 11.91959
+          }
+        },
+        {
+          "name": "burst-2-15.json",
+          "frames": 31,
+          "cpuP95": 1.531,
+          "cpuMax": 82.448507,
+          "gpuTimelineMax": 0.349184,
+          "slowestStages": {
+            "paintMs": 0.16264,
+            "postMs": 0.00271,
+            "preMs": 82.102036
+          }
+        },
+        {
+          "name": "burst-3--15.json",
+          "frames": 38,
+          "cpuP95": 1.084,
+          "cpuMax": 14.731827,
+          "gpuTimelineMax": 0.329728,
+          "slowestStages": {
+            "paintMs": 0.26844,
+            "postMs": 0.00305,
+            "preMs": 14.222286
+          }
+        },
+        {
+          "name": "burst-3-15.json",
+          "frames": 28,
+          "cpuP95": 1.489,
+          "cpuMax": 108.246221,
+          "gpuTimelineMax": 0.331776,
+          "slowestStages": {
+            "paintMs": 0.297081,
+            "postMs": 0.0034,
+            "preMs": 107.71949
+          }
+        },
+        {
+          "name": "burst-4--15.json",
+          "frames": 32,
+          "cpuP95": 1.08,
+          "cpuMax": 12.632512,
+          "gpuTimelineMax": 0.361472,
+          "slowestStages": {
+            "paintMs": 0.164851,
+            "postMs": 0.0024,
+            "preMs": 12.282161
+          }
+        },
+        {
+          "name": "burst-4-15.json",
+          "frames": 27,
+          "cpuP95": 1.55,
+          "cpuMax": 72.614322,
+          "gpuTimelineMax": 0.336896,
+          "slowestStages": {
+            "paintMs": 0.161041,
+            "postMs": 0.00271,
+            "preMs": 72.274841
+          }
+        }
+      ]
+    },
+    {
+      "name": "updated-instrumented",
+      "path": "/tmp/krellis-scn.uUa0cu/overlay-reuse/out",
+      "phases": [
+        {
+          "name": "burst-0--15.json",
+          "frames": 37,
+          "cpuP95": 1.658,
+          "cpuMax": 6.254996,
+          "gpuTimelineMax": 5.612544,
+          "slowestStages": {
+            "paintMs": 6.037615,
+            "postMs": 0.00255,
+            "preMs": 0.09281
+          }
+        },
+        {
+          "name": "burst-0-15.json",
+          "frames": 38,
+          "cpuP95": 2.481,
+          "cpuMax": 4.295891,
+          "gpuTimelineMax": 2.895872,
+          "slowestStages": {
+            "paintMs": 3.574879,
+            "postMs": 0.00252,
+            "preMs": 0.599512
+          }
+        },
+        {
+          "name": "burst-1--15.json",
+          "frames": 35,
+          "cpuP95": 1.477,
+          "cpuMax": 4.585312,
+          "gpuTimelineMax": 4.64896,
+          "slowestStages": {
+            "paintMs": 4.374191,
+            "postMs": 0.00252,
+            "preMs": 0.089531
+          }
+        },
+        {
+          "name": "burst-1-15.json",
+          "frames": 37,
+          "cpuP95": 1.58,
+          "cpuMax": 6.108975,
+          "gpuTimelineMax": 4.799488,
+          "slowestStages": {
+            "paintMs": 5.415303,
+            "postMs": 0.00251,
+            "preMs": 0.575892
+          }
+        },
+        {
+          "name": "burst-2--15.json",
+          "frames": 37,
+          "cpuP95": 1.376,
+          "cpuMax": 5.845214,
+          "gpuTimelineMax": 5.021696,
+          "slowestStages": {
+            "paintMs": 5.632684,
+            "postMs": 0.0025,
+            "preMs": 0.09246
+          }
+        },
+        {
+          "name": "burst-2-15.json",
+          "frames": 36,
+          "cpuP95": 1.922,
+          "cpuMax": 5.111263,
+          "gpuTimelineMax": 3.981312,
+          "slowestStages": {
+            "paintMs": 4.640572,
+            "postMs": 0.00259,
+            "preMs": 0.347771
+          }
+        },
+        {
+          "name": "burst-3--15.json",
+          "frames": 37,
+          "cpuP95": 1.576,
+          "cpuMax": 5.231033,
+          "gpuTimelineMax": 4.753408,
+          "slowestStages": {
+            "paintMs": 5.052553,
+            "postMs": 0.00244,
+            "preMs": 0.06743
+          }
+        },
+        {
+          "name": "burst-3-15.json",
+          "frames": 36,
+          "cpuP95": 1.982,
+          "cpuMax": 3.88163,
+          "gpuTimelineMax": 13.582336,
+          "slowestStages": {
+            "paintMs": 3.131548,
+            "postMs": 0.0025,
+            "preMs": 0.631532
+          }
+        },
+        {
+          "name": "burst-4--15.json",
+          "frames": 32,
+          "cpuP95": 1.428,
+          "cpuMax": 4.777732,
+          "gpuTimelineMax": 4.199424,
+          "slowestStages": {
+            "paintMs": 4.569942,
+            "postMs": 0.00258,
+            "preMs": 0.08817
+          }
+        },
+        {
+          "name": "burst-4-15.json",
+          "frames": 32,
+          "cpuP95": 1.686,
+          "cpuMax": 5.722164,
+          "gpuTimelineMax": 5.16608,
+          "slowestStages": {
+            "paintMs": 5.300624,
+            "postMs": 0.0025,
+            "preMs": 0.30443
+          }
+        },
+        {
+          "name": "burst-5--15.json",
+          "frames": 33,
+          "cpuP95": 1.884,
+          "cpuMax": 4.876002,
+          "gpuTimelineMax": 19.904512,
+          "slowestStages": {
+            "paintMs": 4.691852,
+            "postMs": 0.00249,
+            "preMs": 0.0704
+          }
+        },
+        {
+          "name": "burst-5-15.json",
+          "frames": 31,
+          "cpuP95": 1.769,
+          "cpuMax": 4.881812,
+          "gpuTimelineMax": 4.29568,
+          "slowestStages": {
+            "paintMs": 4.465731,
+            "postMs": 0.00249,
+            "preMs": 0.294911
+          }
+        },
+        {
+          "name": "burst-6--15.json",
+          "frames": 32,
+          "cpuP95": 1.422,
+          "cpuMax": 4.776252,
+          "gpuTimelineMax": 4.486144,
+          "slowestStages": {
+            "paintMs": 4.561451,
+            "postMs": 0.00261,
+            "preMs": 0.090461
+          }
+        },
+        {
+          "name": "burst-6-15.json",
+          "frames": 32,
+          "cpuP95": 1.635,
+          "cpuMax": 5.697024,
+          "gpuTimelineMax": 5.211136,
+          "slowestStages": {
+            "paintMs": 5.281373,
+            "postMs": 0.00281,
+            "preMs": 0.290541
+          }
+        },
+        {
+          "name": "burst-7--15.json",
+          "frames": 32,
+          "cpuP95": 1.549,
+          "cpuMax": 5.677734,
+          "gpuTimelineMax": 5.103616,
+          "slowestStages": {
+            "paintMs": 5.466354,
+            "postMs": 0.00256,
+            "preMs": 0.08811
+          }
+        },
+        {
+          "name": "burst-7-15.json",
+          "frames": 32,
+          "cpuP95": 1.689,
+          "cpuMax": 3.753329,
+          "gpuTimelineMax": 2.807808,
+          "slowestStages": {
+            "paintMs": 3.264618,
+            "postMs": 0.00259,
+            "preMs": 0.364651
+          }
+        }
+      ]
+    },
+    {
+      "name": "updated-clean-eight",
+      "path": "/tmp/krellis-scn.GCruAl/overlay-reuse/out",
+      "phases": [
+        {
+          "name": "burst-0--15.json",
+          "frames": 37,
+          "cpuMax": 6.055095,
+          "cpuP95": 1.579724,
+          "slowestStages": {
+            "paintMs": 5.854915,
+            "postMs": 0.00247,
+            "preMs": 0.0791
+          }
+        },
+        {
+          "name": "burst-0-15.json",
+          "frames": 33,
+          "cpuMax": 5.489533,
+          "cpuP95": 1.793735,
+          "slowestStages": {
+            "paintMs": 5.030372,
+            "postMs": 0.00252,
+            "preMs": 0.33853
+          }
+        },
+        {
+          "name": "burst-1--15.json",
+          "frames": 36,
+          "cpuMax": 4.04542,
+          "cpuP95": 1.773755,
+          "slowestStages": {
+            "paintMs": 3.87403,
+            "postMs": 0.00231,
+            "preMs": 0.06301
+          }
+        },
+        {
+          "name": "burst-1-15.json",
+          "frames": 36,
+          "cpuMax": 5.556693,
+          "cpuP95": 2.371116,
+          "slowestStages": {
+            "paintMs": 5.157252,
+            "postMs": 0.0024,
+            "preMs": 0.2862
+          }
+        },
+        {
+          "name": "burst-2--15.json",
+          "frames": 36,
+          "cpuMax": 5.591354,
+          "cpuP95": 1.540043,
+          "slowestStages": {
+            "paintMs": 5.415963,
+            "postMs": 0.00249,
+            "preMs": 0.064421
+          }
+        },
+        {
+          "name": "burst-2-15.json",
+          "frames": 35,
+          "cpuMax": 4.823612,
+          "cpuP95": 1.814335,
+          "slowestStages": {
+            "paintMs": 4.023201,
+            "postMs": 0.00245,
+            "preMs": 0.672301
+          }
+        },
+        {
+          "name": "burst-3--15.json",
+          "frames": 39,
+          "cpuMax": 5.724624,
+          "cpuP95": 1.533854,
+          "slowestStages": {
+            "paintMs": 5.521154,
+            "postMs": 0.00249,
+            "preMs": 0.0808
+          }
+        },
+        {
+          "name": "burst-3-15.json",
+          "frames": 34,
+          "cpuMax": 4.179261,
+          "cpuP95": 1.942794,
+          "slowestStages": {
+            "paintMs": 3.78402,
+            "postMs": 0.00241,
+            "preMs": 0.281911
+          }
+        },
+        {
+          "name": "burst-4--15.json",
+          "frames": 32,
+          "cpuMax": 3.546379,
+          "cpuP95": 2.121155,
+          "slowestStages": {
+            "paintMs": 3.349339,
+            "postMs": 0.00235,
+            "preMs": 0.08271
+          }
+        },
+        {
+          "name": "burst-4-15.json",
+          "frames": 32,
+          "cpuMax": 5.836765,
+          "cpuP95": 1.760035,
+          "slowestStages": {
+            "paintMs": 5.376893,
+            "postMs": 0.00242,
+            "preMs": 0.330951
+          }
+        },
+        {
+          "name": "burst-5--15.json",
+          "frames": 31,
+          "cpuMax": 3.99372,
+          "cpuP95": 1.435573,
+          "slowestStages": {
+            "paintMs": 3.788769,
+            "postMs": 0.00242,
+            "preMs": 0.07915
+          }
+        },
+        {
+          "name": "burst-5-15.json",
+          "frames": 31,
+          "cpuMax": 4.956802,
+          "cpuP95": 1.913135,
+          "slowestStages": {
+            "paintMs": 4.507011,
+            "postMs": 0.00246,
+            "preMs": 0.328591
+          }
+        },
+        {
+          "name": "burst-6--15.json",
+          "frames": 31,
+          "cpuMax": 4.503842,
+          "cpuP95": 1.474394,
+          "slowestStages": {
+            "paintMs": 4.29215,
+            "postMs": 0.00252,
+            "preMs": 0.0812
+          }
+        },
+        {
+          "name": "burst-6-15.json",
+          "frames": 31,
+          "cpuMax": 6.249095,
+          "cpuP95": 1.779314,
+          "slowestStages": {
+            "paintMs": 5.591604,
+            "postMs": 0.00235,
+            "preMs": 0.546261
+          }
+        },
+        {
+          "name": "burst-7--15.json",
+          "frames": 32,
+          "cpuMax": 4.493951,
+          "cpuP95": 1.562814,
+          "slowestStages": {
+            "paintMs": 4.2921,
+            "postMs": 0.0024,
+            "preMs": 0.079251
+          }
+        },
+        {
+          "name": "burst-7-15.json",
+          "frames": 32,
+          "cpuMax": 5.659834,
+          "cpuP95": 1.468004,
+          "slowestStages": {
+            "paintMs": 5.277783,
+            "postMs": 0.00254,
+            "preMs": 0.268001
+          }
+        }
+      ]
+    },
+    {
+      "name": "updated-endurance",
+      "path": "/tmp/krellis-scn.KUCyAp/overlay-reuse/out",
+      "phases": [
+        {
+          "name": "burst-0--15.json",
+          "frames": 36,
+          "cpuMax": 6.299276,
+          "cpuP95": 1.618864,
+          "slowestStages": {
+            "paintMs": 6.090206,
+            "postMs": 0.0025,
+            "preMs": 0.08466
+          }
+        },
+        {
+          "name": "burst-0-15.json",
+          "frames": 36,
+          "cpuMax": 8.504021,
+          "cpuP95": 2.023835,
+          "slowestStages": {
+            "paintMs": 8.03014,
+            "postMs": 0.0025,
+            "preMs": 0.351671
+          }
+        },
+        {
+          "name": "burst-1--15.json",
+          "frames": 36,
+          "cpuMax": 4.233451,
+          "cpuP95": 1.417664,
+          "slowestStages": {
+            "paintMs": 3.92602,
+            "postMs": 0.00241,
+            "preMs": 0.196381
+          }
+        },
+        {
+          "name": "burst-1-15.json",
+          "frames": 36,
+          "cpuMax": 6.459726,
+          "cpuP95": 2.047145,
+          "slowestStages": {
+            "paintMs": 6.000075,
+            "postMs": 0.0028,
+            "preMs": 0.321131
+          }
+        },
+        {
+          "name": "burst-10--15.json",
+          "frames": 32,
+          "cpuMax": 5.681644,
+          "cpuP95": 1.501814,
+          "slowestStages": {
+            "paintMs": 5.479444,
+            "postMs": 0.00245,
+            "preMs": 0.07955
+          }
+        },
+        {
+          "name": "burst-10-15.json",
+          "frames": 31,
+          "cpuMax": 5.053873,
+          "cpuP95": 1.862254,
+          "slowestStages": {
+            "paintMs": 4.627971,
+            "postMs": 0.0024,
+            "preMs": 0.304481
+          }
+        },
+        {
+          "name": "burst-11--15.json",
+          "frames": 31,
+          "cpuMax": 4.770892,
+          "cpuP95": 1.618234,
+          "slowestStages": {
+            "paintMs": 4.574021,
+            "postMs": 0.00238,
+            "preMs": 0.07792
+          }
+        },
+        {
+          "name": "burst-11-15.json",
+          "frames": 32,
+          "cpuMax": 5.504994,
+          "cpuP95": 1.802704,
+          "slowestStages": {
+            "paintMs": 5.057663,
+            "postMs": 0.00232,
+            "preMs": 0.326451
+          }
+        },
+        {
+          "name": "burst-12--15.json",
+          "frames": 31,
+          "cpuMax": 5.663654,
+          "cpuP95": 1.440044,
+          "slowestStages": {
+            "paintMs": 5.461294,
+            "postMs": 0.00249,
+            "preMs": 0.07942
+          }
+        },
+        {
+          "name": "burst-12-15.json",
+          "frames": 31,
+          "cpuMax": 5.530533,
+          "cpuP95": 1.775304,
+          "slowestStages": {
+            "paintMs": 4.851822,
+            "postMs": 0.00239,
+            "preMs": 0.563801
+          }
+        },
+        {
+          "name": "burst-13--15.json",
+          "frames": 31,
+          "cpuMax": 3.604649,
+          "cpuP95": 1.471554,
+          "slowestStages": {
+            "paintMs": 3.410228,
+            "postMs": 0.00243,
+            "preMs": 0.07752
+          }
+        },
+        {
+          "name": "burst-13-15.json",
+          "frames": 31,
+          "cpuMax": 5.706774,
+          "cpuP95": 1.831714,
+          "slowestStages": {
+            "paintMs": 5.317203,
+            "postMs": 0.00257,
+            "preMs": 0.275621
+          }
+        },
+        {
+          "name": "burst-14--15.json",
+          "frames": 31,
+          "cpuMax": 5.753825,
+          "cpuP95": 1.243123,
+          "slowestStages": {
+            "paintMs": 5.574604,
+            "postMs": 0.00247,
+            "preMs": 0.065211
+          }
+        },
+        {
+          "name": "burst-14-15.json",
+          "frames": 32,
+          "cpuMax": 3.211068,
+          "cpuP95": 2.844457,
+          "slowestStages": {
+            "paintMs": 2.475796,
+            "postMs": 0.00235,
+            "preMs": 0.619882
+          }
+        },
+        {
+          "name": "burst-15--15.json",
+          "frames": 32,
+          "cpuMax": 4.08289,
+          "cpuP95": 1.457333,
+          "slowestStages": {
+            "paintMs": 3.88393,
+            "postMs": 0.00247,
+            "preMs": 0.07906
+          }
+        },
+        {
+          "name": "burst-15-15.json",
+          "frames": 32,
+          "cpuMax": 6.181226,
+          "cpuP95": 1.593284,
+          "slowestStages": {
+            "paintMs": 5.413563,
+            "postMs": 0.00245,
+            "preMs": 0.643102
+          }
+        },
+        {
+          "name": "burst-16--15.json",
+          "frames": 31,
+          "cpuMax": 6.346506,
+          "cpuP95": 1.217523,
+          "slowestStages": {
+            "paintMs": 6.159166,
+            "postMs": 0.00247,
+            "preMs": 0.07149
+          }
+        },
+        {
+          "name": "burst-16-15.json",
+          "frames": 31,
+          "cpuMax": 4.804602,
+          "cpuP95": 1.818765,
+          "slowestStages": {
+            "paintMs": 3.9364,
+            "postMs": 0.00247,
+            "preMs": 0.730322
+          }
+        },
+        {
+          "name": "burst-17--15.json",
+          "frames": 31,
+          "cpuMax": 5.761435,
+          "cpuP95": 1.494513,
+          "slowestStages": {
+            "paintMs": 5.549593,
+            "postMs": 0.00254,
+            "preMs": 0.08346
+          }
+        },
+        {
+          "name": "burst-17-15.json",
+          "frames": 32,
+          "cpuMax": 6.055175,
+          "cpuP95": 1.698175,
+          "slowestStages": {
+            "paintMs": 5.286714,
+            "postMs": 0.00246,
+            "preMs": 0.637041
+          }
+        },
+        {
+          "name": "burst-18--15.json",
+          "frames": 31,
+          "cpuMax": 5.370073,
+          "cpuP95": 1.586384,
+          "slowestStages": {
+            "paintMs": 5.159433,
+            "postMs": 0.0024,
+            "preMs": 0.08746
+          }
+        },
+        {
+          "name": "burst-18-15.json",
+          "frames": 32,
+          "cpuMax": 4.608972,
+          "cpuP95": 2.901178,
+          "slowestStages": {
+            "paintMs": 3.87382,
+            "postMs": 0.00293,
+            "preMs": 0.597502
+          }
+        },
+        {
+          "name": "burst-19--15.json",
+          "frames": 32,
+          "cpuMax": 5.922314,
+          "cpuP95": 1.592244,
+          "slowestStages": {
+            "paintMs": 5.697564,
+            "postMs": 0.00252,
+            "preMs": 0.08851
+          }
+        },
+        {
+          "name": "burst-19-15.json",
+          "frames": 31,
+          "cpuMax": 4.956822,
+          "cpuP95": 1.998565,
+          "slowestStages": {
+            "paintMs": 4.183491,
+            "postMs": 0.00244,
+            "preMs": 0.647461
+          }
+        },
+        {
+          "name": "burst-2--15.json",
+          "frames": 37,
+          "cpuMax": 4.519531,
+          "cpuP95": 1.736064,
+          "slowestStages": {
+            "paintMs": 4.323251,
+            "postMs": 0.00239,
+            "preMs": 0.07967
+          }
+        },
+        {
+          "name": "burst-2-15.json",
+          "frames": 34,
+          "cpuMax": 5.657874,
+          "cpuP95": 1.669354,
+          "slowestStages": {
+            "paintMs": 5.258183,
+            "postMs": 0.0025,
+            "preMs": 0.285451
+          }
+        },
+        {
+          "name": "burst-20--15.json",
+          "frames": 31,
+          "cpuMax": 5.017922,
+          "cpuP95": 1.565534,
+          "slowestStages": {
+            "paintMs": 4.823192,
+            "postMs": 0.00239,
+            "preMs": 0.07248
+          }
+        },
+        {
+          "name": "burst-20-15.json",
+          "frames": 31,
+          "cpuMax": 4.648142,
+          "cpuP95": 1.839065,
+          "slowestStages": {
+            "paintMs": 3.89099,
+            "postMs": 0.0025,
+            "preMs": 0.640792
+          }
+        },
+        {
+          "name": "burst-21--15.json",
+          "frames": 31,
+          "cpuMax": 5.803664,
+          "cpuP95": 1.469014,
+          "slowestStages": {
+            "paintMs": 5.595804,
+            "postMs": 0.00247,
+            "preMs": 0.07934
+          }
+        },
+        {
+          "name": "burst-21-15.json",
+          "frames": 31,
+          "cpuMax": 5.662494,
+          "cpuP95": 1.692794,
+          "slowestStages": {
+            "paintMs": 5.259393,
+            "postMs": 0.0024,
+            "preMs": 0.287761
+          }
+        },
+        {
+          "name": "burst-22--15.json",
+          "frames": 31,
+          "cpuMax": 4.22365,
+          "cpuP95": 1.656284,
+          "slowestStages": {
+            "paintMs": 4.01999,
+            "postMs": 0.00242,
+            "preMs": 0.08519
+          }
+        },
+        {
+          "name": "burst-22-15.json",
+          "frames": 32,
+          "cpuMax": 3.187518,
+          "cpuP95": 2.232935,
+          "slowestStages": {
+            "paintMs": 2.702207,
+            "postMs": 0.00233,
+            "preMs": 0.367031
+          }
+        },
+        {
+          "name": "burst-23--15.json",
+          "frames": 32,
+          "cpuMax": 3.803229,
+          "cpuP95": 1.567114,
+          "slowestStages": {
+            "paintMs": 3.596729,
+            "postMs": 0.00247,
+            "preMs": 0.08267
+          }
+        },
+        {
+          "name": "burst-23-15.json",
+          "frames": 32,
+          "cpuMax": 6.029675,
+          "cpuP95": 1.794905,
+          "slowestStages": {
+            "paintMs": 5.558374,
+            "postMs": 0.00245,
+            "preMs": 0.344991
+          }
+        },
+        {
+          "name": "burst-24--15.json",
+          "frames": 32,
+          "cpuMax": 4.03064,
+          "cpuP95": 1.569714,
+          "slowestStages": {
+            "paintMs": 3.85816,
+            "postMs": 0.00238,
+            "preMs": 0.0636
+          }
+        },
+        {
+          "name": "burst-24-15.json",
+          "frames": 31,
+          "cpuMax": 4.829752,
+          "cpuP95": 2.013035,
+          "slowestStages": {
+            "paintMs": 4.428881,
+            "postMs": 0.00247,
+            "preMs": 0.273621
+          }
+        },
+        {
+          "name": "burst-25--15.json",
+          "frames": 32,
+          "cpuMax": 4.16715,
+          "cpuP95": 1.574384,
+          "slowestStages": {
+            "paintMs": 3.96711,
+            "postMs": 0.00252,
+            "preMs": 0.08135
+          }
+        },
+        {
+          "name": "burst-25-15.json",
+          "frames": 32,
+          "cpuMax": 5.258883,
+          "cpuP95": 2.296016,
+          "slowestStages": {
+            "paintMs": 4.862382,
+            "postMs": 0.00237,
+            "preMs": 0.281441
+          }
+        },
+        {
+          "name": "burst-26--15.json",
+          "frames": 33,
+          "cpuMax": 7.244388,
+          "cpuP95": 1.475124,
+          "slowestStages": {
+            "paintMs": 7.059267,
+            "postMs": 0.00287,
+            "preMs": 0.0713
+          }
+        },
+        {
+          "name": "burst-26-15.json",
+          "frames": 32,
+          "cpuMax": 5.772904,
+          "cpuP95": 1.799715,
+          "slowestStages": {
+            "paintMs": 5.339883,
+            "postMs": 0.0025,
+            "preMs": 0.30872
+          }
+        },
+        {
+          "name": "burst-27--15.json",
+          "frames": 32,
+          "cpuMax": 5.268173,
+          "cpuP95": 2.084485,
+          "slowestStages": {
+            "paintMs": 5.096803,
+            "postMs": 0.00238,
+            "preMs": 0.06223
+          }
+        },
+        {
+          "name": "burst-27-15.json",
+          "frames": 32,
+          "cpuMax": 5.946084,
+          "cpuP95": 1.655644,
+          "slowestStages": {
+            "paintMs": 5.480723,
+            "postMs": 0.00249,
+            "preMs": 0.34224
+          }
+        },
+        {
+          "name": "burst-28--15.json",
+          "frames": 33,
+          "cpuMax": 4.332101,
+          "cpuP95": 1.575824,
+          "slowestStages": {
+            "paintMs": 4.15805,
+            "postMs": 0.00237,
+            "preMs": 0.06398
+          }
+        },
+        {
+          "name": "burst-28-15.json",
+          "frames": 32,
+          "cpuMax": 3.350569,
+          "cpuP95": 2.765007,
+          "slowestStages": {
+            "paintMs": 2.956938,
+            "postMs": 0.00237,
+            "preMs": 0.280971
+          }
+        },
+        {
+          "name": "burst-29--15.json",
+          "frames": 32,
+          "cpuMax": 2.784777,
+          "cpuP95": 2.528367,
+          "slowestStages": {
+            "paintMs": 2.588936,
+            "postMs": 0.00241,
+            "preMs": 0.07782
+          }
+        },
+        {
+          "name": "burst-29-15.json",
+          "frames": 32,
+          "cpuMax": 5.732344,
+          "cpuP95": 1.802734,
+          "slowestStages": {
+            "paintMs": 5.327264,
+            "postMs": 0.00242,
+            "preMs": 0.28313
+          }
+        },
+        {
+          "name": "burst-3--15.json",
+          "frames": 34,
+          "cpuMax": 5.537934,
+          "cpuP95": 1.502434,
+          "slowestStages": {
+            "paintMs": 5.337514,
+            "postMs": 0.00244,
+            "preMs": 0.08088
+          }
+        },
+        {
+          "name": "burst-3-15.json",
+          "frames": 35,
+          "cpuMax": 4.157111,
+          "cpuP95": 1.892215,
+          "slowestStages": {
+            "paintMs": 3.77035,
+            "postMs": 0.00241,
+            "preMs": 0.275591
+          }
+        },
+        {
+          "name": "burst-4--15.json",
+          "frames": 32,
+          "cpuMax": 7.240228,
+          "cpuP95": 0.896482,
+          "slowestStages": {
+            "paintMs": 7.061338,
+            "postMs": 0.00237,
+            "preMs": 0.06542
+          }
+        },
+        {
+          "name": "burst-4-15.json",
+          "frames": 31,
+          "cpuMax": 4.0315,
+          "cpuP95": 1.786094,
+          "slowestStages": {
+            "paintMs": 3.492799,
+            "postMs": 0.00247,
+            "preMs": 0.401401
+          }
+        },
+        {
+          "name": "burst-5--15.json",
+          "frames": 32,
+          "cpuMax": 5.219933,
+          "cpuP95": 1.370574,
+          "slowestStages": {
+            "paintMs": 5.024502,
+            "postMs": 0.00244,
+            "preMs": 0.07684
+          }
+        },
+        {
+          "name": "burst-5-15.json",
+          "frames": 32,
+          "cpuMax": 4.007189,
+          "cpuP95": 3.640989,
+          "slowestStages": {
+            "paintMs": 0.963802,
+            "postMs": 0.00239,
+            "preMs": 1.169183
+          }
+        },
+        {
+          "name": "burst-6--15.json",
+          "frames": 31,
+          "cpuMax": 3.337899,
+          "cpuP95": 1.484664,
+          "slowestStages": {
+            "paintMs": 3.167077,
+            "postMs": 0.00247,
+            "preMs": 0.063091
+          }
+        },
+        {
+          "name": "burst-6-15.json",
+          "frames": 31,
+          "cpuMax": 4.07421,
+          "cpuP95": 1.738894,
+          "slowestStages": {
+            "paintMs": 3.595689,
+            "postMs": 0.00237,
+            "preMs": 0.348671
+          }
+        },
+        {
+          "name": "burst-7--15.json",
+          "frames": 31,
+          "cpuMax": 5.604054,
+          "cpuP95": 1.503644,
+          "slowestStages": {
+            "paintMs": 5.393623,
+            "postMs": 0.00245,
+            "preMs": 0.078601
+          }
+        },
+        {
+          "name": "burst-7-15.json",
+          "frames": 31,
+          "cpuMax": 3.944869,
+          "cpuP95": 1.850095,
+          "slowestStages": {
+            "paintMs": 3.207138,
+            "postMs": 0.00242,
+            "preMs": 0.616171
+          }
+        },
+        {
+          "name": "burst-8--15.json",
+          "frames": 31,
+          "cpuMax": 4.04523,
+          "cpuP95": 1.578644,
+          "slowestStages": {
+            "paintMs": 3.853469,
+            "postMs": 0.0024,
+            "preMs": 0.0703
+          }
+        },
+        {
+          "name": "burst-8-15.json",
+          "frames": 32,
+          "cpuMax": 4.12403,
+          "cpuP95": 1.711834,
+          "slowestStages": {
+            "paintMs": 3.650139,
+            "postMs": 0.00238,
+            "preMs": 0.340821
+          }
+        },
+        {
+          "name": "burst-9--15.json",
+          "frames": 32,
+          "cpuMax": 5.782155,
+          "cpuP95": 1.420394,
+          "slowestStages": {
+            "paintMs": 5.579244,
+            "postMs": 0.00242,
+            "preMs": 0.08064
+          }
+        },
+        {
+          "name": "burst-9-15.json",
+          "frames": 32,
+          "cpuMax": 5.160853,
+          "cpuP95": 3.017818,
+          "slowestStages": {
+            "paintMs": 4.716002,
+            "postMs": 0.00232,
+            "preMs": 0.326791
+          }
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "The live whole-desktop pause duration is subjective, not a measured one-second event. Nested measured pauses are not an upper bound on live stalls.",
+    "Temporary per-canvas timing localized the repeated pause to overview overlay setup; profiling code was removed from the final production build.",
+    "Inactive QML/GL resources are retained for reuse; visual policy, client configure timing, blur policy and full damage flags are unchanged.",
+    "CPU timings include driver waits. GPU timestamps measure elapsed timeline spans and omit unavailable trailing queries.",
+    "A cold scene creation still costs time; this change removes repeated destruction/recreation, not all possible sources of desktop stalls.",
+    "Coverage clarification: zoom-burst sends events 60ms apart, below the navigator quiet threshold of 180ms. Each burst accepts one hierarchy step, so those burst/overlay-reuse results do not establish deep traversal. The later deep-out fixture verifies depth and distinct outward destinations."
+  ],
+  "screenshots": [
+    {
+      "name": "overview-initial.png",
+      "pixels": 4953600,
+      "different": 4,
+      "bounds": [
+        2826,
+        1051,
+        3428,
+        1412
+      ]
+    },
+    {
+      "name": "settled--15.png",
+      "pixels": 4953600,
+      "different": 1,
+      "bounds": [
+        3427,
+        1406,
+        3428,
+        1407
+      ]
+    },
+    {
+      "name": "settled-15.png",
+      "pixels": 4953600,
+      "different": 11,
+      "bounds": [
+        2834,
+        1227,
+        3428,
+        1411
+      ]
+    }
+  ]
+}

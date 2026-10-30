@@ -18,13 +18,14 @@ using namespace krellis;
 
 KrellisCanvas::Tracked *KrellisCanvas::stowedFor(EffectWindow *w)
 {
-    for (auto &t : m_stowed)
-        if (t.window == w) return &t;
-    return nullptr;
+    return const_cast<Tracked *>(static_cast<const KrellisCanvas *>(this)->stowedFor(w));
 }
 
 const KrellisCanvas::Tracked *KrellisCanvas::stowedFor(const EffectWindow *w) const
 {
+    if (const auto it = m_stowedIndex.find(w); it != m_stowedIndex.end())
+        if (it->second < m_stowed.size() && m_stowed[it->second].window == w)
+            return &m_stowed[it->second];
     for (const auto &t : m_stowed)
         if (t.window == w) return &t;
     return nullptr;

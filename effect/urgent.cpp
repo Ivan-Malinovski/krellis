@@ -18,8 +18,7 @@ bool KrellisCanvas::isUrgent(EffectWindow *w) const
 
 bool KrellisCanvas::urgentPanel(const std::string &panel) const
 {
-    for (const auto &t : m_windows)
-        if (t.panel == panel && isUrgent(t.window)) return true;
+    if (const auto *t = presentedPanel(panel); t && isUrgent(t->window)) return true;
     for (const auto &t : m_stowed) // a tab behind the shown one still counts
         if (t.panel == panel && isUrgent(t.window)) return true;
     return false;

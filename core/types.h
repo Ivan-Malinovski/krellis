@@ -43,6 +43,9 @@ struct Node {
     Axis axis = Axis::X;
     std::vector<double> weights;
     std::vector<NodePtr> children;
+    // A dwindle split: it stays a group of its own inside a parent split of the same axis instead of being flattened
+    // into it, so when a member closes the other one takes the whole group's share (Hyprland's dwindle).
+    bool nested = false;
     // Panel
     std::vector<std::string> views;
     std::string selected;
@@ -53,7 +56,8 @@ struct Node {
 
 NodePtr makePanel(std::string id, std::vector<std::string> views, std::string selected = {});
 NodePtr makeVacancy(std::string id);
-NodePtr makeSplit(std::string id, Axis axis, std::vector<NodePtr> children, std::vector<double> weights = {});
+NodePtr makeSplit(std::string id, Axis axis, std::vector<NodePtr> children, std::vector<double> weights = {},
+                  bool nested = false);
 NodePtr makeStage(std::string id, NodePtr child = nullptr);
 
 enum class FloatingLayer { Stage, Overlay };

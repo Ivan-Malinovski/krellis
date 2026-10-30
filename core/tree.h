@@ -38,8 +38,9 @@ NodePtr normalize(const NodePtr &node);
 /// Removes a node. The freed share goes to the following sibling, or with keepProportions to all siblings
 /// in proportion, so nothing else changes size relative to its neighbours.
 NodePtr removeNode(const NodePtr &root, const std::string &id, bool keepProportions = false);
+/// `nested` marks the new split as a dwindle group (Node::nested): it is not flattened into a same-axis parent.
 NodePtr insertBeside(const NodePtr &root, const std::string &targetId, const NodePtr &incoming, Edge edge,
-                     const std::string &splitId, double share = 0.5);
+                     const std::string &splitId, double share = 0.5, bool nested = false);
 NodePtr replaceNode(const NodePtr &root, const std::string &id, const NodePtr &replacement);
 /// Turns the pair of siblings either side of a boundary from side-by-side to stacked or back. A split of exactly
 /// two is toggled in place; in a longer one the pair is wrapped in a new split of the other axis (`wrapperId`),

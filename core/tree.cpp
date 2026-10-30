@@ -27,12 +27,13 @@ NodePtr makeVacancy(std::string id)
     return n;
 }
 
-NodePtr makeSplit(std::string id, Axis axis, std::vector<NodePtr> children, std::vector<double> weights)
+NodePtr makeSplit(std::string id, Axis axis, std::vector<NodePtr> children, std::vector<double> weights, bool nested)
 {
     auto n = std::make_shared<Node>();
     n->kind = Node::Kind::Split;
     n->id = std::move(id);
     n->axis = axis;
+    n->nested = nested;
     if (weights.size() != children.size())
         weights.assign(children.size(), 1.0);
     n->children = std::move(children);
@@ -268,7 +269,7 @@ NodePtr normalize(const NodePtr &node)
         const double weight = (std::isfinite(raw) && raw > 0) ? raw : 1e-3;
         if (!next)
             continue;
-        if (next->kind == Node::Kind::Split && next->axis == node->axis) {
+        if (next->kind == Node::Kind::Split && next->axis == node->axis && !next->nested) {
             const double total = sum(next->weights);
             for (size_t j = 0; j < next->children.size(); ++j) {
                 children.push_back(next->children[j]);
@@ -353,7 +354,7 @@ NodePtr removeNode(const NodePtr &root, const std::string &id, bool keepProporti
 }
 
 NodePtr insertBeside(const NodePtr &root, const std::string &targetId, const NodePtr &incoming, Edge edge,
-                     const std::string &splitId, double share)
+                     const std::string &splitId, double share, bool nested)
 {
     if (!root)
         return incoming;
@@ -363,20 +364,21 @@ NodePtr insertBeside(const NodePtr &root, const std::string &targetId, const Nod
         return normalize(makeSplit(splitId, edgeAxis(edge),
                                    before ? std::vector<NodePtr>{incoming, root} : std::vector<NodePtr>{root, incoming},
                                    before ? std::vector<double>{share, 1 - share}
-                                          : std::vector<double>{1 - share, share}));
+                                          : std::vector<double>{1 - share, share},
+                                   nested));
     }
     if (root->kind == Node::Kind::Panel)
         return root;
     if (root->kind == Node::Kind::Stage) {
         if (!root->child)
             return root;
-        NodePtr child = insertBeside(root->child, targetId, incoming, edge, splitId, share);
+        NodePtr child = insertBeside(root->child, targetId, incoming, edge, splitId, share, nested);
         return child == root->child ? root : withChild(*root, child);
     }
     bool changed = false;
     std::vector<NodePtr> children;
     for (const auto &c : root->children) {
-        NodePtr next = insertBeside(c, targetId, incoming, edge, splitId, share);
+        NodePtr next = insertBeside(c, targetId, incoming, edge, splitId, share, nested);
         if (next != c)
             changed = true;
         children.push_back(next);
@@ -417,7 +419,7 @@ NodePtr flipBoundary(const NodePtr &root, const std::string &splitId, int index,
         return root;
     const Axis other = split->axis == Axis::X ? Axis::Y : Axis::X;
     if (n == 2)
-        return normalize(replaceNode(root, splitId, makeSplit(split->id, other, split->children, split->weights)));
+        return normalize(replaceNode(root, splitId, makeSplit(split->id, other, split->children, split->weights, split->nested)));
     const double a = split->weights[index], b = split->weights[index + 1];
     std::vector<NodePtr> children;
     std::vector<double> weights;
@@ -430,7 +432,7 @@ NodePtr flipBoundary(const NodePtr &root, const std::string &splitId, int index,
             weights.push_back(split->weights[i]);
         }
     }
-    return normalize(replaceNode(root, splitId, makeSplit(split->id, split->axis, children, weights)));
+    return normalize(replaceNode(root, splitId, makeSplit(split->id, split->axis, children, weights, split->nested)));
 }
 
 NodePtr resizeBoundary(const NodePtr &split, int index, double position, const std::function<double(int)> &min)

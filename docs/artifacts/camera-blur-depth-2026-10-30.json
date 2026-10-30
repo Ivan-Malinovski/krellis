@@ -1,0 +1,534 @@
+{
+  "workload": "25 independent Kitty clients, config NONE, opacity .8, blur 16, 13 successive Meta wheel inward steps",
+  "output": "1280x800 virtual nested KWin",
+  "baseline": "early visible sizing build krellis_1030104600, staged as krellis",
+  "updated": "bounded forced blur plus camera-motion blur suspension",
+  "timing": "elapsed pre-paint through post-paint, including submission/driver waits; not GPU execution timing",
+  "phaseSeconds": 0.65,
+  "baselinePhases": [
+    {
+      "step": 0,
+      "camera": "camera 0.483871 0.473684 0.516129 0.526316 (target 0.483871 0.473684 0.516129 0.526316)",
+      "frames": 31,
+      "cpuP95": 14.276,
+      "cpuMedian": 12.464,
+      "intervalP95": 17.298,
+      "cpuMax": 18.59914
+    },
+    {
+      "step": 1,
+      "camera": "camera 0.741935 0.736842 0.258065 0.263158 (target 0.741935 0.736842 0.258065 0.263158)",
+      "frames": 29,
+      "cpuP95": 15.633,
+      "cpuMedian": 11.606,
+      "intervalP95": 26.59,
+      "cpuMax": 18.91804
+    },
+    {
+      "step": 2,
+      "camera": "camera 0.870968 0.868421 0.129032 0.131579 (target 0.870968 0.868421 0.129032 0.131579)",
+      "frames": 29,
+      "cpuP95": 14.143,
+      "cpuMedian": 11.208,
+      "intervalP95": 17.492,
+      "cpuMax": 16.905526
+    },
+    {
+      "step": 3,
+      "camera": "camera 0.935484 0.934211 0.0645161 0.0657895 (target 0.935484 0.934211 0.0645161 0.0657895)",
+      "frames": 27,
+      "cpuP95": 17.995,
+      "cpuMedian": 14.808,
+      "intervalP95": 33.025,
+      "cpuMax": 20.535105
+    },
+    {
+      "step": 4,
+      "camera": "camera 0.967742 0.967105 0.0322581 0.0328947 (target 0.967742 0.967105 0.0322581 0.0328947)",
+      "frames": 24,
+      "cpuP95": 22.635,
+      "cpuMedian": 12.531,
+      "intervalP95": 33.682,
+      "cpuMax": 24.859627
+    },
+    {
+      "step": 5,
+      "camera": "camera 0.983871 0.983553 0.016129 0.0164474 (target 0.983871 0.983553 0.016129 0.0164474)",
+      "frames": 21,
+      "cpuP95": 26.689,
+      "cpuMedian": 18.543,
+      "intervalP95": 33.726,
+      "cpuMax": 27.053163
+    },
+    {
+      "step": 6,
+      "camera": "camera 0.991935 0.991776 0.00806452 0.00822368 (target 0.991935 0.991776 0.00806452 0.00822368)",
+      "frames": 22,
+      "cpuP95": 19.715,
+      "cpuMedian": 15.493,
+      "intervalP95": 33.475,
+      "cpuMax": 20.445605
+    },
+    {
+      "step": 7,
+      "camera": "camera 0.995161 0.994737 0.00483871 0.00526316 (target 0.995161 0.994737 0.00483871 0.00526316)",
+      "frames": 30,
+      "cpuP95": 16.089,
+      "cpuMedian": 12.749,
+      "intervalP95": 17.508,
+      "cpuMax": 18.074049
+    },
+    {
+      "step": 8,
+      "camera": "camera 0.995968 0.996053 0.00403226 0.00394737 (target 0.995968 0.996053 0.00403226 0.00394737)",
+      "frames": 31,
+      "cpuP95": 12.063,
+      "cpuMedian": 10.38,
+      "intervalP95": 17.062,
+      "cpuMax": 16.206953
+    },
+    {
+      "step": 9,
+      "camera": "camera 0.996774 0.997368 0.00322581 0.00263158 (target 0.996774 0.997368 0.00322581 0.00263158)",
+      "frames": 34,
+      "cpuP95": 10.673,
+      "cpuMedian": 8.758,
+      "intervalP95": 17.135,
+      "cpuMax": 13.771997
+    },
+    {
+      "step": 10,
+      "camera": "camera 0.997581 0.998684 0.00241935 0.00131579 (target 0.997581 0.998684 0.00241935 0.00131579)",
+      "frames": 33,
+      "cpuP95": 8.459,
+      "cpuMedian": 6.502,
+      "intervalP95": 17.232,
+      "cpuMax": 10.071297
+    },
+    {
+      "step": 11,
+      "camera": "camera 0.998387 0.998684 0.0016129 0.00131579 (target 0.998387 0.998684 0.0016129 0.00131579)",
+      "frames": 32,
+      "cpuP95": 6.656,
+      "cpuMedian": 5.621,
+      "intervalP95": 17.25,
+      "cpuMax": 7.49842
+    },
+    {
+      "step": 12,
+      "camera": "camera 0.999194 0.998684 0.000806452 0.00131579 (target 0.999194 0.998684 0.000806452 0.00131579)",
+      "frames": 32,
+      "cpuP95": 6.737,
+      "cpuMedian": 4.141,
+      "intervalP95": 17.367,
+      "cpuMax": 7.56233
+    },
+    {
+      "step": 13,
+      "camera": "camera 0.999194 0.998684 0.000806452 0.00131579 (target 0.999194 0.998684 0.000806452 0.00131579)",
+      "frames": 2,
+      "cpuP95": 0.501,
+      "cpuMedian": 0.501,
+      "intervalP95": 8.122,
+      "cpuMax": 1.057773
+    }
+  ],
+  "updatedPhases": [
+    {
+      "step": 0,
+      "camera": "camera 0.483871 0.473684 0.516129 0.526316 (target 0.483871 0.473684 0.516129 0.526316)",
+      "frames": 33,
+      "cpuP95": 2.088,
+      "cpuMedian": 0.817,
+      "intervalP95": 17.276,
+      "cpuMax": 12.916283
+    },
+    {
+      "step": 1,
+      "camera": "camera 0.741935 0.736842 0.258065 0.263158 (target 0.741935 0.736842 0.258065 0.263158)",
+      "frames": 32,
+      "cpuP95": 3.452,
+      "cpuMedian": 0.702,
+      "intervalP95": 17.38,
+      "cpuMax": 10.208017
+    },
+    {
+      "step": 2,
+      "camera": "camera 0.870968 0.868421 0.129032 0.131579 (target 0.870968 0.868421 0.129032 0.131579)",
+      "frames": 31,
+      "cpuP95": 5.521,
+      "cpuMedian": 0.365,
+      "intervalP95": 17.287,
+      "cpuMax": 19.22066
+    },
+    {
+      "step": 3,
+      "camera": "camera 0.935484 0.934211 0.0645161 0.0657895 (target 0.935484 0.934211 0.0645161 0.0657895)",
+      "frames": 33,
+      "cpuP95": 5.742,
+      "cpuMedian": 0.421,
+      "intervalP95": 17.129,
+      "cpuMax": 9.289634
+    },
+    {
+      "step": 4,
+      "camera": "camera 0.967742 0.967105 0.0322581 0.0328947 (target 0.967742 0.967105 0.0322581 0.0328947)",
+      "frames": 35,
+      "cpuP95": 1.976,
+      "cpuMedian": 0.41,
+      "intervalP95": 16.968,
+      "cpuMax": 8.250422
+    },
+    {
+      "step": 5,
+      "camera": "camera 0.983871 0.983553 0.016129 0.0164474 (target 0.983871 0.983553 0.016129 0.0164474)",
+      "frames": 32,
+      "cpuP95": 1.803,
+      "cpuMedian": 0.391,
+      "intervalP95": 17.48,
+      "cpuMax": 12.759623
+    },
+    {
+      "step": 6,
+      "camera": "camera 0.991935 0.991776 0.00806452 0.00822368 (target 0.991935 0.991776 0.00806452 0.00822368)",
+      "frames": 33,
+      "cpuP95": 2.223,
+      "cpuMedian": 0.389,
+      "intervalP95": 17.099,
+      "cpuMax": 13.245484
+    },
+    {
+      "step": 7,
+      "camera": "camera 0.995161 0.994737 0.00483871 0.00526316 (target 0.995161 0.994737 0.00483871 0.00526316)",
+      "frames": 33,
+      "cpuP95": 2.891,
+      "cpuMedian": 0.377,
+      "intervalP95": 16.894,
+      "cpuMax": 13.396065
+    },
+    {
+      "step": 8,
+      "camera": "camera 0.995968 0.996053 0.00403226 0.00394737 (target 0.995968 0.996053 0.00403226 0.00394737)",
+      "frames": 33,
+      "cpuP95": 1.27,
+      "cpuMedian": 0.363,
+      "intervalP95": 17.052,
+      "cpuMax": 9.700545
+    },
+    {
+      "step": 9,
+      "camera": "camera 0.996774 0.997368 0.00322581 0.00263158 (target 0.996774 0.997368 0.00322581 0.00263158)",
+      "frames": 33,
+      "cpuP95": 1.176,
+      "cpuMedian": 0.36,
+      "intervalP95": 17.054,
+      "cpuMax": 7.971821
+    },
+    {
+      "step": 10,
+      "camera": "camera 0.997581 0.998684 0.00241935 0.00131579 (target 0.997581 0.998684 0.00241935 0.00131579)",
+      "frames": 33,
+      "cpuP95": 1.004,
+      "cpuMedian": 0.338,
+      "intervalP95": 17.085,
+      "cpuMax": 7.491449
+    },
+    {
+      "step": 11,
+      "camera": "camera 0.998387 0.998684 0.0016129 0.00131579 (target 0.998387 0.998684 0.0016129 0.00131579)",
+      "frames": 33,
+      "cpuP95": 0.754,
+      "cpuMedian": 0.324,
+      "intervalP95": 17.191,
+      "cpuMax": 4.495542
+    },
+    {
+      "step": 12,
+      "camera": "camera 0.999194 0.998684 0.000806452 0.00131579 (target 0.999194 0.998684 0.000806452 0.00131579)",
+      "frames": 33,
+      "cpuP95": 1.807,
+      "cpuMedian": 0.335,
+      "intervalP95": 17.399,
+      "cpuMax": 2.936837
+    },
+    {
+      "step": 13,
+      "camera": "camera 0.999194 0.998684 0.000806452 0.00131579 (target 0.999194 0.998684 0.000806452 0.00131579)",
+      "frames": 1,
+      "cpuP95": 0.581,
+      "cpuMedian": 0.581,
+      "intervalP95": null,
+      "cpuMax": 0.580501
+    }
+  ],
+  "notes": [
+    "Steps 0 through 12 change destinations; step 13 is a no-op at the zoom limit.",
+    "No timings run concurrently with other scenarios or builds.",
+    "First allocate/catch-up and final blur restoration can still cost a longer frame.",
+    "Samples include settled frames. No claim about physical 144 Hz displays, busy clients or subjective smoothness."
+  ],
+  "wideOutputComparison": {
+    "output": "3440x1440 virtual nested KWin",
+    "baselinePhases": [
+      {
+        "step": 0,
+        "camera": "camera 0.747059 0.485714 0.252941 0.514286 (target 0.747059 0.485714 0.252941 0.514286)",
+        "frames": 28,
+        "cpuP95": 17.204,
+        "cpuMedian": 14.104,
+        "intervalP95": 32.412,
+        "cpuMax": 22.418867
+      },
+      {
+        "step": 1,
+        "camera": "camera 0.873529 0.742857 0.126471 0.257143 (target 0.873529 0.742857 0.126471 0.257143)",
+        "frames": 27,
+        "cpuP95": 17.909,
+        "cpuMedian": 14.071,
+        "intervalP95": 33.26,
+        "cpuMax": 21.884846
+      },
+      {
+        "step": 2,
+        "camera": "camera 0.936765 0.871429 0.0632353 0.128571 (target 0.936765 0.871429 0.0632353 0.128571)",
+        "frames": 27,
+        "cpuP95": 17.672,
+        "cpuMedian": 14.535,
+        "intervalP95": 32.868,
+        "cpuMax": 21.509545
+      },
+      {
+        "step": 3,
+        "camera": "camera 0.968382 0.935714 0.0316176 0.0642857 (target 0.968382 0.935714 0.0316176 0.0642857)",
+        "frames": 23,
+        "cpuP95": 19.408,
+        "cpuMedian": 13.605,
+        "intervalP95": 33.529,
+        "cpuMax": 24.944313
+      },
+      {
+        "step": 4,
+        "camera": "camera 0.984191 0.967857 0.0158088 0.0321429 (target 0.984191 0.967857 0.0158088 0.0321429)",
+        "frames": 28,
+        "cpuP95": 19.163,
+        "cpuMedian": 13.448,
+        "intervalP95": 33.376,
+        "cpuMax": 21.159174
+      },
+      {
+        "step": 5,
+        "camera": "camera 0.992096 0.983929 0.00790441 0.0160714 (target 0.992096 0.983929 0.00790441 0.0160714)",
+        "frames": 27,
+        "cpuP95": 17.287,
+        "cpuMedian": 14.522,
+        "intervalP95": 33.039,
+        "cpuMax": 20.167471
+      },
+      {
+        "step": 6,
+        "camera": "camera 0.996048 0.991964 0.00395221 0.00803571 (target 0.996048 0.991964 0.00395221 0.00803571)",
+        "frames": 29,
+        "cpuP95": 16.817,
+        "cpuMedian": 14.203,
+        "intervalP95": 27.867,
+        "cpuMax": 18.983578
+      },
+      {
+        "step": 7,
+        "camera": "camera 0.998024 0.995982 0.0019761 0.00401786 (target 0.998024 0.995982 0.0019761 0.00401786)",
+        "frames": 33,
+        "cpuP95": 15.168,
+        "cpuMedian": 12.783,
+        "intervalP95": 17.514,
+        "cpuMax": 16.623232
+      },
+      {
+        "step": 8,
+        "camera": "camera 0.998824 0.997857 0.00117647 0.00214286 (target 0.998824 0.997857 0.00117647 0.00214286)",
+        "frames": 32,
+        "cpuP95": 12.437,
+        "cpuMedian": 10.674,
+        "intervalP95": 17.017,
+        "cpuMax": 13.862995
+      },
+      {
+        "step": 9,
+        "camera": "camera 0.999118 0.998571 0.000882353 0.00142857 (target 0.999118 0.998571 0.000882353 0.00142857)",
+        "frames": 32,
+        "cpuP95": 8.776,
+        "cpuMedian": 8.01,
+        "intervalP95": 17.223,
+        "cpuMax": 12.983873
+      },
+      {
+        "step": 10,
+        "camera": "camera 0.999412 0.999286 0.000588235 0.000714286 (target 0.999412 0.999286 0.000588235 0.000714286)",
+        "frames": 32,
+        "cpuP95": 5.935,
+        "cpuMedian": 5.704,
+        "intervalP95": 17.467,
+        "cpuMax": 8.922392
+      },
+      {
+        "step": 11,
+        "camera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)",
+        "frames": 28,
+        "cpuP95": 21.47,
+        "cpuMedian": 4.566,
+        "intervalP95": 33.863,
+        "cpuMax": 64.558234
+      },
+      {
+        "step": 12,
+        "camera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)",
+        "frames": 2,
+        "cpuP95": 0.603,
+        "cpuMedian": 0.603,
+        "intervalP95": 500.24,
+        "cpuMax": 0.629131
+      },
+      {
+        "step": 13,
+        "camera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)",
+        "frames": 1,
+        "cpuP95": 0.667,
+        "cpuMedian": 0.667,
+        "intervalP95": null,
+        "cpuMax": 0.666822
+      }
+    ],
+    "updatedPhases": [
+      {
+        "step": 0,
+        "camera": "camera 0.747059 0.485714 0.252941 0.514286 (target 0.747059 0.485714 0.252941 0.514286)",
+        "frames": 31,
+        "cpuP95": 2.22,
+        "cpuMedian": 0.772,
+        "intervalP95": 17.166,
+        "cpuMax": 15.060408
+      },
+      {
+        "step": 1,
+        "camera": "camera 0.873529 0.742857 0.126471 0.257143 (target 0.873529 0.742857 0.126471 0.257143)",
+        "frames": 32,
+        "cpuP95": 7.994,
+        "cpuMedian": 0.383,
+        "intervalP95": 17.116,
+        "cpuMax": 13.030142
+      },
+      {
+        "step": 2,
+        "camera": "camera 0.936765 0.871429 0.0632353 0.128571 (target 0.936765 0.871429 0.0632353 0.128571)",
+        "frames": 33,
+        "cpuP95": 2.489,
+        "cpuMedian": 0.396,
+        "intervalP95": 17.217,
+        "cpuMax": 12.095631
+      },
+      {
+        "step": 3,
+        "camera": "camera 0.968382 0.935714 0.0316176 0.0642857 (target 0.968382 0.935714 0.0316176 0.0642857)",
+        "frames": 33,
+        "cpuP95": 1.971,
+        "cpuMedian": 0.404,
+        "intervalP95": 17.532,
+        "cpuMax": 12.234281
+      },
+      {
+        "step": 4,
+        "camera": "camera 0.984191 0.967857 0.0158088 0.0321429 (target 0.984191 0.967857 0.0158088 0.0321429)",
+        "frames": 33,
+        "cpuP95": 1.949,
+        "cpuMedian": 0.395,
+        "intervalP95": 17.089,
+        "cpuMax": 17.752445
+      },
+      {
+        "step": 5,
+        "camera": "camera 0.992096 0.983929 0.00790441 0.0160714 (target 0.992096 0.983929 0.00790441 0.0160714)",
+        "frames": 33,
+        "cpuP95": 1.747,
+        "cpuMedian": 0.388,
+        "intervalP95": 17.13,
+        "cpuMax": 14.563827
+      },
+      {
+        "step": 6,
+        "camera": "camera 0.996048 0.991964 0.00395221 0.00803571 (target 0.996048 0.991964 0.00395221 0.00803571)",
+        "frames": 33,
+        "cpuP95": 2.145,
+        "cpuMedian": 0.368,
+        "intervalP95": 17.014,
+        "cpuMax": 14.018156
+      },
+      {
+        "step": 7,
+        "camera": "camera 0.998024 0.995982 0.0019761 0.00401786 (target 0.998024 0.995982 0.0019761 0.00401786)",
+        "frames": 33,
+        "cpuP95": 1.458,
+        "cpuMedian": 0.356,
+        "intervalP95": 17.245,
+        "cpuMax": 11.84365
+      },
+      {
+        "step": 8,
+        "camera": "camera 0.998824 0.997857 0.00117647 0.00214286 (target 0.998824 0.997857 0.00117647 0.00214286)",
+        "frames": 32,
+        "cpuP95": 1.247,
+        "cpuMedian": 0.347,
+        "intervalP95": 17.247,
+        "cpuMax": 9.732644
+      },
+      {
+        "step": 9,
+        "camera": "camera 0.999118 0.998571 0.000882353 0.00142857 (target 0.999118 0.998571 0.000882353 0.00142857)",
+        "frames": 34,
+        "cpuP95": 0.946,
+        "cpuMedian": 0.333,
+        "intervalP95": 17.239,
+        "cpuMax": 6.996348
+      },
+      {
+        "step": 10,
+        "camera": "camera 0.999412 0.999286 0.000588235 0.000714286 (target 0.999412 0.999286 0.000588235 0.000714286)",
+        "frames": 33,
+        "cpuP95": 1.15,
+        "cpuMedian": 0.324,
+        "intervalP95": 17.224,
+        "cpuMax": 4.703382
+      },
+      {
+        "step": 11,
+        "camera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)",
+        "frames": 33,
+        "cpuP95": 1.814,
+        "cpuMedian": 0.33,
+        "intervalP95": 17.276,
+        "cpuMax": 3.342178
+      },
+      {
+        "step": 12,
+        "camera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)",
+        "frames": 2,
+        "cpuP95": 0.515,
+        "cpuMedian": 0.515,
+        "intervalP95": 500.155,
+        "cpuMax": 0.583662
+      },
+      {
+        "step": 13,
+        "camera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)",
+        "frames": 1,
+        "cpuP95": 0.56,
+        "cpuMedian": 0.56,
+        "intervalP95": null,
+        "cpuMax": 0.559702
+      }
+    ],
+    "notes": [
+      "Same client count/options, 650ms/phase; pointer 3360,1340.",
+      "Only steps0 through11 change destinations at this output size; steps12 and13 are no-ops. Long no-op idle intervals are not stutter measurements.",
+      "Final restoration/client catch-up can still cost longer frames; updated step4 maximum17.752ms."
+    ]
+  }
+}

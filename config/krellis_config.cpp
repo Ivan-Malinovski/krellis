@@ -57,6 +57,7 @@ Settings load(const QString &file)
     } else if (!c.value(QStringLiteral("placeAtPointer"), true).toBool()) {
         s.spawnTarget = SpawnTarget::End; // the key this setting replaced: off meant "at the end"
     }
+    s.dwindleSide = c.value(QStringLiteral("dwindleSide")).toString() == QLatin1String("after") ? DwindleSide::After : DwindleSide::Cursor;
     s.peek = std::max(0.0, c.value(QStringLiteral("peek"), s.peek).toDouble());
     s.map = c.value(QStringLiteral("map"), s.map).toBool();
     s.mapPinned = c.value(QStringLiteral("mapPinned"), s.mapPinned).toBool();
@@ -91,6 +92,7 @@ bool save(const Settings &s, const QString &file)
                s.spawnTarget == SpawnTarget::Focused ? QStringLiteral("focused")
                    : s.spawnTarget == SpawnTarget::End ? QStringLiteral("end")
                    : s.spawnTarget == SpawnTarget::Dwindle ? QStringLiteral("dwindle") : QStringLiteral("pointer"));
+    c.setValue(QStringLiteral("dwindleSide"), s.dwindleSide == DwindleSide::After ? QStringLiteral("after") : QStringLiteral("cursor"));
     c.setValue(QStringLiteral("peek"), s.peek);
     c.setValue(QStringLiteral("map"), s.map);
     c.setValue(QStringLiteral("mapPinned"), s.mapPinned);

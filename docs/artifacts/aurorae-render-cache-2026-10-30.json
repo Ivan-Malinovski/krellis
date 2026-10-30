@@ -1,0 +1,171 @@
+{
+  "date": "2026-10-30",
+  "source": "https://github.com/KDE/aurorae/tree/v6.7.5",
+  "archiveSHA256": "2481f979e3f0999aa8aab57be1664476d6c0caf71780e9b68030180fc5c661e0",
+  "pluginId": "org.kde.kwin.aurorae.krellis_1030123148",
+  "runs": [
+    {
+      "name": "aurorae-1-before",
+      "phases": [
+        {
+          "name": "deep-out-0.json",
+          "heartbeatMaxMs": 782.9250769864302,
+          "inputMaxMs": 0.6941620085854083,
+          "frameProcessingMaxMs": 22.204895,
+          "explicitSaveMs": 3.99214998469688,
+          "distinctOutwardDestinations": 13,
+          "startCamera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)"
+        },
+        {
+          "name": "deep-out-1.json",
+          "heartbeatMaxMs": 360.9896420093719,
+          "inputMaxMs": 0.9572030103299767,
+          "frameProcessingMaxMs": 21.736094,
+          "explicitSaveMs": 4.745231999550015,
+          "distinctOutwardDestinations": 13,
+          "startCamera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)"
+        },
+        {
+          "name": "deep-out-2.json",
+          "heartbeatMaxMs": 6.001505011226982,
+          "inputMaxMs": 0.7943219970911741,
+          "frameProcessingMaxMs": 21.521573,
+          "explicitSaveMs": 18.205316009698436,
+          "distinctOutwardDestinations": 13,
+          "startCamera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)"
+        }
+      ]
+    },
+    {
+      "name": "aurorae-2-after",
+      "phases": [
+        {
+          "name": "deep-out-0.json",
+          "heartbeatMaxMs": 0.2482109994161874,
+          "inputMaxMs": 0.7763220055494457,
+          "frameProcessingMaxMs": 18.993357,
+          "explicitSaveMs": 4.817011998966336,
+          "distinctOutwardDestinations": 13,
+          "startCamera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)"
+        },
+        {
+          "name": "deep-out-1.json",
+          "heartbeatMaxMs": 0.25731101050041616,
+          "inputMaxMs": 0.6951709801796824,
+          "frameProcessingMaxMs": 22.620377,
+          "explicitSaveMs": 17.64467399334535,
+          "distinctOutwardDestinations": 13,
+          "startCamera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)"
+        },
+        {
+          "name": "deep-out-2.json",
+          "heartbeatMaxMs": 7.8304699854925275,
+          "inputMaxMs": 0.7301219739019871,
+          "frameProcessingMaxMs": 17.376964,
+          "explicitSaveMs": 6.532426021294668,
+          "distinctOutwardDestinations": 13,
+          "startCamera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)"
+        }
+      ]
+    },
+    {
+      "name": "aurorae-3-after",
+      "phases": [
+        {
+          "name": "deep-out-0.json",
+          "heartbeatMaxMs": 0.23741100449115038,
+          "inputMaxMs": 0.93088299036026,
+          "frameProcessingMaxMs": 14.377636,
+          "explicitSaveMs": 17.896604986162856,
+          "distinctOutwardDestinations": 13,
+          "startCamera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)"
+        },
+        {
+          "name": "deep-out-1.json",
+          "heartbeatMaxMs": 0.24473000667057931,
+          "inputMaxMs": 0.7268619956448674,
+          "frameProcessingMaxMs": 19.176548,
+          "explicitSaveMs": 6.956058001378551,
+          "distinctOutwardDestinations": 13,
+          "startCamera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)"
+        },
+        {
+          "name": "deep-out-2.json",
+          "heartbeatMaxMs": 0.24168100208044052,
+          "inputMaxMs": 0.7309819920919836,
+          "frameProcessingMaxMs": 13.806184,
+          "explicitSaveMs": 4.04935100232251,
+          "distinctOutwardDestinations": 13,
+          "startCamera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)"
+        }
+      ]
+    },
+    {
+      "name": "aurorae-4-before",
+      "phases": [
+        {
+          "name": "deep-out-0.json",
+          "heartbeatMaxMs": 777.9429139918648,
+          "inputMaxMs": 0.7867620151955634,
+          "frameProcessingMaxMs": 21.780154,
+          "explicitSaveMs": 3.8780589820817113,
+          "distinctOutwardDestinations": 13,
+          "startCamera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)"
+        },
+        {
+          "name": "deep-out-1.json",
+          "heartbeatMaxMs": 355.90923999552615,
+          "inputMaxMs": 0.6943619810044765,
+          "frameProcessingMaxMs": 45.033873,
+          "explicitSaveMs": 4.355910990852863,
+          "distinctOutwardDestinations": 13,
+          "startCamera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)"
+        },
+        {
+          "name": "deep-out-2.json",
+          "heartbeatMaxMs": 0.2348500129301101,
+          "inputMaxMs": 1.0874519939534366,
+          "frameProcessingMaxMs": 21.391244,
+          "explicitSaveMs": 7.5324089848436415,
+          "distinctOutwardDestinations": 13,
+          "startCamera": "camera 0.999706 0.999286 0.000294118 0.000714286 (target 0.999706 0.999286 0.000294118 0.000714286)"
+        }
+      ]
+    }
+  ],
+  "blockedMainThread": [
+    "png_write_row () from /usr/lib/libpng16.so.16",
+    "png_write_row () from /usr/lib/libpng16.so.16",
+    "png_write_rows () from /usr/lib/libpng16.so.16",
+    "?? () from /usr/lib/libQt6Gui.so.6",
+    "?? () from /usr/lib/libQt6Gui.so.6",
+    "?? () from /usr/lib/libQt6Gui.so.6",
+    "QImage::save(QIODevice*, char const*, int) const () from /usr/lib/libQt6Gui.so.6",
+    "KLocalImageCacheImplementation::serializeImage(QImage const&) const () from /usr/lib/libKF6GuiAddons.so.6",
+    "?? () from /usr/lib/libKF6Svg.so.6",
+    "?? () from /usr/lib/libQt6Core.so.6",
+    "QTimer::timerEvent(QTimerEvent*) () from /usr/lib/libQt6Core.so.6",
+    "QObject::event(QEvent*) () from /usr/lib/libQt6Core.so.6",
+    "QApplicationPrivate::notify_helper(QObject*, QEvent*) () from /usr/lib/libQt6Widgets.so.6",
+    "QCoreApplication::notifyInternal2(QObject*, QEvent*) () from /usr/lib/libQt6Core.so.6",
+    "QTimerInfoList::activateTimers() () from /usr/lib/libQt6Core.so.6",
+    "QEventDispatcherUNIX::processEvents(QFlags<QEventLoop::ProcessEventsFlag>) () from /usr/lib/libQt6Core.so.6",
+    "QUnixEventDispatcherQPA::processEvents(QFlags<QEventLoop::ProcessEventsFlag>) () from /usr/lib/libQt6Gui.so.6",
+    "QEventLoop::exec(QFlags<QEventLoop::ProcessEventsFlag>) () from /usr/lib/libQt6Core.so.6",
+    "QCoreApplication::exec() () from /usr/lib/libQt6Core.so.6",
+    "?? ()",
+    "?? () from /usr/lib/libc.so.6",
+    "__libc_start_main () from /usr/lib/libc.so.6",
+    "?? ()"
+  ],
+  "notes": [
+    "Virtual output, 3440x1440, 25 opaque text-filled Kitty windows sharing a process.",
+    "Persistent D-Bus connection excludes spawning a new qdbus CLI process for each heartbeat.",
+    "Each outward event is separated by 220 ms, exceeding the 180 ms wheel-gesture quiet threshold; starts below .001 normalized camera width.",
+    "Timing samples omit compositor stalls between frames; heartbeat latency captures the delayed SVG cache timer instead.",
+    "Automatic background session saving was tested and did not remove the pause; that candidate was reverted completely.",
+    "PNG serialization is CPU work; moving cache directories or disabling disk I/O is not established as a fix.",
+    "Pixel comparisons differ at 44/1/68 of 4953600 pixels for overview/deep/returned views.",
+    "The patch changes only full-frame SVG render-cache flags, leaving the theme and transparency intact. Smaller native redraw/paint frames near 20 ms remain possible."
+  ]
+}

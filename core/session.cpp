@@ -52,7 +52,7 @@ LayoutDocument rebindSession(const LayoutDocument &saved, const std::map<std::st
         std::vector<double> weights;
         for (size_t i = 0; i < node->children.size(); ++i)
             if (auto child = tree(node->children[i])) { children.push_back(child); weights.push_back(i < node->weights.size() ? node->weights[i] : 1.0); }
-        return children.empty() ? nullptr : normalize(makeSplit(structuralIds.at(node->id), node->axis, children, weights));
+        return children.empty() ? nullptr : normalize(makeSplit(structuralIds.at(node->id), node->axis, children, weights, node->nested));
     };
     out.root = tree(saved.root);
     for (const auto &floating : saved.floating)

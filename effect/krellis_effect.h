@@ -33,6 +33,7 @@
 #include <deque>
 #include <set>
 #include <vector>
+#include <unordered_map>
 
 namespace KWin {
 
@@ -280,6 +281,7 @@ private:
         double requestedMs = 0;          // when, on the canvas clock
         std::optional<TRect> lastDrawn;  // rect paintWindow last drew it at
         std::optional<TRect> motionTarget; // last presentation destination; unrelated to client configure acknowledgements
+        double crossedMs = -1;           // realMs() when the window arrived from another output; -1 if it never did
     };
     // True while the window's frame is where applyRest put it. A camera can place a neighbour past the
     // output edge; KWin then reports an output change that is ours, not a user transfer.
@@ -304,6 +306,10 @@ private:
     bool layerShown() const;
     double m_layerDim = 0, m_layerTarget = 0;
     Tracked *trackedFor(EffectWindow *w);
+    const Tracked *trackedFor(const EffectWindow *w) const;
+    const Tracked *presentedPanel(const std::string &panel) const;
+    void indexWindows();
+    void cacheVisuals();
     Tracked *trackedForPanel(const std::string &panel);
     // Tabbed tiles (opt-in, `tabs`). A panel can hold several windows; one is shown under a tab strip and the rest are
     // stowed: sized like it, kept out of paint and input. m_windows holds only the shown window of each panel, so the
@@ -355,6 +361,7 @@ private:
     void updateMotionOverlay(double dt);
     std::unique_ptr<class OffscreenQuickScene> m_motionOverlay;
     QStringList m_motionIds;
+    std::set<std::string> m_motionActivePanels;
     bool m_motionBusy = false;
     std::string m_keyMovePanel;
     bool m_keyMoveHeld = false;
@@ -373,7 +380,8 @@ private:
     bool layoutAwaitingLanding() const;
     // tweened: request the sizes of the running layout tween instead of the final ones, so clients really
     // resize through the animation and their contents are never scaled.
-    void applyRest(bool stepping = false);
+    void applyRest(bool stepping = false, bool navigationOnly = false);
+    void finishCameraResize();
     void configureAnimations(bool hyprland, const QString &style);
     void syncWindowMotion(Tracked &tracked);
     void repaintCanvas();
@@ -391,6 +399,7 @@ private:
         double fromOpacity = 1;
         bool hyprland = false; // captured so a settings reload cannot change an active flight's curve
         double fadeStart = 0, fadeFrom = 1, fadeMs = krellis::HyprlandMotion::fadeInMs;
+        bool cameraNavigation = false; // suspend changing-size blur targets during camera presentation
     };
     void startFlight(EffectWindow *w, FlightKind kind, TRect from, TRect to, double opacity = 1);
     bool flightRect(EffectWindow *w, const Tracked &t, TRect &rect, double &opacity) const;
@@ -428,10 +437,21 @@ private:
     krellis::LayoutTween m_tween;
     krellis::Entries m_rects; // panel world rects
     std::vector<Tracked> m_windows;
+    // Indices, never vector element pointers. A synchronous tab/close/transfer can
+    // reorder the vectors; every hit is validated and falls back to a scan.
+    std::unordered_map<const EffectWindow *, size_t> m_windowIndex, m_stowedIndex;
+    std::unordered_map<std::string, size_t> m_panelIndex;
+    struct PaintedGeometry { std::optional<TRect> rect; double opacity = 1; };
+    std::unordered_map<const EffectWindow *, PaintedGeometry> m_frameVisuals;
+    bool m_useFrameVisuals = false;
     AnimationClock m_clock;
     double m_nowMs = 0;
     quint64 m_framePasses = 0, m_restPasses = 0, m_motionPasses = 0;
+    quint64 m_motionSceneBuilds = 0;
     std::optional<TRect> m_restCamera; // Hyprland destinations only need refreshing after the camera changes
+    QTimer m_cameraResizeTimer;
+    bool m_cameraResizePending = false;
+    quint64 m_cameraChanges = 0, m_cameraCulled = 0;
     bool m_animating = false;
     int m_counter = 0;
     QRectF m_area;
@@ -467,7 +487,7 @@ private:
     bool peeking(const std::string &panel) const;
     bool handlePeekButton(const PointerButtonEvent &event);
     std::string m_peekPressed;
-    struct Tile { double amount = 0, velocity = 0, target = 0; QString icon; bool idle = false; };
+    struct Tile { double amount = 0, velocity = 0, target = 0; QString icon; bool idle = false, presented = false; };
     std::map<std::string, Tile> m_tiles;
     std::unique_ptr<class OffscreenQuickScene> m_tileScene;
     QStringList m_tileIds;
@@ -493,6 +513,7 @@ private:
     RectF m_dragStartGeometry;
     int m_simForceFloat = -1;
     krellis::config::SpawnTarget m_spawnTarget = krellis::config::SpawnTarget::Pointer; // where a new tiled window opens
+    krellis::config::DwindleSide m_dwindleSide = krellis::config::DwindleSide::Cursor;   // dwindle: which half of the tile the new window takes
     std::string m_lastActivePanel; // the panel of the last tracked window to be activated (KWin activates a new window before windowAdded)
     double m_peekPx = 40; // gutter of neighbouring tiles left in view around a zoomed framing; 0 = off
     bool m_closeFocus = true;  // closing the focused window focuses its layout neighbour
@@ -835,6 +856,7 @@ private:
     KrellisCanvas *m_pointerCanvas = nullptr, *m_pinchCanvas = nullptr;
     LogicalOutput *m_selectedOutput = nullptr;
     krellis::config::SpawnTarget m_spawnTarget = krellis::config::SpawnTarget::Pointer; // loaded from krellisrc; mirrored into every canvas
+    krellis::config::DwindleSide m_dwindleSide = krellis::config::DwindleSide::Cursor;   // likewise
     krellis::config::SpawnTarget m_spawnBack = krellis::config::SpawnTarget::Dwindle; // what the pill returns to when pointer placement goes off
     double m_peekPx = 40;         // likewise ([General] peek, pixels)
     bool m_closeFocus = true;  // loaded from krellisrc; mirrored into every canvas

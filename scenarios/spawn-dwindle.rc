@@ -5,3 +5,4 @@ followTheme=false
 toasts=false
 whichKey=false
 spawnTarget=dwindle
+dwindleSide=after

@@ -77,7 +77,7 @@ try:
         # restore by resetting the layout through a reload: later probes start from changed widths, so re-read
         s,f,c=geometry('alpha'); right=s[0]+s[2]
     ok=any(r for _,r,_ in rows)
-    print('EDGE RESIZE', 'works' if ok else 'NEVER STARTS')
+    print(('PASS ' if ok else 'FAIL ') + 'real pointer edge resize starts and changes width')
     assert ok
 finally:
     pointer.stdin.write('quit\n'); pointer.stdin.flush()

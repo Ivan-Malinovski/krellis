@@ -11,12 +11,16 @@ namespace krellis::config {
 // Where a new tiled window opens.
 enum class SpawnTarget { Pointer, Focused, End, Dwindle };
 
+// Which side of the halved tile a dwindle window takes.
+enum class DwindleSide { Cursor, After };
+
 struct Settings
 {
     bool closeFocus = true;       // closing the focused window focuses its neighbour in the layout
     bool floatFirst = false;      // new windows float; drops tile only at screen edges and corners
     bool shakeFloat = true;       // shaking a window by its title bar floats it (tiling-first mode)
     SpawnTarget spawnTarget = SpawnTarget::Pointer; // beside the tile under the cursor | the focused tile | the end of the row | halve the focused tile (dwindle)
+    DwindleSide dwindleSide = DwindleSide::Cursor; // dwindle: the half of the tile the pointer is in (as Hyprland) | always right/below
     double peek = 40;             // pixels of neighbouring tiles kept in view around a zoomed framing; 0 = off
     bool map = true;              // the minimap is available (it tucks itself away at the screen edge)
     bool mapPinned = false;       // the minimap stays out instead of sliding off the edge

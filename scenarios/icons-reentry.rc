@@ -1,0 +1,10 @@
+[General]
+animationProfile=hyprland
+glide=false
+map=false
+followTheme=false
+toasts=false
+whichKey=false
+iconBelow=160
+spawnTarget=dwindle
+dwindleSide=after

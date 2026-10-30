@@ -129,6 +129,52 @@ private slots:
         auto n = resizeBoundary(root, 0, 0.99, [](int) { return 0.1; });
         QVERIFY(qAbs(n->weights[1] - 0.1) < 1e-9);
     }
+    // Dwindle (Hyprland): splitting a tile of a row keeps the new pair as a group, so closing one of them gives the
+    // other the pair's whole share and the rest of the row does not change.
+    void nestedSplitStaysAGroupAndTheSiblingTakesItsShare()
+    {
+        auto root = makeSplit("r", Axis::X, {P("a"), P("b")});
+        // Focus a, open c on its right: a | c | b at 25 / 25 / 50.
+        auto split = insertBeside(root, "a", P("c"), Edge::Right, "s", 0.5, true);
+        QCOMPARE(split->children.size(), size_t(2));
+        QVERIFY(split->children[0]->nested);
+        auto e = layoutRects(split);
+        QVERIFY(qAbs(e.at("a").rect.w - 0.25) < 1e-9);
+        QVERIFY(qAbs(e.at("c").rect.x - 0.25) < 1e-9);
+        QVERIFY(qAbs(e.at("b").rect.x - 0.5) < 1e-9);
+        // Closing c gives a the whole half; the following sibling b is untouched. The plain rule would give c's share to b.
+        auto closed = layoutRects(removeNode(split, "c"));
+        QVERIFY(qAbs(closed.at("a").rect.w - 0.5) < 1e-9);
+        QVERIFY(qAbs(closed.at("b").rect.w - 0.5) < 1e-9);
+        auto plain = layoutRects(removeNode(insertBeside(root, "a", P("c"), Edge::Right, "s"), "c"));
+        QVERIFY(qAbs(plain.at("a").rect.w - 0.25) < 1e-9);
+        // Closing a hands the space to c, the window a was split with.
+        auto lost = layoutRects(removeNode(split, "a"));
+        QVERIFY(qAbs(lost.at("c").rect.w - 0.5) < 1e-9);
+    }
+    void nestedSplitOnTheNearSideAndAcrossAxes()
+    {
+        auto root = makeSplit("r", Axis::X, {P("a"), P("b")});
+        // Opening before b (cursor in its left half): a | c | b with c and b sharing b's half.
+        auto split = insertBeside(root, "b", P("c"), Edge::Left, "s", 0.5, true);
+        auto e = layoutRects(split);
+        QVERIFY(qAbs(e.at("c").rect.x - 0.5) < 1e-9);
+        QVERIFY(qAbs(e.at("b").rect.x - 0.75) < 1e-9);
+        // A split along the other axis is a plain child either way, and a plain pair still flattens.
+        auto stacked = insertBeside(root, "b", P("d"), Edge::Bottom, "t", 0.5, true);
+        QCOMPARE(stacked->children[1]->axis, Axis::Y);
+        auto flat = insertBeside(root, "b", P("e"), Edge::Right, "u");
+        QCOMPARE(flat->children.size(), size_t(3));
+    }
+    void nestedSurvivesNormalizeAndFlip()
+    {
+        auto root = makeSplit("r", Axis::X, {P("a"), makeSplit("g", Axis::X, {P("b"), P("c")}, {}, true)});
+        QCOMPARE(normalize(root)->children.size(), size_t(2));
+        QVERIFY(normalize(root)->children[1]->nested);
+        auto flipped = flipBoundary(root, "g", 0, "w");
+        QCOMPARE(findNode(flipped, "g")->axis, Axis::Y);
+        QVERIFY(findNode(flipped, "g")->nested);
+    }
 };
 
 QTEST_APPLESS_MAIN(TestTree)

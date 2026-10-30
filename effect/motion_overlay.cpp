@@ -41,23 +41,30 @@ void KrellisCanvas::updateMotionOverlay(double dt)
     if (!dragging && m_liftAmount == 0 && detail == 0 && landing == 0 && rewind == 0 && keyMove == 0 && m_urgentFade == 0) {
         if (m_motionOverlay) {
             repaintRegion(Region(m_motionOverlay->geometry()));
-            m_motionOverlay.reset();
-            m_motionIds.clear();
+            // Keep the QML engine, GL context and delegates warm. Recreating
+            // this scene at every overview return can block KWin's main thread.
+            // Opacity hides its previous buffer immediately; root visibility
+            // also keeps its label diagnostics and subsequent render empty.
+            m_motionOverlay->setOpacity(0);
+            m_motionOverlay->rootItem()->setVisible(false);
         }
         return;
     }
     if (!m_motionOverlay) {
         m_motionOverlay = makeScene(QStringLiteral("motion_overlay.qml"));
         if (!m_motionOverlay) return;
+        ++m_motionSceneBuilds;
     }
     m_motionOverlay->setVisible(!m_overlaysCovered);
     m_motionOverlay->setGeometry(Rect(m_area.toAlignedRect()));
     auto *root = m_motionOverlay->rootItem();
+    root->setVisible(true);
     QStringList ids;
     for (const auto &t : m_windows) ids << QString::fromStdString(t.panel);
     if (ids != m_motionIds) {
         m_motionIds = ids;
         root->setProperty("panels", ids);
+        m_motionActivePanels.clear(); // a model reset creates fresh, invisible delegates
     }
     // visualRect searches the tracked windows. Cache each result for this frame;
     // otherwise testing every cover for every label repeats that search cubically.
@@ -68,30 +75,39 @@ void KrellisCanvas::updateMotionOverlay(double dt)
         if (inserted) it->second.rect = visualRect(window, &it->second.opacity);
         return it->second;
     };
-    const auto stack = effects->stackingOrder();
+    struct Cover { EffectWindow *window; QRectF rect; };
+    std::vector<Cover> covers;
+    for (auto *w : effects->stackingOrder()) {
+        if (w->isDeleted() || w->isMinimized() || w->isHidden()) continue;
+        QRectF rect;
+        if (const auto &shown = paintOf(w).rect)
+            rect = QRectF(shown->x, shown->y, shown->w, shown->h);
+        else if (!w->isDesktop()) rect = w->frameGeometry();
+        if (rect.intersects(m_area)) covers.push_back({w, rect});
+    }
     for (size_t i = 0; i < m_windows.size(); ++i) {
         const auto &t = m_windows[i];
         const auto &paint = paintOf(t.window);
         const double opacity = paint.opacity;
         const auto rect = paint.rect.value_or(TRect{});
-        const bool visible = paint.rect && !t.window->isMinimized() && !t.window->isHidden();
+        const QRectF bounds(rect.x, rect.y, rect.w, rect.h);
+        const bool visible = paint.rect && bounds.intersects(m_area) && !t.window->isMinimized() && !t.window->isHidden();
         const double flash = !visible ? 0 : t.panel == m_keyMovePanel ? keyMove : t.panel == m_landingPanel ? landing
             : m_rewindPanels.count(t.panel) ? rewind * 0.65 : 0;
-        const double label = visible && !floatScreen(t.panel) ? detail * opacity * std::clamp((600 - rect.w) / 300, 0.0, 1.0) : 0;
+        const double label = visible && rect.w > 68 && rect.h > 52 && !floatScreen(t.panel)
+            ? detail * opacity * std::clamp((600 - rect.w) / 300, 0.0, 1.0) : 0;
         const double urgent = visible && isUrgent(t.window) ? m_urgentFade : 0;
+        const double lift = visible && t.panel == m_liftPanel ? m_liftAmount : 0;
+        const bool active = label > 0 || flash > 0 || urgent > 0 || lift > 0;
+        if (!active && !m_motionActivePanels.erase(t.panel)) continue;
+        if (active) m_motionActivePanels.insert(t.panel);
         QVariantList pieces;
         if (label > 0 || flash > 0 || urgent > 0) {
-            QRegion uncovered(QRectF(0, 0, rect.w, rect.h).toAlignedRect());
+            QRegion uncovered(QRectF(0, 0, rect.w, rect.h).intersected(m_area.translated(-rect.x, -rect.y)).toAlignedRect());
             bool above = false;
-            for (auto *w : stack) {
-                if (w == t.window) { above = true; continue; }
-                if (!above || w->isDeleted() || w->isMinimized() || w->isHidden()) continue;
-                if (const auto &cover = paintOf(w).rect)
-                    uncovered -= QRectF(cover->x - rect.x, cover->y - rect.y, cover->w, cover->h).toAlignedRect();
-                else if (!w->isDesktop()) {
-                    const auto f = w->frameGeometry();
-                    uncovered -= QRectF(f.x() - rect.x, f.y() - rect.y, f.width(), f.height()).toAlignedRect();
-                }
+            for (const auto &cover : covers) {
+                if (cover.window == t.window) { above = true; continue; }
+                if (above && cover.rect.intersects(bounds)) uncovered -= cover.rect.translated(-rect.x, -rect.y).toAlignedRect();
             }
             for (const QRect &p : uncovered)
                 pieces << QVariantMap{{"x", p.x()}, {"y", p.y()}, {"w", p.width()}, {"h", p.height()}};
@@ -105,7 +121,7 @@ void KrellisCanvas::updateMotionOverlay(double dt)
             tile.icon = bytes.isEmpty() ? QStringLiteral("") : QStringLiteral("data:image/png;base64,") + QString::fromLatin1(bytes.toBase64());
         }
         QVariantMap data{{"x", rect.x - m_area.x()}, {"y", rect.y - m_area.y()}, {"w", rect.w}, {"h", rect.h},
-            {"lift", visible && t.panel == m_liftPanel ? m_liftAmount : 0}, {"flash", flash}, {"urgent", urgent}, {"detail", label}, {"pieces", pieces},
+            {"lift", lift}, {"flash", flash}, {"urgent", urgent}, {"detail", label}, {"pieces", pieces},
             {"title", t.window->caption()}, {"icon", tile.icon}};
         QMetaObject::invokeMethod(root, "setPanel", Q_ARG(QVariant, int(i)), Q_ARG(QVariant, data));
     }
@@ -129,5 +145,6 @@ void KrellisCanvas::updateMotionOverlay(double dt)
                 {"w", r.w + 6}, {"h", r.h + 6}, {"amount", detail}, {"name", QString::fromStdString(f.name)}};
         }
     root->setProperty("frames", frames);
+    m_motionOverlay->setOpacity(1);
 }
 } // namespace KWin

@@ -19,6 +19,14 @@ case "${1:-status}" in
     if [ "$(effects org.kde.kwin.Effects.loadEffect "$(basename "$file" .so)")" != true ]; then
       echo 'KWin refused to load Krellis (see: journalctl --user -b -t kwin_wayland | grep -i krellis).' >&2; exit 1
     fi;;
+  login)
+    # For login startup: wait for KWin, then load the newest install. Unlike "on" this
+    # keeps the crash-loop marker, so safe mode and the KWin-version check still stop a bad build at login.
+    file=$(newest_file); [ -n "$file" ] || { echo 'Nothing installed.' >&2; exit 1; }
+    for _ in $(seq 60); do effects org.freedesktop.DBus.Properties.Get org.kde.kwin.Effects loadedEffects >/dev/null 2>&1 && break; sleep 1; done
+    [ -z "$(loaded_ids)" ] || exit 0
+    [ "$(effects org.kde.kwin.Effects.loadEffect "$(basename "$file" .so)")" = true ] \
+      || { echo 'KWin did not load Krellis (safe mode, KWin version mismatch or a bad build).' >&2; exit 1; };;
   reset) rm -f "$marker"; echo 'Crash-loop marker cleared.';;
   off) unload_all;;
   status)
@@ -35,5 +43,5 @@ case "${1:-status}" in
     installed=$(grep -ao 'build [A-Z][a-z][a-z] [ 0-9][0-9] 20[0-9][0-9] [0-9:]*' "$file" | head -1)
     echo "running:   $running"; echo "installed: $installed ($(basename "${file:-none}"))"
     [ "$running" = "$installed" ] || echo 'MISMATCH: the loaded Krellis is not the newest installed one. Run tools/live.sh on.';;
-  *) echo 'usage: live.sh on|off|reset|status' >&2; exit 1;;
+  *) echo 'usage: live.sh on|off|login|reset|status' >&2; exit 1;;
 esac

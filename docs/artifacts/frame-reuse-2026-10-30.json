@@ -1,0 +1,93 @@
+{
+  "date": "2026-10-30",
+  "workload": "100 quiet Qt windows, four deepest-leaf/overview round trips, 1280x800 virtual output",
+  "order": "before,after,after,before for normal, then same order with iconBelow=160",
+  "notes": [
+    "Serial, no builds or other task-owned nested scenarios running.",
+    "Timings include driver waits, not isolated GPU execution; virtual 60 Hz does not establish live 144 Hz smoothness.",
+    "One normal baseline issued 64 geometry requests versus 24 in the other normal runs; no geometry-path code was changed.",
+    "Initial baseline during compilation discarded. Blurred Kitty depth recheck showed no consistent improvement."
+  ],
+  "runs": [
+    {
+      "run": "krellis-further-icons-5-before",
+      "windows": 100,
+      "frames": 296,
+      "nativeRequests": 3,
+      "cpuMedianMs": 1.63,
+      "cpuP95Ms": 3.539,
+      "intervalMedianMs": 16.661,
+      "intervalP95Ms": 17.504
+    },
+    {
+      "run": "krellis-further-icons-6-after",
+      "windows": 100,
+      "frames": 298,
+      "nativeRequests": 3,
+      "cpuMedianMs": 1.14,
+      "cpuP95Ms": 2.904,
+      "intervalMedianMs": 16.79,
+      "intervalP95Ms": 17.51
+    },
+    {
+      "run": "krellis-further-icons-7-after",
+      "windows": 100,
+      "frames": 294,
+      "nativeRequests": 3,
+      "cpuMedianMs": 1.151,
+      "cpuP95Ms": 3.119,
+      "intervalMedianMs": 16.813,
+      "intervalP95Ms": 17.459
+    },
+    {
+      "run": "krellis-further-icons-8-before",
+      "windows": 100,
+      "frames": 294,
+      "nativeRequests": 3,
+      "cpuMedianMs": 1.638,
+      "cpuP95Ms": 3.505,
+      "intervalMedianMs": 16.734,
+      "intervalP95Ms": 17.581
+    },
+    {
+      "run": "krellis-further-normal-1-before",
+      "windows": 100,
+      "frames": 235,
+      "nativeRequests": 64,
+      "cpuMedianMs": 0.715,
+      "cpuP95Ms": 3.035,
+      "intervalMedianMs": 16.731,
+      "intervalP95Ms": 17.404
+    },
+    {
+      "run": "krellis-further-normal-2-after",
+      "windows": 100,
+      "frames": 236,
+      "nativeRequests": 24,
+      "cpuMedianMs": 0.691,
+      "cpuP95Ms": 2.831,
+      "intervalMedianMs": 16.709,
+      "intervalP95Ms": 17.336
+    },
+    {
+      "run": "krellis-further-normal-3-after",
+      "windows": 100,
+      "frames": 233,
+      "nativeRequests": 24,
+      "cpuMedianMs": 0.699,
+      "cpuP95Ms": 2.784,
+      "intervalMedianMs": 16.72,
+      "intervalP95Ms": 17.397
+    },
+    {
+      "run": "krellis-further-normal-4-before",
+      "windows": 100,
+      "frames": 233,
+      "nativeRequests": 24,
+      "cpuMedianMs": 0.694,
+      "cpuP95Ms": 2.447,
+      "intervalMedianMs": 16.715,
+      "intervalP95Ms": 17.539
+    }
+  ]
+}

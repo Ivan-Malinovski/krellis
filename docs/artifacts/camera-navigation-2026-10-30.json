@@ -1,0 +1,132 @@
+{
+  "date": "2026-10-30",
+  "comparison": "Second pass: retained buffers during camera-only navigation, visible-only final geometry, and transformed expanded-bounds paint culling, against the first-pass build already installed earlier in the session. Both include unrelated pre-existing working-tree changes.",
+  "workload": "Virtual nested KWin 1280x800, Hyprland profile, glide/flyTo off, minimap on. Alternate deepest leaf and overview four times with 650 ms per phase. Qt counts 25/50/100; Kitty uses 25 independent processes with --config NONE and sleep; Dolphin uses 25 windows of an empty temporary directory on a private D-Bus session. Dolphin repeat runs in reverse order (after first, then before).",
+  "measurement": "cpuMs measures elapsed pre-paint through post-paint including rendering/submission/driver waits. Not isolated CPU utilization or GPU execution. nativeRequests counts moveResize calls (position and/or size), not client commits. Counts exclude spawning and cleanup. Settled frames may be included; sample counts vary with repaint scheduling.",
+  "runs": {
+    "camera-before": [
+      {
+        "windows": 25,
+        "frames": 203,
+        "nativeRequests": 200,
+        "cpuMedianMs": 0.442,
+        "cpuP95Ms": 28.405,
+        "intervalMedianMs": 16.527,
+        "intervalP95Ms": 34.018
+      },
+      {
+        "windows": 50,
+        "frames": 176,
+        "nativeRequests": 400,
+        "cpuMedianMs": 0.735,
+        "cpuP95Ms": 43.455,
+        "intervalMedianMs": 16.702,
+        "intervalP95Ms": 66.864
+      },
+      {
+        "windows": 100,
+        "frames": 117,
+        "nativeRequests": 800,
+        "cpuMedianMs": 1.322,
+        "cpuP95Ms": 50.553,
+        "intervalMedianMs": 17.133,
+        "intervalP95Ms": 66.893
+      }
+    ],
+    "camera-after": [
+      {
+        "windows": 25,
+        "frames": 247,
+        "nativeRequests": 24,
+        "cpuMedianMs": 0.298,
+        "cpuP95Ms": 1.546,
+        "intervalMedianMs": 16.404,
+        "intervalP95Ms": 17.77
+      },
+      {
+        "windows": 50,
+        "frames": 249,
+        "nativeRequests": 24,
+        "cpuMedianMs": 0.428,
+        "cpuP95Ms": 1.528,
+        "intervalMedianMs": 16.502,
+        "intervalP95Ms": 17.619
+      },
+      {
+        "windows": 100,
+        "frames": 246,
+        "nativeRequests": 24,
+        "cpuMedianMs": 0.727,
+        "cpuP95Ms": 2.47,
+        "intervalMedianMs": 16.738,
+        "intervalP95Ms": 17.708
+      }
+    ],
+    "kitty-before": [
+      {
+        "windows": 25,
+        "frames": 231,
+        "nativeRequests": 200,
+        "cpuMedianMs": 0.614,
+        "cpuP95Ms": 7.687,
+        "intervalMedianMs": 16.551,
+        "intervalP95Ms": 23.777
+      }
+    ],
+    "kitty-after": [
+      {
+        "windows": 25,
+        "frames": 272,
+        "nativeRequests": 24,
+        "cpuMedianMs": 0.322,
+        "cpuP95Ms": 1.218,
+        "intervalMedianMs": 16.427,
+        "intervalP95Ms": 17.64
+      }
+    ],
+    "dolphin-before": [
+      {
+        "windows": 25,
+        "frames": 150,
+        "nativeRequests": 200,
+        "cpuMedianMs": 0.771,
+        "cpuP95Ms": 62.896,
+        "intervalMedianMs": 16.752,
+        "intervalP95Ms": 108.916
+      }
+    ],
+    "dolphin-after": [
+      {
+        "windows": 25,
+        "frames": 261,
+        "nativeRequests": 24,
+        "cpuMedianMs": 0.301,
+        "cpuP95Ms": 2.457,
+        "intervalMedianMs": 16.422,
+        "intervalP95Ms": 17.567
+      }
+    ],
+    "dolphin-after-repeat": [
+      {
+        "windows": 25,
+        "frames": 259,
+        "nativeRequests": 24,
+        "cpuMedianMs": 0.303,
+        "cpuP95Ms": 2.523,
+        "intervalMedianMs": 16.391,
+        "intervalP95Ms": 17.674
+      }
+    ],
+    "dolphin-before-repeat": [
+      {
+        "windows": 25,
+        "frames": 155,
+        "nativeRequests": 200,
+        "cpuMedianMs": 0.678,
+        "cpuP95Ms": 71.022,
+        "intervalMedianMs": 16.532,
+        "intervalP95Ms": 91.289
+      }
+    ]
+  }
+}

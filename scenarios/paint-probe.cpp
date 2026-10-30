@@ -15,6 +15,7 @@
 #include <array>
 #include <cmath>
 #include <vector>
+#include <deque>
 
 namespace KWin {
 class PaintProbe : public Effect {
@@ -26,11 +27,88 @@ public:
             && qEnvironmentVariable("NEST_SOCKET").startsWith("krellis-test-");
         QDBusConnection::sessionBus().registerObject("/KrellisPaintProbe", this, QDBusConnection::ExportAllSlots);
     }
-    ~PaintProbe() override { QDBusConnection::sessionBus().unregisterObject("/KrellisPaintProbe"); }
+    ~PaintProbe() override {
+        effects->makeOpenGLContextCurrent();
+        for (const auto &query : m_gpuPending) glDeleteQueries(2, query.ids.data());
+        QDBusConnection::sessionBus().unregisterObject("/KrellisPaintProbe");
+    }
     bool isActive() const override { return m_allowed; }
     int requestedEffectChainPosition() const override { return 0; }
+    void prePaintScreen(ScreenPrePaintData &data) override {
+        if (m_timing) {
+            m_frameStart = m_timingClock.nsecsElapsed();
+            if (m_previousStart >= 0) m_intervals.append(double(m_frameStart - m_previousStart) / 1e6);
+            m_previousStart = m_frameStart;
+            m_frameStarts.append(double(m_frameStart) / 1e6);
+            m_draws = m_shadowOnly = 0;
+            m_frameArea = m_expandedArea = 0;
+            m_paintMs = 0;
+        }
+        effects->prePaintScreen(data);
+        if (m_timing) m_preMs = double(m_timingClock.nsecsElapsed()-m_frameStart)/1e6;
+    }
+    void postPaintScreen() override {
+        const auto postStart = m_timing ? m_timingClock.nsecsElapsed() : 0;
+        effects->postPaintScreen();
+        if (m_timing) {
+            m_stageTimes.append(QJsonObject{{"preMs",m_preMs},{"paintMs",m_paintMs},
+                {"postMs",double(m_timingClock.nsecsElapsed()-postStart)/1e6}});
+            m_frameTimes.append(double(m_timingClock.nsecsElapsed() - m_frameStart) / 1e6);
+            m_drawStats.append(QJsonObject{{"draws", m_draws}, {"shadowOnly", m_shadowOnly},
+                {"frameArea", m_frameArea}, {"expandedArea", m_expandedArea}});
+        }
+    }
+    void drawWindow(const RenderTarget &target, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &region, WindowPaintData &data) override {
+        if (m_timing && !region.isEmpty()) {
+            const auto frame = w->frameGeometry();
+            const auto expanded = w->expandedGeometry();
+            const QRectF shown(frame.x()+data.xTranslation(), frame.y()+data.yTranslation(),
+                frame.width()*data.xScale(), frame.height()*data.yScale());
+            const QRectF bounds(shown.x()+(expanded.x()-frame.x())*data.xScale(),
+                shown.y()+(expanded.y()-frame.y())*data.yScale(),
+                expanded.width()*data.xScale(), expanded.height()*data.yScale());
+            const QRectF view(viewport.renderRect());
+            const auto visible = shown.intersected(view), visibleExpanded = bounds.intersected(view);
+            ++m_draws;
+            if (visible.isEmpty() && !visibleExpanded.isEmpty()) ++m_shadowOnly;
+            m_frameArea += visible.width()*visible.height();
+            m_expandedArea += visibleExpanded.width()*visibleExpanded.height();
+        }
+        effects->drawWindow(target, viewport, w, mask, region, data);
+    }
+    void collectGpu() {
+        while (!m_gpuPending.empty()) {
+            const auto &query = m_gpuPending.front();
+            GLuint ready = 0;
+            glGetQueryObjectuiv(query.ids[1], GL_QUERY_RESULT_AVAILABLE, &ready);
+            if (!ready) break; // never wait for the GPU to collect a timing sample
+            GLuint64 start = 0, end = 0;
+            glGetQueryObjectui64v(query.ids[0], GL_QUERY_RESULT, &start);
+            glGetQueryObjectui64v(query.ids[1], GL_QUERY_RESULT, &end);
+            if (query.generation == m_timingGeneration)
+                m_gpuTimes.append(QJsonObject{{"startMs", query.startMs}, {"gpuMs", double(end-start)/1e6}});
+            glDeleteQueries(2, query.ids.data());
+            m_gpuPending.pop_front();
+        }
+    }
     void paintScreen(const RenderTarget &target, const RenderViewport &viewport, int mask, const Region &region, LogicalOutput *screen) override {
+        collectGpu();
+        const bool gpu = m_timing && qEnvironmentVariableIntValue("KRELLIS_PROBE_GPU_TIMING") == 1
+            && EglContext::currentContext()->supportsTimerQueries();
+        GpuQuery query;
+        if (gpu) {
+            query.startMs = double(m_frameStart)/1e6;
+            query.generation = m_timingGeneration;
+            glGenQueries(2, query.ids.data());
+            glQueryCounter(query.ids[0], GL_TIMESTAMP);
+        }
+        const auto paintStart = m_timing ? m_timingClock.nsecsElapsed() : 0;
         effects->paintScreen(target, viewport, mask, region, screen);
+        if (m_timing) m_paintMs += double(m_timingClock.nsecsElapsed()-paintStart)/1e6;
+        if (gpu) {
+            glQueryCounter(query.ids[1], GL_TIMESTAMP);
+            m_gpuPending.push_back(query);
+        }
         if (!target.framebuffer()) return;
         GLFramebuffer::pushFramebuffer(target.framebuffer());
         if (m_watch) {
@@ -68,6 +146,19 @@ public:
         GLFramebuffer::popFramebuffer();
     }
 public Q_SLOTS:
+    bool timing(bool on) {
+        m_timing = on && m_allowed;
+        if (m_timing) {
+            m_frameTimes = {}; m_intervals = {}; m_frameStarts = {}; m_gpuTimes = {}; m_drawStats = {}; m_stageTimes = {};
+            ++m_timingGeneration;
+            m_previousStart = -1;
+            m_timingClock.start();
+        }
+        return m_timing;
+    }
+    QString timingJson() const {
+        return QString::fromUtf8(QJsonDocument(QJsonObject{{"cpuMs", m_frameTimes}, {"intervalMs", m_intervals}, {"startMs", m_frameStarts}, {"gpu", m_gpuTimes}, {"drawStats", m_drawStats}, {"stages",m_stageTimes}}).toJson(QJsonDocument::Compact));
+    }
     bool configure(const QString &json) {
         if (!m_allowed) return false;
         m_points.clear(); m_frames=0;
@@ -105,6 +196,15 @@ private:
     int m_frames=0;
     bool m_allowed=false,m_enabled=false,m_watch=false,m_history=false;
     QElapsedTimer m_clock;
+    bool m_timing = false;
+    QElapsedTimer m_timingClock;
+    qint64 m_frameStart = 0, m_previousStart = -1;
+    QJsonArray m_frameTimes, m_intervals, m_frameStarts, m_gpuTimes, m_drawStats, m_stageTimes;
+    struct GpuQuery { std::array<GLuint, 2> ids{}; double startMs = 0; unsigned generation = 0; };
+    std::deque<GpuQuery> m_gpuPending;
+    unsigned m_timingGeneration = 0;
+    int m_draws = 0, m_shadowOnly = 0;
+    double m_frameArea = 0, m_expandedArea = 0, m_preMs = 0, m_paintMs = 0;
     int m_watchFrames=0,m_blackFrames=0;
     double m_maxBlack=0;
 };

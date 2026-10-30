@@ -1,0 +1,111 @@
+{
+  "date": "2026-10-30",
+  "workload": "Quiet Qt Widgets windows in one process; alternate deepest leaf and overview four times; 650 ms per phase; virtual nested KWin at 1280x800; Hyprland profile, glide/flyTo off, minimap on",
+  "measurement": "cpuMs is elapsed wall time from the test probe prePaintScreen to postPaintScreen, including downstream rendering/submission and driver waits. It is not CPU utilization or a GPU timer. Interval samples are within each phase; idle gaps can occur. Frame counts vary with repaint scheduling.",
+  "runs": {
+    "baseline": [
+      {
+        "windows": 25,
+        "frames": 193,
+        "cpuMedianMs": 0.758,
+        "cpuP95Ms": 34.247,
+        "intervalMedianMs": 16.598,
+        "intervalP95Ms": 63.484
+      },
+      {
+        "windows": 50,
+        "frames": 168,
+        "cpuMedianMs": 1.129,
+        "cpuP95Ms": 42.62,
+        "intervalMedianMs": 16.829,
+        "intervalP95Ms": 60.045
+      },
+      {
+        "windows": 100,
+        "frames": 111,
+        "cpuMedianMs": 2.404,
+        "cpuP95Ms": 55.871,
+        "intervalMedianMs": 16.822,
+        "intervalP95Ms": 66.709
+      }
+    ],
+    "final": [
+      {
+        "windows": 25,
+        "frames": 203,
+        "cpuMedianMs": 0.468,
+        "cpuP95Ms": 28.433,
+        "intervalMedianMs": 16.524,
+        "intervalP95Ms": 65.557
+      },
+      {
+        "windows": 50,
+        "frames": 171,
+        "cpuMedianMs": 0.793,
+        "cpuP95Ms": 40.975,
+        "intervalMedianMs": 16.723,
+        "intervalP95Ms": 64.1
+      },
+      {
+        "windows": 100,
+        "frames": 114,
+        "cpuMedianMs": 1.499,
+        "cpuP95Ms": 50.154,
+        "intervalMedianMs": 17.006,
+        "intervalP95Ms": 78.868
+      }
+    ],
+    "baseline-repeat": [
+      {
+        "windows": 25,
+        "frames": 196,
+        "cpuMedianMs": 0.736,
+        "cpuP95Ms": 32.077,
+        "intervalMedianMs": 16.634,
+        "intervalP95Ms": 49.704
+      },
+      {
+        "windows": 50,
+        "frames": 169,
+        "cpuMedianMs": 1.065,
+        "cpuP95Ms": 42.092,
+        "intervalMedianMs": 16.803,
+        "intervalP95Ms": 62.962
+      },
+      {
+        "windows": 100,
+        "frames": 96,
+        "cpuMedianMs": 2.337,
+        "cpuP95Ms": 62.718,
+        "intervalMedianMs": 16.844,
+        "intervalP95Ms": 113.495
+      }
+    ],
+    "final-repeat": [
+      {
+        "windows": 25,
+        "frames": 198,
+        "cpuMedianMs": 0.492,
+        "cpuP95Ms": 31.159,
+        "intervalMedianMs": 16.536,
+        "intervalP95Ms": 65.326
+      },
+      {
+        "windows": 50,
+        "frames": 174,
+        "cpuMedianMs": 0.781,
+        "cpuP95Ms": 40.875,
+        "intervalMedianMs": 16.737,
+        "intervalP95Ms": 66.68
+      },
+      {
+        "windows": 100,
+        "frames": 115,
+        "cpuMedianMs": 1.435,
+        "cpuP95Ms": 49.928,
+        "intervalMedianMs": 17.231,
+        "intervalP95Ms": 84.604
+      }
+    ]
+  }
+}

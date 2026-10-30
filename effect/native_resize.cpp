@@ -51,6 +51,8 @@ void KrellisCanvas::startResize(EffectWindow *w)
             }
         }
     }
+    m_cameraResizeTimer.stop();
+    m_cameraResizePending = false;
     m_resize = std::move(state);
     m_flights.erase(w);
     m_tween.stop();

@@ -1,0 +1,16 @@
+--- a/v2/decoration.cpp
++++ b/v2/decoration.cpp
+@@ -72,0 +73 @@
++    m_decoration->setUsingRenderingCache(false);
+@@ -78,0 +80 @@
++    m_decorationInactive->setUsingRenderingCache(false);
+@@ -84,0 +87 @@
++    m_decorationMaximized->setUsingRenderingCache(false);
+@@ -90,0 +94 @@
++    m_decorationMaximizedInactive->setUsingRenderingCache(false);
+@@ -97,0 +102 @@
++        m_innerBorder->setUsingRenderingCache(false);
+@@ -104,0 +110 @@
++        m_innerBorderInactive->setUsingRenderingCache(false);
+@@ -111,0 +118 @@
++        m_blur->setUsingRenderingCache(false);

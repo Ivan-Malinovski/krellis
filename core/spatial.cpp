@@ -430,7 +430,7 @@ NodePtr applyDockTarget(const NodePtr &root, const DockTargetSpec &target, const
         return incoming;
     if (target.seam)
         return insertAtSeam(root, *target.seam, incoming, splitId);
-    return insertBeside(root, target.id, incoming, target.edge, splitId);
+    return insertBeside(root, target.id, incoming, target.edge, splitId, 0.5, target.nested);
 }
 
 } // namespace krellis

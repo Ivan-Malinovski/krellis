@@ -559,7 +559,7 @@ LayoutDocument sanitize(LayoutDocument input, const std::function<bool(const std
         }
         if (children.empty())
             return nullptr;
-        return normalize(makeSplit(node->id, node->axis, children, weights));
+        return normalize(makeSplit(node->id, node->axis, children, weights, node->nested));
     };
     doc.root = doc.root ? fixNode(doc.root) : nullptr;
     doc.root = doc.root ? normalize(doc.root) : nullptr;

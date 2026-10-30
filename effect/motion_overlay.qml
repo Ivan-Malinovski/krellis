@@ -7,6 +7,7 @@ Item {
     property var panels: []
     property var frames: []
     function labelCount() {
+        if (!visible) return 0
         var count = 0
         for (var i = 0; i < windows.count; ++i) {
             var card = windows.itemAt(i)

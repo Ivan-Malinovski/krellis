@@ -222,9 +222,10 @@ void KrellisCanvas::updateTiles(double dt)
     if (ids != m_tileIds) {
         m_tileIds = ids;
         root->setProperty("panels", ids);
+        for (auto &[panel, tile] : m_tiles) tile.presented = false;
     }
     std::erase_if(m_tiles, [this](const auto &tile) {
-        return std::none_of(m_windows.begin(), m_windows.end(), [&](const auto &t) { return t.panel == tile.first; });
+        return !presentedPanel(tile.first);
     });
     for (size_t i = 0; i < m_windows.size(); ++i) {
         const auto &t = m_windows[i];
@@ -239,19 +240,26 @@ void KrellisCanvas::updateTiles(double dt)
         const bool resting = tile.amount == 0 && target == 0;
         if (resting && tile.idle) continue;
         tile.idle = resting;
-        if (tile.icon.isNull()) {
+        double opacity = 1;
+        const auto rect = visualRect(t.window, &opacity).value_or(TRect{});
+        const bool presented = (tile.amount > 0 || target > 0)
+            && QRectF(rect.x, rect.y, rect.w, rect.h).intersects(m_area);
+        // The QML root clips to m_area. Clear a departing tile once, then
+        // leave its invisible delegate alone while its spring keeps ticking.
+        // Re-entering tiles always get fresh geometry, contents and clipping.
+        if (!presented && !tile.presented) continue;
+        tile.presented = presented;
+        if (presented && tile.icon.isNull()) {
             QByteArray bytes;
             QBuffer buffer(&bytes);
             buffer.open(QIODevice::WriteOnly);
             if (!t.window->icon().isNull()) t.window->icon().pixmap(48, 48).save(&buffer, "PNG");
             tile.icon = bytes.isEmpty() ? QStringLiteral("") : QStringLiteral("data:image/png;base64,") + QString::fromLatin1(bytes.toBase64());
         }
-        double opacity = 1;
-        const auto rect = visualRect(t.window, &opacity).value_or(TRect{});
         // The icon overlay is only drawn while it is showing; which parts of it are uncovered matters only then,
         // and finding out costs every window above this one.
         QVariantList pieces;
-        if (tile.amount > 0 || target > 0) {
+        if (presented) {
             QRegion visible(QRectF(0, 0, rect.w, rect.h).toAlignedRect());
             bool above = false;
             for (auto *window : effects->stackingOrder()) {

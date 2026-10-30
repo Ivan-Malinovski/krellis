@@ -140,6 +140,7 @@ Use the settings module (System Settings → Window Management → Krellis, or t
 | `closeFocus` | `true` | Closing the focused window focuses its neighbour in the layout |
 | `floatFirst` | `false` | New windows float; drops tile only at screen edges and corners |
 | `spawnTarget` | pointer | Where a new window opens: `pointer` (beside the tile under the pointer), `focused` (beside the focused tile), `dwindle` (halves the focused tile, like Hyprland's dwindle layout), or `end` (the end of the row) |
+| `dwindleSide` | cursor | With `spawnTarget=dwindle`, which half of the focused tile the new window takes: `cursor` (the half the pointer is in, as in Hyprland) or `after` (right of / below the tile). Closing a dwindle window gives its split-sibling the whole pair's share, as in Hyprland |
 | `peek` | `40` | Pixels of neighbouring tiles kept in view around a zoomed framing (0 = off) |
 | `shakeFloat` | `true` | Shaking a window by its title bar while dragging floats it (tiling-first mode; with `floatFirst` a drag floats already) |
 | `map` | `true` | Minimap available |
@@ -161,6 +162,8 @@ Use the settings module (System Settings → Window Management → Krellis, or t
 Choose **Animation profile → Hyprland** in the settings module to try the new window animations. It works with `glide=false`: applications receive their destination size once, and their available contents are scaled while the painted window moves. Geometry and opacity have independent curves and durations. A slow client can still visibly change its contents when its new buffer arrives; this is not a guarantee of identical rendering or frame pacing to Hyprland. Workspace transitions, animated Hyprland borders/shadows, and newer spring presets are not included. See [the animation reference and limits](docs/hyprland-animations.md).
 
 Animations update the canvas for the output being rendered, and ordinary animation repaints target that output. Cross-monitor flights repaint both sides until landing. The Hyprland profile skips native geometry scans while only the painted rectangle is animating; changing a destination, moving the camera, or changing a drag preview still refreshes client geometry.
+
+With the Hyprland profile, backdrop blur pauses during camera zoom animations and held navigation gestures, then returns when they settle. Transparent contents remain visible, with a temporarily sharper backdrop during motion. Very small or oversized tiles also skip forced blur: KWin otherwise allocates blur buffers for their entire scaled size, including the part outside the screen. Window geometry and resize timing are unaffected.
 
 For example, to keep KDE's Emoji Selector floating and prevent docking it by shortcut or drag, add this rule (or set the same placement permissions in the settings module):
 
@@ -192,6 +195,8 @@ An effect that crashes takes the compositor down with it, and every Wayland app 
 
 It has been exercised in a nested KWin and on one real desktop. Hardware input, fractional scaling and unusual monitor layouts have had little testing.
 
+With many windows, Krellis shares painted geometry within each animation frame and skips label work for tiles outside the view or too small to read. Overview labels reuse their rendering scene across zooms, avoiding repeated setup when returning to overview. With the **Hyprland animation profile**, a discrete zoom requests destination sizes once for visible content tiles at the start of the transition. Offscreen, icon-only and background-tab windows retain their buffers. Continuous pinch/pan gestures defer client sizing until release. Available buffers animate directly into their tile, with no cover-cropping; a late client can briefly show rescaled contents. Layout edits and native border resizing keep their normal behavior. Apps continue running; hundreds of windows still have a cost. See the [zoom performance investigation](docs/zoom-performance.md). Long pauses with SVG/Aurorae decorations and an optional Aurorae 6.7.5 cache fix are covered in the [decoration-cache investigation](docs/aurorae-cache-fix-2026-10-30.md).
+
 ## Building and testing
 
 The layout model is a pure C++ library with no Qt GUI or KWin dependency, so it builds and tests anywhere:
@@ -202,6 +207,10 @@ cmake --build build-core && ctest --test-dir build-core --output-on-failure
 ```
 
 The effect and the settings module need the KWin development files (`-DKRELLIS_BUILD_EFFECT=ON`). Scenario scripts in `scenarios/` drive the effect inside a nested KWin that never touches your session; `tools/nested.sh` runs one, and `tools/scenarios.sh [name...]` runs several (or all of them) in parallel. [`AGENTS.md`](AGENTS.md) describes the architecture, the harness, and the many gotchas.
+
+For an isolated zoom benchmark, build the test probe (`cmake --build build --target krellis_paint_probe`), then run `ZOOM_LOAD_COUNTS="25 50 100" tools/scenarios.sh -j 1 -k zoom-load`. It reports frame processing times and frame intervals for quiet Qt windows in one process; this measures neither GPU execution time separately nor real Dolphin/Kitty performance. The normal scenario run uses 25 windows. Run benchmarks without other scenarios in parallel. The `deep-out` diagnostic additionally requires Python’s `dbus` module and verifies a genuinely deep starting camera plus distinct outward steps.
+
+To use real apps, set `ZOOM_LOAD_APP=kitty` or `ZOOM_LOAD_APP=dolphin` with `ZOOM_LOAD_COUNTS=25`. Kitty uses no personal config and runs `sleep`; Dolphin opens an empty temporary directory. Both run inside the isolated compositor. For example: `ZOOM_LOAD_APP=dolphin ZOOM_LOAD_COUNTS=25 tools/scenarios.sh -j 1 -k zoom-load`.
 
 ## Credits
 

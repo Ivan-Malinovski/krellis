@@ -36,6 +36,7 @@ class KrellisKcm : public KQuickConfigModule
     Q_PROPERTY(bool closeFocus READ closeFocus WRITE setCloseFocus NOTIFY settingsChanged)
     Q_PROPERTY(bool floatFirst READ floatFirst WRITE setFloatFirst NOTIFY settingsChanged)
     Q_PROPERTY(int spawnTarget READ spawnTarget WRITE setSpawnTarget NOTIFY settingsChanged) // 0 pointer, 1 focused, 2 end, 3 dwindle
+    Q_PROPERTY(int dwindleSide READ dwindleSide WRITE setDwindleSide NOTIFY settingsChanged) // 0 cursor, 1 after
     Q_PROPERTY(int peek READ peek WRITE setPeek NOTIFY settingsChanged)
     Q_PROPERTY(bool map READ map WRITE setMap NOTIFY settingsChanged)
     Q_PROPERTY(bool mapPinned READ mapPinned WRITE setMapPinned NOTIFY settingsChanged)
@@ -67,6 +68,7 @@ public:
     bool closeFocus() const { return m_current.closeFocus; }
     bool floatFirst() const { return m_current.floatFirst; }
     int spawnTarget() const { return int(m_current.spawnTarget); }
+    int dwindleSide() const { return int(m_current.dwindleSide); }
     int peek() const { return int(m_current.peek); }
     bool map() const { return m_current.map; }
     bool mapPinned() const { return m_current.mapPinned; }
@@ -90,6 +92,7 @@ public:
     void setCloseFocus(bool v) { edit([&] { m_current.closeFocus = v; }); }
     void setFloatFirst(bool v) { edit([&] { m_current.floatFirst = v; }); }
     void setSpawnTarget(int v) { edit([&] { m_current.spawnTarget = krellis::config::SpawnTarget(std::clamp(v, 0, 3)); }); }
+    void setDwindleSide(int v) { edit([&] { m_current.dwindleSide = krellis::config::DwindleSide(std::clamp(v, 0, 1)); }); }
     void setPeek(int v) { edit([&] { m_current.peek = v; }); }
     void setMap(bool v) { edit([&] { m_current.map = v; }); }
     void setMapPinned(bool v) { edit([&] { m_current.mapPinned = v; }); }

@@ -1,0 +1,115 @@
+{
+  "date": "2026-10-30",
+  "purpose": "Real-frame regression test for black letterboxing while deferred camera resize is pending, plus clipping against a neighbour while the retained buffer window is topmost. The old installed build krellis_1030094919 fails before its first client resize.",
+  "beforeZoomIn": {
+    "frames": 9,
+    "points": [
+      {
+        "bad": 9,
+        "last": [
+          0,
+          0,
+          0
+        ],
+        "samples": 9,
+        "seen": 0
+      },
+      {
+        "bad": 9,
+        "last": [
+          0,
+          0,
+          0
+        ],
+        "samples": 9,
+        "seen": 0
+      }
+    ]
+  },
+  "afterZoomIn": {
+    "frames": 9,
+    "points": [
+      {
+        "bad": 0,
+        "last": [
+          100,
+          92,
+          61
+        ],
+        "samples": 9,
+        "seen": 0
+      },
+      {
+        "bad": 0,
+        "last": [
+          100,
+          92,
+          61
+        ],
+        "samples": 9,
+        "seen": 0
+      }
+    ]
+  },
+  "afterZoomOut": {
+    "frames": 9,
+    "points": [
+      {
+        "bad": 0,
+        "last": [
+          100,
+          92,
+          61
+        ],
+        "samples": 9,
+        "seen": 0
+      },
+      {
+        "bad": 0,
+        "last": [
+          100,
+          92,
+          61
+        ],
+        "samples": 9,
+        "seen": 0
+      }
+    ]
+  },
+  "timingNote": "Serial 1280x800 virtual nested KWin, Hyprland profile, four deep-focus/overview round trips. Before is installed gap build krellis_1030094919. Elapsed pre-paint/post-paint wall time includes driver waits; not a GPU execution timer. Geometry counts are moveResize calls.",
+  "timings": {
+    "gap-dolphin-before": [
+      {
+        "windows": 25,
+        "frames": 256,
+        "nativeRequests": 24,
+        "cpuMedianMs": 0.321,
+        "cpuP95Ms": 2.743,
+        "intervalMedianMs": 16.442,
+        "intervalP95Ms": 17.717
+      }
+    ],
+    "gap-dolphin-after": [
+      {
+        "windows": 25,
+        "frames": 256,
+        "nativeRequests": 24,
+        "cpuMedianMs": 0.333,
+        "cpuP95Ms": 2.672,
+        "intervalMedianMs": 16.449,
+        "intervalP95Ms": 18.152
+      }
+    ],
+    "gap-qt-after": [
+      {
+        "windows": 100,
+        "frames": 246,
+        "nativeRequests": 24,
+        "cpuMedianMs": 0.739,
+        "cpuP95Ms": 2.925,
+        "intervalMedianMs": 16.738,
+        "intervalP95Ms": 17.61
+      }
+    ]
+  }
+}
