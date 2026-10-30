@@ -21,6 +21,10 @@ public:
             p.fillRect(QRect(100, 0, 10, height()), Qt::cyan);
             p.fillRect(QRect(0, 100, width(), 10), Qt::magenta);
         }
+        // A right-anchored stripe moves within the window whenever its width changes: a new layout that replaces
+        // the old one in a single presented frame shows up as the stripe jumping.
+        if (QApplication::arguments().contains(QStringLiteral("--right-marker")))
+            p.fillRect(QRect(width() - 150, 0, 24, height()), Qt::yellow);
         p.setPen(Qt::white);
         p.drawText(rect(), Qt::AlignCenter, windowTitle());
     }

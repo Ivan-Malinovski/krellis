@@ -1,5 +1,7 @@
 # Zoom performance handoff
 
+**Rollback update, 2026-10-30:** the subsequent blink/resize experiments were rejected and fully reverted to source `e308e79`. The restored build is `krellis_1030150556`, stamp `build Oct 30 2026 15:05:58`; Ivan confirms it is smooth again, with the original blink. Read the [window zoom blink handoff](window-zoom-blink-handoff-2026-10-30.md) for current status, recordings, failed approaches and test limitations. The live-state and commit/push requests below are historical, not current authorization.
+
 Updated 2026-10-30 after installing the overview-scene and Aurorae cache fixes. The sections below retain the investigation history; later entries supersede earlier status notes.
 
 ## Current live state

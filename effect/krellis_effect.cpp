@@ -102,6 +102,9 @@ void KrellisCanvas::prepareUnload()
 {
     m_unloading = true;
     m_cameraResizeTimer.stop();
+    for (auto &[w, fade] : m_fades)
+        if (m_effect) m_effect->unredirect(w);
+    m_fades.clear();
     for (const auto &t : m_windows) t.window->setData(WindowForceBlurRole, QVariant());
     for (const auto &t : m_windows) effects->setElevatedWindow(t.window, false);
     for (const auto &t : m_stowed) effects->setElevatedWindow(t.window, false);
@@ -1007,13 +1010,81 @@ void KrellisCanvas::applyRest(bool stepping, bool navigationOnly)
             && std::abs(actual.height() - target.height()) <= 1;
         if (actual != target && !rounded) {
             ++m_resizeRequests;
+            if (m_hyprland && !previewing && !m_resize && list == &m_windows
+                && (std::abs(actual.width() - target.width()) > 1 || std::abs(actual.height() - target.height()) > 1))
+                startFade(t);
             window->moveResize(target);
         }
     }
 }
 
+void KrellisCanvas::startFade(Tracked &t)
+{
+    EffectWindow *w = t.window;
+    // Only a window that is on screen has a presentation worth keeping.
+    static const bool off = qEnvironmentVariableIntValue("KRELLIS_NO_CROSSFADE"); // test knob: the old hard swap
+    if (off || !m_effect || !t.lastDrawn || !effects->isOpenGLCompositing()) return;
+    const QRectF last(t.lastDrawn->x, t.lastDrawn->y, t.lastDrawn->w, t.lastDrawn->h);
+    if (!last.intersects(m_area)) return;
+    const QSizeF size = w->frameGeometry().size();
+    if (size.width() <= 0 || size.height() <= 0) return;
+    const auto it = m_fades.find(w);
+    // A new destination while the client still owes the previous one: the snapshot is still the last real layout.
+    if (it != m_fades.end() && it->second.start < 0) {
+        it->second.issued = realMs();
+        return;
+    }
+    m_effect->capture(w);
+    m_fades[w] = Fade{size, realMs(), -1};
+    m_animating = true;
+    schedule();
+}
+
+void KrellisCanvas::dropFade(EffectWindow *w)
+{
+    if (m_fades.erase(w) && m_effect) m_effect->unredirect(w);
+}
+
+void KrellisCanvas::stepFades()
+{
+    const double now = realMs();
+    for (auto it = m_fades.begin(); it != m_fades.end();) {
+        EffectWindow *w = it->first;
+        auto &f = it->second;
+        bool done = !trackedFor(w) || w->isDeleted();
+        if (!done && f.start < 0) {
+            const QSizeF size = w->frameGeometry().size();
+            if (std::abs(size.width() - f.captured.width()) > 1 || std::abs(size.height() - f.captured.height()) > 1)
+                f.start = now;
+            else if (now - f.issued > FadeWaitMs)
+                done = true; // the client kept its size (or never answered): the snapshot is what it shows anyway
+        }
+        if (!done && f.start >= 0 && now - f.start >= FadeMs) done = true;
+        if (done) {
+            if (m_effect) m_effect->unredirect(w);
+            it = m_fades.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+double KrellisCanvas::fadeProgress(EffectWindow *w) const
+{
+    const auto it = m_fades.find(w);
+    if (it == m_fades.end()) return 1;
+    if (it->second.start < 0) return 0;
+    const double p = std::clamp((realMs() - it->second.start) / FadeMs, 0.0, 1.0);
+    return p * p * (3 - 2 * p);
+}
+
 void KrellisCanvas::configureAnimations(bool hyprland, const QString &style)
 {
+    if (!hyprland)
+        for (auto it = m_fades.begin(); it != m_fades.end();) {
+            if (m_effect) m_effect->unredirect(it->first);
+            it = m_fades.erase(it);
+        }
     if (m_hyprland != hyprland) {
         m_cameraResizeTimer.stop();
         m_cameraResizePending = false;
@@ -1869,6 +1940,10 @@ void KrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
         m_layerDim = m_layerDim < m_layerTarget ? std::min(m_layerTarget, m_layerDim + step) : std::max(m_layerTarget, m_layerDim - step);
         m_animating = true;
     }
+    if (!m_fades.empty()) {
+        stepFades();
+        m_animating = true;
+    }
     if (m_animating) {
         const double dt = std::min(Motion::maxStep, double(ms) / 1000.0);
         if (m_session) {
@@ -1947,7 +2022,7 @@ void KrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
         updateDrawerTabs();
         updateTabStrips();
         const bool tilesMoving = std::any_of(m_tiles.begin(), m_tiles.end(), [](const auto &t) { return std::abs(t.second.velocity) > 0.001 || std::abs(t.second.target - t.second.amount) > 0.0001; });
-        m_animating = m_motionBusy || tilesMoving || areaProgress < 1 || springing || (m_map && !m_map->rootItem()->property("settled").toBool()) || tweening || !m_flights.empty() || !m_popups.empty() || !m_closing.empty() || m_session || m_slot || m_marquee || m_nav.flying() || m_toastBusy || m_sheetBusy || m_paletteBusy || m_layerDim != m_layerTarget || (!m_hyprland && !m_glide && layoutAwaitingLanding()) || !m_landings.empty();
+        m_animating = m_motionBusy || tilesMoving || areaProgress < 1 || springing || (m_map && !m_map->rootItem()->property("settled").toBool()) || tweening || !m_flights.empty() || !m_popups.empty() || !m_closing.empty() || m_session || m_slot || m_marquee || m_nav.flying() || m_toastBusy || m_sheetBusy || m_paletteBusy || m_layerDim != m_layerTarget || (!m_hyprland && !m_glide && layoutAwaitingLanding()) || !m_landings.empty() || !m_fades.empty();
     }
 }
 
@@ -2021,6 +2096,7 @@ void KrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp
             data += QPointF(want.x - frame.x(), want.y - frame.y());
             data *= QVector2D(float(want.w / frame.width()), float(want.h / frame.height()));
         }
+        if (m_fades.count(w)) data.setCrossFadeProgress(fadeProgress(w));
     }
     else if (const auto c = m_closing.find(w); c != m_closing.end()) {
         const TRect target = closingRect(c->second, &opacity);
@@ -3386,6 +3462,9 @@ QString KrellisCanvas::dump()
         QMetaObject::invokeMethod(m_motionOverlay->rootItem(), "labelCount", Q_RETURN_ARG(QVariant, labelCount));
     lines << QStringLiteral("KEY-MOVE %1 held %2").arg(QString::fromStdString(m_keyMovePanel)).arg(m_keyMoveHeld);
     lines << QStringLiteral("NATIVE-REQUESTS %1").arg(m_resizeRequests);
+    for (const auto &[w, fade] : m_fades)
+        if (const auto *t = trackedFor(w))
+            lines << QStringLiteral("FADE %1 %2 progress %3").arg(QString::fromStdString(t->panel), fade.start < 0 ? QStringLiteral("waiting") : QStringLiteral("blending")).arg(fadeProgress(w), 0, 'f', 2);
     lines << QStringLiteral("CAMERA-RESIZE pending %1 changes %2 culled %3")
                  .arg(m_cameraResizePending).arg(m_cameraChanges).arg(m_cameraCulled);
     lines << QStringLiteral("PAINT-STATS frames %1 rest %2 motion %3").arg(m_framePasses).arg(m_restPasses).arg(m_motionPasses);

@@ -2,6 +2,7 @@
 
 #include "effect/effect.h"
 #include "effect/effectwindow.h"
+#include "effect/offscreeneffect.h"
 #include "input.h"
 #include "input_event.h"
 #include "effect/timeline.h"
@@ -283,6 +284,21 @@ private:
         std::optional<TRect> motionTarget; // last presentation destination; unrelated to client configure acknowledgements
         double crossedMs = -1;           // realMs() when the window arrived from another output; -1 if it never did
     };
+    // Hyprland profile: a resized client re-lays out its contents mid-flight, and its new buffer replaces the old one
+    // in a single frame, both scaled into the same moving rect (the "blink"). The old presentation is snapshotted
+    // before the configure, shown alone until the client commits its new size, then crossfaded out.
+    struct Fade {
+        QSizeF captured;   // frame size the snapshot was taken at
+        double issued = 0; // realMs() of the configure
+        double start = -1; // realMs() when the new size arrived; -1 while waiting
+    };
+    std::map<EffectWindow *, Fade> m_fades;
+    KrellisEffect *m_effect = nullptr; // the coordinator owns the snapshots (it is the CrossFadeEffect)
+    static constexpr double FadeMs = 160, FadeWaitMs = 700;
+    void startFade(Tracked &t);
+    void dropFade(EffectWindow *w);
+    void stepFades();
+    double fadeProgress(EffectWindow *w) const; // 1 = no snapshot on show
     // True while the window's frame is where applyRest put it. A camera can place a neighbour past the
     // output edge; KWin then reports an output change that is ours, not a user transfer.
     bool placedByUs(EffectWindow *w) const;
@@ -617,7 +633,7 @@ private:
 };
 
 // One effect-chain participant, owning an independent state machine per output.
-class KrellisEffect : public Effect
+class KrellisEffect : public CrossFadeEffect
 {
     Q_OBJECT
 public:
@@ -629,6 +645,11 @@ public:
     void postPaintScreen() override;
     void prePaintWindow(RenderView *view, EffectWindow *w, WindowPrePaintData &data) override;
     void paintWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data) override;
+    void drawWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data) override;
+    // Takes a fresh cross-fade snapshot. redirect() registers the window before rendering it through the
+    // effect chain, so CrossFadeEffect::drawWindow would draw the empty snapshot into itself; m_capturing
+    // sends that one render straight to the window.
+    void capture(EffectWindow *w);
     bool handleButton(const PointerButtonEvent &e);
     bool handleMotion(const PointerMotionEvent &e);
     bool handleAxis(const PointerAxisEvent &e);
@@ -744,6 +765,7 @@ public Q_SLOTS:
     QString sessionStatus() const;
     void restoreSession();
 private:
+    bool m_capturing = false;
     void applySettings(const krellis::config::Settings &settings);
     void syncOutputs();
     void initializeSession();

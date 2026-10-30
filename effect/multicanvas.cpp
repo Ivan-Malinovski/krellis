@@ -214,6 +214,7 @@ void KrellisEffect::syncOutputs()
         if (std::any_of(m_canvases.begin(), m_canvases.end(), [output](const auto &c) { return c->m_output == output; }))
             continue;
         auto canvas = std::make_unique<KrellisCanvas>(output);
+        canvas->m_effect = this;
         canvas->m_theme = &m_theme;
         canvas->m_closeFocus = m_closeFocus;
         canvas->m_floatFirst = m_floatFirst;
@@ -390,6 +391,23 @@ void KrellisEffect::prePaintWindow(RenderView *view, EffectWindow *w, WindowPreP
     if (auto *canvas = owner(w)) canvas->prePaintWindow(view, w, data);
     effects->prePaintWindow(view, w, data);
 }
+void KrellisEffect::capture(EffectWindow *w)
+{
+    unredirect(w);
+    m_capturing = true;
+    redirect(w);
+    m_capturing = false;
+}
+
+void KrellisEffect::drawWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data)
+{
+    if (m_capturing) {
+        Effect::drawWindow(rt, vp, w, mask, region, data);
+        return;
+    }
+    CrossFadeEffect::drawWindow(rt, vp, w, mask, region, data);
+}
+
 void KrellisEffect::paintWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data)
 {
     if (auto *canvas = owner(w)) {
