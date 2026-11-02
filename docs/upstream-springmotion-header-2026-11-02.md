@@ -44,3 +44,48 @@ Verified: applies cleanly to KWin v6.8.2 `src/CMakeLists.txt` (`patch -p1 --dry-
 3. Delete `effect/kwin_springmotion.h` and the note about it in `README.md`'s "KWin 6.8" section and in `AGENTS.md`.
 4. Rebuild and check nothing is duplicated: `nm -C build-release/root/kwin/effects/plugins/krellis.so | grep SpringMotion` should show only undefined (`U`) references, never a defined constructor.
 5. `ctest` and the motion scenarios (`motion-feedback`, `hyprland`) as usual.
+
+## Ready-to-paste MR text
+
+Commit subject:
+
+```
+Install the SpringMotion header
+```
+
+Commit body:
+
+```
+SpringMotion became part of the effect API in 6.8: it moved out of the slide
+plugin into src/effect/, it is exported from libkwin (KWIN_EXPORT) and KWin's
+own animations run on it. Its header is not in the list of effect headers
+installed for development, so an out-of-tree effect cannot #include a class
+the library already exports - it either re-declares the ABI by hand or
+duplicates the simulation.
+
+Adding it to the existing install(FILES ...) block costs nothing at runtime:
+the header only includes kwin_export.h, <QtGlobal> and <chrono>.
+```
+
+MR description:
+
+```
+## Problem
+
+`KWin::SpringMotion` (`src/effect/springmotion.h`) is exported from libkwin but
+not installed with the other effect headers (`src/CMakeLists.txt`, Devel
+component). Out-of-tree effects that want KWin's own spring therefore cannot
+include it, even though the symbol is part of the public effect surface.
+
+## Solution
+
+Add `effect/springmotion.h` to the effect header install list.
+
+## Testing
+
+- Builds unchanged; the file is only added to an `install(FILES ...)` list.
+- Verified that `effect/springmotion.h` compiles standalone against the
+  installed `kwin_export.h` and pulls in nothing but Qt and `<chrono>`.
+- With the header installed, an out-of-tree effect can drop its local ABI
+  declaration and `#include <kwin/effect/springmotion.h>` directly.
+```
