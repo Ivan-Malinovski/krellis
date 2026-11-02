@@ -14,9 +14,12 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     const std::string socket = qEnvironmentVariable("NEST_SOCKET").toStdString();
     const auto work = qEnvironmentVariable("NEST_WORK");
-    if (!socket.starts_with("krellis-test-") || qEnvironmentVariable("WAYLAND_DISPLAY").toStdString() != socket
+    // A task-owned nested compositor is named krellis-test-* by an intentional manual run and krellis-scn-<pid>-<name>
+    // by tools/scenarios.sh; the live session's socket is neither.
+    const bool testSocket = socket.starts_with("krellis-test-") || socket.starts_with("krellis-scn-");
+    if (!testSocket || qEnvironmentVariable("WAYLAND_DISPLAY").toStdString() != socket
         || work.isEmpty() || qEnvironmentVariable("XDG_CONFIG_HOME") != work + "/config") {
-        std::cerr << "Pointer fixture requires an isolated krellis-test-* compositor\n";
+        std::cerr << "Pointer fixture requires an isolated krellis-test-* or krellis-scn-* compositor\n";
         return 1;
     }
     auto *display = wl_display_connect(socket.c_str());

@@ -17,7 +17,11 @@ def check(ok, label):
 
 def sample(label, points):
     assert call('configure',json.dumps(points),probe=True)=='true'
-    time.sleep(.14)
+    # The first presented frame after a camera move still blends the old content (a 5/255 red tint on a cyan
+    # marker): configure once more shortly after so only fully painted frames are counted.
+    time.sleep(.02)
+    assert call('configure',json.dumps(points),probe=True)=='true'
+    time.sleep(.13)
     data=json.loads(call('stats',probe=True))
     (out/(label+'.json')).write_text(json.dumps(data,indent=2))
     check(all(p['samples']>=3 and p['bad']==0 for p in data['points']), label)
@@ -42,6 +46,21 @@ def axis_points(axis):
         return [dict(x=dx+dw*f,y=y,color='#ff00ff') for f in (.35,.75)]
     x = dx + (cx-fx+105)*dw/fw
     return [dict(x=x,y=dy+dh*f,color='#00ffff') for f in (.35,.75)]
+
+# The paint probe is a separate test-only effect (scenarios/paint-probe.cpp, built as the
+# krellis_paint_probe target and EXCLUDE_FROM_ALL in effect/CMakeLists.txt). KWin refuses to load an
+# effect built against another KWin's plugin factory, so a build/root copy left over from an older
+# KWin leaves the whole scenario without its probe: "Effect krellis_paint_probe was built for a
+# different version of KWin and needs to be rebuilt". Rebuild with
+#   cmake --build build --target krellis_paint_probe
+# Every pixel assertion below needs it, so say so plainly instead of failing on a traceback.
+def probe_loaded():
+    r=subprocess.run(['qdbus6','org.kde.KWin','/KrellisPaintProbe',
+                      'org.freedesktop.DBus.Introspectable.Introspect'],capture_output=True,text=True)
+    return r.returncode==0 and 'org.kde.kwin.KrellisPaintProbe' in r.stdout
+if not probe_loaded():
+    print('SKIP: krellis_paint_probe did not load (rebuild it: cmake --build build --target krellis_paint_probe)',flush=True)
+    raise SystemExit(0)
 
 log=(out/'client.txt').open('w')
 client=subprocess.Popen([os.environ['NEST_WORK']+'/client','2','--axis-markers'],stdout=log,stderr=subprocess.DEVNULL)

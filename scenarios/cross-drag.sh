@@ -2,7 +2,12 @@
 # Run with NEST_OUTPUTS=2. A real title-bar drag that crosses to the other output must hand the live drag
 # to that output's canvas (drop slot, reflow preview), and a drop there must commit.
 set -euo pipefail
-[[ "$NEST_SOCKET" == krellis-test-* ]]
+# Only ever drive a throwaway compositor: the harness names its socket krellis-scn-<pid>-<name>, an intentional
+# manual run krellis-test-*. The live session's socket is neither.
+[[ "$NEST_SOCKET" == krellis-test-* || "$NEST_SOCKET" == krellis-scn-* ]] || {
+    echo "SKIP: NEST_SOCKET=$NEST_SOCKET is not a test socket (want krellis-test-* or krellis-scn-*)"
+    exit 0
+}
 exec >"$NEST_OUT/log.txt" 2>&1
 export WAYLAND_DISPLAY=$NEST_SOCKET
 unset DISPLAY
@@ -41,6 +46,12 @@ rm -f "$fifo"; mkfifo "$fifo"
 exec 9>"$fifo"
 send() { echo "$1" >&9; sleep 0.06; }
 sleep 0.8
+# The fixture needs KWin's org_kde_kwin_fake_input on this compositor. Without it there is no real pointer to
+# drive, and no honest verdict: say so instead of reporting a failure nothing established.
+if ! grep -q '^READY$' "$NEST_OUT/driver.out"; then
+    echo "SKIP: fake-input pointer driver could not attach to the nested compositor: $(tail -1 "$NEST_OUT/driver.out")"
+    exit 0
+fi
 title=$(call dumpOutput 0 | awk "/'xdrag-alpha'/ { match(\$0,/screen ([-0-9.]+),([-0-9.]+)/,a); print int(a[1]+60), int(a[2]+14) }")
 echo "press at $title"
 send "move $title"; send down

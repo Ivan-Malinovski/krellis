@@ -58,7 +58,7 @@ public:
                 {"frameArea", m_frameArea}, {"expandedArea", m_expandedArea}});
         }
     }
-    void drawWindow(const RenderTarget &target, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &region, WindowPaintData &data) override {
+    bool drawWindow(const RenderTarget &target, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &region, WindowPaintData &data) override {
         if (m_timing && !region.isEmpty()) {
             const auto frame = w->frameGeometry();
             const auto expanded = w->expandedGeometry();
@@ -74,7 +74,7 @@ public:
             m_frameArea += visible.width()*visible.height();
             m_expandedArea += visibleExpanded.width()*visibleExpanded.height();
         }
-        effects->drawWindow(target, viewport, w, mask, region, data);
+        return effects->drawWindow(target, viewport, w, mask, region, data);
     }
     void collectGpu() {
         while (!m_gpuPending.empty()) {
@@ -91,7 +91,7 @@ public:
             m_gpuPending.pop_front();
         }
     }
-    void paintScreen(const RenderTarget &target, const RenderViewport &viewport, int mask, const Region &region, LogicalOutput *screen) override {
+    bool paintScreen(const RenderTarget &target, const RenderViewport &viewport, int mask, const Region &region, LogicalOutput *screen) override {
         collectGpu();
         const bool gpu = m_timing && qEnvironmentVariableIntValue("KRELLIS_PROBE_GPU_TIMING") == 1
             && EglContext::currentContext()->supportsTimerQueries();
@@ -103,13 +103,13 @@ public:
             glQueryCounter(query.ids[0], GL_TIMESTAMP);
         }
         const auto paintStart = m_timing ? m_timingClock.nsecsElapsed() : 0;
-        effects->paintScreen(target, viewport, mask, region, screen);
+        if (!effects->paintScreen(target, viewport, mask, region, screen)) return false;
         if (m_timing) m_paintMs += double(m_timingClock.nsecsElapsed()-paintStart)/1e6;
         if (gpu) {
             glQueryCounter(query.ids[1], GL_TIMESTAMP);
             m_gpuPending.push_back(query);
         }
-        if (!target.framebuffer()) return;
+        if (!target.framebuffer()) return true;
         GLFramebuffer::pushFramebuffer(target.framebuffer());
         if (m_watch) {
             // Count near-black samples over the whole frame: a black flash shows as a spike.
@@ -126,7 +126,7 @@ public:
             m_maxBlack = std::max(m_maxBlack, fraction);
             if (fraction > 0.02) ++m_blackFrames;
         }
-        if (!m_enabled) { GLFramebuffer::popFramebuffer(); return; }
+        if (!m_enabled) { GLFramebuffer::popFramebuffer(); return true; }
         ++m_frames;
         for (auto &probe : m_points) {
             if (screen && !QRectF(screen->geometry()).contains(probe.point)) continue;
@@ -144,6 +144,7 @@ public:
             } else if (std::abs(r-probe.expected.red())>12 || std::abs(g-probe.expected.green())>12 || std::abs(b-probe.expected.blue())>12) ++probe.bad;
         }
         GLFramebuffer::popFramebuffer();
+        return true;
     }
 public Q_SLOTS:
     bool timing(bool on) {
