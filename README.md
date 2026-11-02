@@ -183,6 +183,7 @@ Use the settings module (System Settings → Window Management → Krellis, or t
 | `whichKey` | `true` | Holding Meta+Alt shows the cheat sheet (`whichKeyDelayMs`, default 400) |
 | `tileMinWidth`, `tileMinHeight` | `1` | Pixel minimum of a tile for apps without a rule |
 | `iconBelow` | `0` | Tiles narrower than this show an icon instead of the live window; 0 keeps windows live at any size |
+| `loneWidth` | `0` | A window alone on the canvas takes this percent of the screen width, centred, instead of filling it (0 or 100 = full width). A second window brings the usual split back. Set it to `70` to keep a browser readable on an ultrawide, or override it per app with the rule key of the same name (`-1` follows this setting, `0` is full width) |
 
 Choose **Animation profile → Hyprland** in the settings module to try the new window animations. It works with `glide=false`: applications receive their destination size once, and their available contents are scaled while the painted window moves. Geometry and opacity have independent curves and durations. A slow client can still visibly change its contents when its new buffer arrives; this is not a guarantee of identical rendering or frame pacing to Hyprland. Workspace transitions, animated Hyprland borders/shadows, and newer spring presets are not included. See [the animation reference and limits](docs/hyprland-animations.md).
 
@@ -199,6 +200,15 @@ org.kde.plasma.emojier\allowSide=false
 org.kde.plasma.emojier\allowStage=false
 org.kde.plasma.emojier\allowFloating=true
 ```
+
+A rule can also give one application a reading width when it is alone on the canvas, whatever the general `loneWidth` says:
+
+```ini
+[ViewRules]
+org.mozilla.firefox\loneWidth=70
+```
+
+Neither `-1` (the default: follow `[General] loneWidth`) nor `0` (full width) narrows anything. The width is a share of the screen, applied only while that window is the only tile; a second window, a tab or a stashed drawer does not count as one, so `loneWidth` never changes a split.
 
 A floating window otherwise opens at 60% × 65% of the screen. Three more rule keys change that for one app: `floatWidth` and `floatHeight` (pixels; 0 or absent on an axis keeps the window's own size) and `floatAtPointer=true` (its top-left corner opens at the pointer, shifted to stay on the screen). To make the Emoji Selector a small popup where you are working:
 

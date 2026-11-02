@@ -38,7 +38,7 @@ private Q_SLOTS:
         const QString file = dir.filePath("krellisrc");
         Settings s;
         s.closeFocus = false; s.floatFirst = true; s.shakeFloat = false; s.spawnTarget = SpawnTarget::Focused; s.dwindleSide = DwindleSide::After; s.peek = 12; s.map = false; s.mapPinned = true; s.glide = true; s.landMs = 90; s.iconBelow = 40; s.tileMinWidth = 320; s.tileMinHeight = 200; s.scratchpad = true; s.pin = true; s.tabs = false; s.urgent = false;
-        s.followTheme = false; s.toasts = false; s.flyTo = true; s.whichKey = false; s.whichKeyDelayMs = 750;
+        s.followTheme = false; s.toasts = false; s.flyTo = true; s.whichKey = false; s.whichKeyDelayMs = 750; s.loneWidth = 65;
         s.animationProfile = "hyprland"; s.windowAnimation = "slide";
         QVERIFY(save(s, file));
         QCOMPARE(load(file), s);
@@ -47,6 +47,50 @@ private Q_SLOTS:
         QVERIFY(Settings{}.tabs);
         QVERIFY(Settings{}.urgent);
         QVERIFY(Settings{}.map);
+    }
+    // A rule inherits the general lone width until it names one of its own; 0 is "full width", not "inherit".
+    void loneWidthRoundTripAndClamps()
+    {
+        QTemporaryDir dir;
+        const QString file = dir.filePath("krellisrc");
+        QCOMPARE(Settings{}.loneWidth, 0);
+        QCOMPARE(AppRule{}.loneWidth, -1);
+        Settings s;
+        s.loneWidth = 70;
+        QVERIFY(save(s, file));
+        QCOMPARE(load(file).loneWidth, 70);
+        QVERIFY(saveValue("loneWidth", 400, file));
+        QCOMPARE(load(file).loneWidth, 100);           // clamped, never a camera narrower than nothing
+        QVERIFY(saveValue("loneWidth", -5, file));
+        QCOMPARE(load(file).loneWidth, 0);
+
+        QList<AppRule> rules;
+        AppRule inherit, off, narrow;
+        inherit.app = "org.mozilla.firefox";
+        off.app = "alacritty";
+        off.loneWidth = 0;
+        narrow.app = "chromium";
+        narrow.loneWidth = 55;
+        rules << inherit << off << narrow;
+        QVERIFY(saveRules(rules, file));
+        const auto back = loadRules(file);
+        QCOMPARE(back.size(), 3);
+        QHash<QString, int> shares; // QSettings hands the groups back sorted, so match by app
+        for (const auto &r : back) shares[r.app] = r.loneWidth;
+        QCOMPARE(shares.value("org.mozilla.firefox"), -1);
+        QCOMPARE(shares.value("alacritty"), 0);
+        QCOMPARE(shares.value("chromium"), 55);
+        // A rule file from before the key existed follows the general setting.
+        QSettings raw(file, QSettings::IniFormat);
+        raw.beginGroup("ViewRules");
+        raw.beginGroup("old-app");
+        raw.setValue("placement", "side");
+        raw.endGroup();
+        raw.endGroup();
+        raw.sync();
+        const auto mixed = loadRules(file);
+        for (const auto &r : mixed)
+            if (r.app == "old-app") QCOMPARE(r.loneWidth, -1);
     }
     void polishSettingsDefaultsAndClamps()
     {

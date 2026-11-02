@@ -13,6 +13,7 @@ struct Host : NavigationHost {
     NavMode navMode = NavMode::Free;
     int changes = 0;
     double peek = 0;
+    double lone = 1; // what the effect answers for a lone tile (the doc-and-rule decision lives there)
     bool fly = false, reduced = false;
     double clock = 0;
     bool flyTo() const override { return fly; }
@@ -31,6 +32,7 @@ struct Host : NavigationHost {
     }
     void changed() override { ++changes; }
     double peekPadding() const override { return peek; }
+    double loneShare() const override { return lone; }
 };
 
 static LayoutDocument three()
@@ -644,6 +646,39 @@ private slots:
         QVERIFY(qAbs(cam.target.w - edge) < 1e-9);
         QVERIFY(qAbs(cam.target.x) < 1e-9);
         QCOMPARE(nav.framedLeaves(), std::vector<std::string>{"A"});
+    }
+    // A window alone on the canvas can be framed narrower than the screen (a browser on an ultrawide): the camera
+    // widens around the tile so it covers that share of the viewport, centred, with the height untouched. Whether an
+    // app wants a share is the effect's decision; the navigator only asks when the framing is one tile or everything.
+    void loneTileTakesItsShare()
+    {
+        Host h;
+        auto root = L::panel({L::view("t", "a")}, "A");
+        h.document = createDocument(&root);
+        h.peek = 50; // 5% of the viewport, and it must not eat into the share
+        h.lone = 0.7;
+        RectSpring cam(testSpringFactory());
+        Navigator nav(h, cam);
+        nav.sync();
+        const double w = 1 / 0.7;
+        QVERIFY(qAbs(cam.target.w - w) < 1e-9);
+        QVERIFY(qAbs(cam.target.x - (0.5 - w / 2)) < 1e-9);
+        QVERIFY(qAbs(cam.target.h - 1) < 1e-9); // a reading width, not a letterbox
+        QVERIFY(qAbs(cam.target.y) < 1e-9);
+    }
+    void fullWidthLoneTileIsUnchanged()
+    {
+        for (const double share : {1.0, 0.0}) { // 1 = no opinion, 0 = a share that would divide by zero
+            Host h;
+            auto root = L::panel({L::view("t", "a")}, "A");
+            h.document = createDocument(&root);
+            h.peek = 50;
+            h.lone = share;
+            RectSpring cam(testSpringFactory());
+            Navigator nav(h, cam);
+            nav.sync();
+            QVERIFY(near(cam.target, 0, 0, 1, 1));
+        }
     }
     void floatsFrameTheirStage()
     {
