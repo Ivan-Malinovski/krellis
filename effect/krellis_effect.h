@@ -266,8 +266,11 @@ private:
     int m_drawerSeq = 0;
     std::unique_ptr<class OffscreenQuickScene> m_drawerTabs;
     QString m_drawerTabsSignature;
+    double m_tabBlinkPhase = 0;                 // seconds into the attention pulse on a closed drawer's tab
+    bool m_tabBlink = false;                    // such a tab is pulsing, so the canvas keeps painting
+    double tabBlinkValue() const;               // 0..1 for the pulse, 0 when nothing is asking
     std::optional<TRect> drawerTab(const std::string &panel) const; // a closed drawer's tab on screen
-    void updateDrawerTabs();
+    void updateDrawerTabs(double dt = 0); // dt advances the attention pulse; layout-only calls pass nothing
     void setDrawerOpen(const std::string &panel, bool open, bool pinned = false); // slide a drawer out or back; pinned stays out until the pointer has visited it
     void slideOutDrawer(const std::string &panel); // brings a stashed window into view, closing any other drawer first; a no-op for anything else
     bool drawerEdgeFree(krellis::Edge edge) const; // false where another display joins this one: a drawer there would open onto it

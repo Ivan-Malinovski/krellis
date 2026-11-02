@@ -5,7 +5,8 @@ import QtQuick
 Item {
     required property QtObject theme
     id: root
-    property var tabs: []   // [{x, y, w, h, edge (0 left, 1 right, 2 top, 3 bottom), icon, title}]
+    property var tabs: []   // [{x, y, w, h, edge (0 left, 1 right, 2 top, 3 bottom), icon, title, urgent}]
+    property real blink: 0  // 0..1, the effect's frame clock: a tab whose window wants attention pulses with it
     Repeater {
         model: root.tabs
         Rectangle {
@@ -14,9 +15,16 @@ Item {
             readonly property bool vertical: modelData.edge === 0 || modelData.edge === 1
             x: modelData.x; y: modelData.y; width: modelData.w; height: modelData.h
             color: root.theme.card
-            border.color: root.theme.cardBorder
-            border.width: 1
+            border.color: tab.modelData.urgent ? root.theme.accent : root.theme.cardBorder
+            border.width: tab.modelData.urgent ? 2 : 1
             radius: 8
+            Rectangle {
+                // Behind the icon and title, so the pulse tints the tab without washing the label out.
+                anchors.fill: parent
+                radius: parent.radius
+                color: root.theme.accent
+                opacity: tab.modelData.urgent ? root.blink : 0
+            }
             Image {
                 id: icon
                 width: 18; height: 18

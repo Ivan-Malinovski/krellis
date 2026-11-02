@@ -41,6 +41,9 @@ const std::function<double(double)> APPEAR_EASE = krellis::cubicBezier(0.22, 1, 
 constexpr double APPEAR_MS = 220;
 constexpr double CLOSE_MS = 180;
 constexpr double BAR_H = 48;
+constexpr double TabPulseHz = 0.85;  // a closed drawer's tab blinks about once every 1.2 s
+constexpr double TabPulseMax = 0.45; // and the accent reaches this far over it
+constexpr double TwoPi = 6.283185307179586;
 constexpr double SteppingPatienceMs = 120; // longest a gliding client may sit on a size request before being asked again
 constexpr double MaxHeldSide = 8192;       // longest side asked of a client held above its tile size
 constexpr double CrossFitMs = 3000; // how long a window that changed output keeps its own aspect while its client catches up (Hyprland profile)
@@ -759,9 +762,10 @@ std::optional<TRect> KrellisCanvas::drawerTab(const std::string &panel) const
 }
 
 // Tabs are for choosing: they show while every drawer is closed and at rest, and give way to an open one.
-void KrellisCanvas::updateDrawerTabs()
+void KrellisCanvas::updateDrawerTabs(double dt)
 {
     QVariantList tabs;
+    std::vector<TRect> tabRects, urgentRects;
     const bool anyOpen = std::any_of(m_drawers.begin(), m_drawers.end(), [](const auto &d) { return d.second.open; });
     if (!anyOpen)
         for (const auto &t : m_windows) {
@@ -770,8 +774,11 @@ void KrellisCanvas::updateDrawerTabs()
             const auto tab = drawerTab(t.panel);
             if (!tab) continue;
             const auto tile = m_tiles.find(t.panel);
+            const bool urgent = isUrgent(t.window); // the same flag that outlines a tile and fills the palette
             tabs << QVariantMap{{"x", tab->x - m_area.x()}, {"y", tab->y - m_area.y()}, {"w", tab->w}, {"h", tab->h}, {"edge", int(d->second.edge)},
-                                {"icon", tile != m_tiles.end() ? tile->second.icon : QString()}, {"title", t.window->caption()}};
+                                {"icon", tile != m_tiles.end() ? tile->second.icon : QString()}, {"title", t.window->caption()}, {"urgent", urgent}};
+            tabRects.push_back(*tab);
+            if (urgent) urgentRects.push_back(*tab);
         }
     if (tabs.isEmpty()) {
         if (m_drawerTabs) {
@@ -779,6 +786,8 @@ void KrellisCanvas::updateDrawerTabs()
             m_drawerTabs.reset();
             m_drawerTabsSignature.clear();
         }
+        m_tabBlink = false;
+        m_tabBlinkPhase = 0;
         return;
     }
     if (!m_drawerTabs) {
@@ -786,6 +795,7 @@ void KrellisCanvas::updateDrawerTabs()
         if (!m_drawerTabs || !m_drawerTabs->rootItem()) {
             qCWarning(krellisLog) << "drawertabs.qml failed to load";
             m_drawerTabs.reset();
+            m_tabBlink = false;
             return;
         }
         m_drawerTabsSignature.clear();
@@ -794,13 +804,39 @@ void KrellisCanvas::updateDrawerTabs()
     QString signature;
     for (const auto &v : tabs) {
         const auto m = v.toMap();
-        signature += QStringLiteral("%1,%2,%3,%4,%5,%6,%7;").arg(m.value("x").toDouble()).arg(m.value("y").toDouble()).arg(m.value("w").toDouble()).arg(m.value("h").toDouble())
-                         .arg(m.value("edge").toInt()).arg(m.value("title").toString(), QString::number(m.value("icon").toString().size()));
+        signature += QStringLiteral("%1,%2,%3,%4,%5,%6,%7,%8;").arg(m.value("x").toDouble()).arg(m.value("y").toDouble()).arg(m.value("w").toDouble()).arg(m.value("h").toDouble())
+                         .arg(m.value("edge").toInt()).arg(m.value("title").toString(), QString::number(m.value("icon").toString().size()))
+                         .arg(m.value("urgent").toBool() ? 1 : 0);
     }
-    if (signature == m_drawerTabsSignature) return;
-    m_drawerTabsSignature = signature;
-    m_drawerTabs->rootItem()->setProperty("tabs", tabs);
-    repaintRegion(Region(m_drawerTabs->geometry()));
+    if (signature != m_drawerTabsSignature) {
+        m_drawerTabsSignature = signature;
+        m_drawerTabs->rootItem()->setProperty("tabs", tabs);
+        repaintRegion(Region(m_drawerTabs->geometry()));
+    }
+
+    // A window behind a closed drawer cannot show its own outline, so its tab pulses instead. The pulse runs on the
+    // canvas's frame clock: the tab scene is offscreen, so a QML animation inside it would never reach the screen.
+    // Only the tabs that ask are repainted, and it stops as soon as the drawer opens or the window is activated.
+    const bool blink = !urgentRects.empty();
+    if (!blink && !m_tabBlink) return;
+    const auto regionOf = [](const TRect &r) { return Region(int(r.x) - 1, int(r.y) - 1, int(r.w) + 2, int(r.h) + 2); };
+    m_tabBlink = blink;
+    if (!blink) {
+        m_tabBlinkPhase = 0;
+        m_drawerTabs->rootItem()->setProperty("blink", 0.0);
+        for (const auto &r : tabRects) repaintRegion(regionOf(r));
+        return;
+    }
+    m_tabBlinkPhase = std::fmod(m_tabBlinkPhase + dt, 600.0);
+    m_drawerTabs->rootItem()->setProperty("blink", tabBlinkValue());
+    for (const auto &r : urgentRects) repaintRegion(regionOf(r));
+}
+
+double KrellisCanvas::tabBlinkValue() const
+{
+    if (!m_tabBlink) return 0;
+    const double t = std::fmod(m_tabBlinkPhase * TabPulseHz, 1.0); // 0..1 within one blink
+    return TabPulseMax * 0.5 * (1 - std::cos(TwoPi * t));
 }
 
 TRect KrellisCanvas::screenRect(const std::string &panel) const
@@ -2019,10 +2055,10 @@ void KrellisCanvas::prePaintScreen(ScreenPrePaintData &data)
         updateTiles(dt);
         updateMotionOverlay(dt);
         updateMap();
-        updateDrawerTabs();
+        updateDrawerTabs(dt);
         updateTabStrips();
         const bool tilesMoving = std::any_of(m_tiles.begin(), m_tiles.end(), [](const auto &t) { return std::abs(t.second.velocity) > 0.001 || std::abs(t.second.target - t.second.amount) > 0.0001; });
-        m_animating = m_motionBusy || tilesMoving || areaProgress < 1 || springing || (m_map && !m_map->rootItem()->property("settled").toBool()) || tweening || !m_flights.empty() || !m_popups.empty() || !m_closing.empty() || m_session || m_slot || m_marquee || m_nav.flying() || m_toastBusy || m_sheetBusy || m_paletteBusy || m_layerDim != m_layerTarget || (!m_hyprland && !m_glide && layoutAwaitingLanding()) || !m_landings.empty() || !m_fades.empty();
+        m_animating = m_motionBusy || tilesMoving || areaProgress < 1 || springing || (m_map && !m_map->rootItem()->property("settled").toBool()) || tweening || !m_flights.empty() || !m_popups.empty() || !m_closing.empty() || m_session || m_slot || m_marquee || m_nav.flying() || m_tabBlink || m_toastBusy || m_sheetBusy || m_paletteBusy || m_layerDim != m_layerTarget || (!m_hyprland && !m_glide && layoutAwaitingLanding()) || !m_landings.empty() || !m_fades.empty();
     }
 }
 
@@ -3529,7 +3565,12 @@ QString KrellisCanvas::dump()
                          .arg(r->x, 0, 'f', 1).arg(r->y, 0, 'f', 1).arg(r->w, 0, 'f', 1).arg(r->h, 0, 'f', 1);
     for (const auto &[panel, d] : m_drawers)
         if (const auto tab = drawerTab(panel))
-            lines << QStringLiteral("TAB %1 at %2,%3 %4x%5 shown %6").arg(QString::fromStdString(panel)).arg(tab->x, 0, 'f', 1).arg(tab->y, 0, 'f', 1).arg(tab->w, 0, 'f', 1).arg(tab->h, 0, 'f', 1).arg(m_drawerTabs != nullptr);
+            {
+                const auto shown = std::find_if(m_windows.begin(), m_windows.end(), [&](const Tracked &t) { return t.panel == panel; });
+                const bool urgent = shown != m_windows.end() && isUrgent(shown->window);
+                lines << QStringLiteral("TAB %1 at %2,%3 %4x%5 shown %6 urgent %7 blink %8").arg(QString::fromStdString(panel)).arg(tab->x, 0, 'f', 1).arg(tab->y, 0, 'f', 1)
+                             .arg(tab->w, 0, 'f', 1).arg(tab->h, 0, 'f', 1).arg(m_drawerTabs != nullptr).arg(urgent ? 1 : 0).arg(urgent ? tabBlinkValue() : 0.0, 0, 'f', 2);
+            }
     for (const auto &id : vacancies(m_doc.root))
         if (const TRect *vw = worldRect(id)) {
             const TRect r = panelAt(m_tween.apply(id, *vw), m_camera.value);
