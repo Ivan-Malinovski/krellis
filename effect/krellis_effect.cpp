@@ -3299,8 +3299,13 @@ void KrellisCanvas::updateDrawerHover(const PointerMotionEvent &event)
         const auto r = floatScreen(panel);
         if (!r) continue;
         QRectF zone(r->x, r->y, r->w, r->h);
-        if (d.open) zone.adjust(-8, -8, 8, 8);
-        else if (const auto slice = drawerSlice(panel)) {
+        if (d.open) {
+            zone.adjust(-8, -8, 8, 8);
+            // An open drawer keeps its slice of the edge as well as its own frame: a drawer that is much
+            // narrower or shorter than its band would otherwise slide back the moment the pointer left the
+            // window while still on the sliver it came from (drawer-stack/drawer-tabs hover checks).
+            if (const auto slice = drawerSlice(panel)) zone = zone.united(QRectF(slice->x, slice->y, slice->w, slice->h));
+        } else if (const auto slice = drawerSlice(panel)) {
             zone = QRectF(slice->x, slice->y, slice->w, slice->h);
             if (const auto tab = drawerTab(panel)) zone = zone.united(QRectF(tab->x, tab->y, tab->w, tab->h));
         }
