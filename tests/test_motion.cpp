@@ -1,4 +1,5 @@
 #include "motion.h"
+#include "test_spring.h"
 
 #include <QtTest>
 
@@ -10,7 +11,7 @@ class TestMotion : public QObject
 private slots:
     void springSettles()
     {
-        RectSpring s({0, 0, 1, 1});
+        RectSpring s(testSpringFactory(), {0, 0, 1, 1});
         s.target = {0.5, 0.25, 0.5, 0.5};
         int frames = 0;
         while (s.step(1.0 / 60) && frames < 600)
@@ -21,7 +22,7 @@ private slots:
     }
     void springIsDeterministic()
     {
-        RectSpring a({0, 0, 1, 1}), b({0, 0, 1, 1});
+        RectSpring a(testSpringFactory(), {0, 0, 1, 1}), b(testSpringFactory(), {0, 0, 1, 1});
         a.target = b.target = {0.2, 0.3, 0.4, 0.5};
         for (int i = 0; i < 30; ++i) {
             a.step(1.0 / 144);

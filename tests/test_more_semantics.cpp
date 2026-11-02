@@ -2,6 +2,7 @@
 // Fixtures and assertions are written independently for the C++ model.
 #include "document.h"
 #include "navigator.h"
+#include "test_spring.h"
 #include "resize.h"
 
 #include <QtTest>
@@ -47,7 +48,7 @@ private slots:
     void savedFramingUsesSurvivorsAndThenHasNoDestination()
     {
         NavHost host;
-        RectSpring camera;
+        RectSpring camera(testSpringFactory());
         Navigator nav(host, camera);
         nav.sync();
         nav.focus(rangeId("row", {"mail", "notes"}));
@@ -74,7 +75,7 @@ private slots:
     {
         NavHost host;
         host.state = document(makeSplit("workspace", Axis::X, {tile("mail"), makeStage("desk"), tile("web")}));
-        RectSpring camera;
+        RectSpring camera(testSpringFactory());
         Navigator nav(host, camera);
         nav.sync();
         nav.focus("mail");
@@ -93,7 +94,7 @@ private slots:
     void cancellingGestureRestoresFrameAndKeepsForwardHistory()
     {
         NavHost host;
-        RectSpring camera;
+        RectSpring camera(testSpringFactory());
         Navigator nav(host, camera);
         nav.sync();
         nav.focus("mail");

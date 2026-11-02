@@ -21,6 +21,19 @@ bool sameRectEps(const Rect &a, const Rect &b, double eps)
         && std::abs(a.h - b.h) < eps;
 }
 
+RectSpring::RectSpring(SpringFactory make, const Rect &initial)
+    : value(initial), target(initial)
+{
+    const double start[4] = {initial.x, initial.y, initial.w, initial.h};
+    for (int i = 0; i < 4; ++i) {
+        m_spring[i].reset(make());
+        m_spring[i]->reset(start[i], 0);
+        m_spring[i]->setAnchor(start[i]);
+    }
+}
+
+RectSpring::~RectSpring() = default;
+
 bool RectSpring::moving() const
 {
     return !sameRectEps(value, target) || !sameRectEps(velocity, Rect{0, 0, 0, 0});
@@ -29,16 +42,18 @@ bool RectSpring::moving() const
 bool RectSpring::step(double dt)
 {
     dt = std::min(dt > 0 ? dt : 0.016, Motion::maxStep);
-    double error = 0;
     double *v[] = {&value.x, &value.y, &value.w, &value.h};
     double *t[] = {&target.x, &target.y, &target.w, &target.h};
     double *vel[] = {&velocity.x, &velocity.y, &velocity.w, &velocity.h};
+    bool moving = false;
     for (int i = 0; i < 4; ++i) {
-        *vel[i] += ((*t[i] - *v[i]) * Motion::stiffness - *vel[i] * Motion::damping) * dt;
-        *v[i] += *vel[i] * dt;
-        error += std::abs(*t[i] - *v[i]) + std::abs(*vel[i]) * 0.1;
+        m_spring[i]->setAnchor(*t[i]);
+        m_spring[i]->advance(dt);
+        *v[i] = m_spring[i]->position();
+        *vel[i] = m_spring[i]->velocity();
+        moving = moving || m_spring[i]->moving();
     }
-    if (error <= Motion::epsilon) {
+    if (!moving) {
         finish();
         return false;
     }
@@ -47,14 +62,28 @@ bool RectSpring::step(double dt)
 
 void RectSpring::finish()
 {
-    value = target;
-    velocity = {0, 0, 0, 0};
+    apply(target, Rect{0, 0, 0, 0});
 }
 
 void RectSpring::jump(const Rect &rect)
 {
     target = rect;
     finish();
+}
+
+void RectSpring::stop()
+{
+    apply(value, Rect{0, 0, 0, 0});
+}
+
+void RectSpring::apply(const Rect &rect, const Rect &speed)
+{
+    value = rect;
+    velocity = speed;
+    m_spring[0]->reset(rect.x, speed.x);
+    m_spring[1]->reset(rect.y, speed.y);
+    m_spring[2]->reset(rect.w, speed.w);
+    m_spring[3]->reset(rect.h, speed.h);
 }
 
 void LayoutTween::begin(std::map<std::string, Rect> f, double nowMs, double durationMs)

@@ -232,10 +232,11 @@ void KrellisCanvas::updateTiles(double dt)
         auto &tile = m_tiles[t.panel];
         const double target = frameOnly(t.panel) && !t.window->isMinimized() ? 1 : 0;
         tile.target = target;
-        const double h = std::clamp(dt, 0.0, Motion::maxStep);
-        tile.velocity += (Motion::stiffness * (target - tile.amount) - Motion::damping * tile.velocity) * h;
-        tile.amount += tile.velocity * h;
-        if (std::abs(target - tile.amount) < 0.0001 && std::abs(tile.velocity) < 0.001) { tile.amount = target; tile.velocity = 0; }
+        tile.spring.setAnchor(target);
+        tile.spring.advance(std::clamp(dt, 0.0, Motion::maxStep));
+        tile.amount = tile.spring.position();
+        tile.velocity = tile.spring.velocity();
+        if (!tile.spring.moving()) { tile.amount = target; tile.velocity = 0; }
         // An invisible overlay has nothing to update; its last push left it at zero opacity.
         const bool resting = tile.amount == 0 && target == 0;
         if (resting && tile.idle) continue;

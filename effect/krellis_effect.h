@@ -19,6 +19,7 @@
 #include "shake.h"
 #include "history.h"
 #include "reconcile.h"
+#include "kwin_spring.h"
 #include <QTimer>
 #include <QVariantList>
 
@@ -448,7 +449,7 @@ private:
         bool m_outer;
         krellis::LayoutDocument m_before;
     };
-    krellis::RectSpring m_camera;
+    krellis::RectSpring m_camera{krellis::kwinSpringFactory()};
     krellis::Navigator m_nav;
     krellis::LayoutTween m_tween;
     krellis::Entries m_rects; // panel world rects
@@ -503,7 +504,12 @@ private:
     bool peeking(const std::string &panel) const;
     bool handlePeekButton(const PointerButtonEvent &event);
     std::string m_peekPressed;
-    struct Tile { double amount = 0, velocity = 0, target = 0; QString icon; bool idle = false, presented = false; };
+    struct Tile {
+        double amount = 0, velocity = 0, target = 0;
+        krellis::KwinSpring spring; // KWin's own spring, not a local integrator (see kwin_spring.h)
+        QString icon;
+        bool idle = false, presented = false;
+    };
     std::map<std::string, Tile> m_tiles;
     std::unique_ptr<class OffscreenQuickScene> m_tileScene;
     QStringList m_tileIds;

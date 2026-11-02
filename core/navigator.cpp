@@ -471,7 +471,7 @@ void Navigator::zoom(double factor, Point p, Point pan)
         m_gesture = true;
         m_host.gestureChanged(true);
     }
-    m_camera.velocity = {0, 0, 0, 0};
+    m_camera.stop();
     const Rect c = m_camera.value;
     const Point vp = m_host.viewport();
     const double minSize = m_minTile * 0.65;

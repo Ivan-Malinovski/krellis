@@ -1,6 +1,7 @@
 // Navigation requirements (NAV-*) against the headless Navigator.
 #include "builder.h"
 #include "navigator.h"
+#include "test_spring.h"
 
 #include <QtTest>
 
@@ -58,7 +59,7 @@ private slots:
         Host h;
         h.document = eight();
         h.fly = true;
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus("Pa");
@@ -73,7 +74,7 @@ private slots:
         h.document = eight();
         h.fly = true;
         h.clock = 1000;
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus("Pa");
@@ -105,7 +106,7 @@ private slots:
         Host h;
         h.document = eight();
         h.fly = true;
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus("Pa");
@@ -122,7 +123,7 @@ private slots:
         Host h;
         h.document = eight();
         h.fly = true;
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus("Pa");
@@ -141,7 +142,7 @@ private slots:
         h.document = eight();
         h.fly = true;
         h.reduced = true;
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus("Pa");
@@ -159,7 +160,7 @@ private slots:
         Host h;
         h.document = eight();
         h.fly = true;
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus("Pa");
@@ -177,7 +178,7 @@ private slots:
         h.document = eight();
         h.fly = true;
         h.clock = 1000;
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus("Pa");
@@ -195,7 +196,7 @@ private slots:
     {
         Host h;
         h.document = three();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         QVERIFY(nav.framed().empty());
@@ -205,7 +206,7 @@ private slots:
     {
         Host h;
         h.document = three();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus(rangeId(h.document.root->id, {"A", "B"}));
@@ -221,7 +222,7 @@ private slots:
         Host h;
         h.document = three();
         h.navMode = NavMode::Off;
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus("A");
@@ -231,7 +232,7 @@ private slots:
     {
         Host h;
         h.document = three();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus("B");
@@ -244,7 +245,7 @@ private slots:
     {
         Host h;
         h.document = three();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus("A");
@@ -260,7 +261,7 @@ private slots:
     {
         Host h;
         h.document = three();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus(rangeId(h.document.root->id, {"A", "B"}));
@@ -273,7 +274,7 @@ private slots:
     {
         Host h;
         h.document = three();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         QVERIFY(!nav.saveFraming("   "));
@@ -296,7 +297,7 @@ private slots:
     {
         Host h;
         h.document = three();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.zoom(0.34, {0.1, 0.5}); // pinch in near the left edge
@@ -310,7 +311,7 @@ private slots:
     {
         Host h;
         h.document = three();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.zoom(5.0, {0.5, 0.5});
@@ -325,7 +326,7 @@ private slots:
     {
         Host h;
         h.document = three();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         double last = 1.0, lastGain = 1e9;
@@ -343,7 +344,7 @@ private slots:
     {
         Host h;
         h.document = three();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.zoom(1.2, {0.5, 0.5}); // 1.2 x 1.0 is still inside the 1.35 limit
@@ -362,7 +363,7 @@ private slots:
     {
         Host h;
         h.document = three();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         for (int i = 0; i < 40; ++i)
@@ -381,7 +382,7 @@ private slots:
             cols.push_back(L::panel({L::view("t", "v" + std::to_string(i))}, "P" + std::to_string(i)));
         auto root = L::row(cols);
         h.document = createDocument(&root);
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         QElapsedTimer t;
         t.start();
@@ -414,7 +415,7 @@ private slots:
     {
         Host h;
         h.document = row8();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.frameTiles({"P1", "P2"});
@@ -428,7 +429,7 @@ private slots:
     {
         Host h;
         h.document = row8();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.frameTiles({"P1", "P2"});
@@ -445,7 +446,7 @@ private slots:
     {
         Host h;
         h.document = row8();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus("P1");
@@ -457,7 +458,7 @@ private slots:
     {
         Host h;
         h.document = row8({1, 1, 1, 1, 1, 1, 1, 5});
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.frameTiles({"P1", "P2"});
@@ -468,7 +469,7 @@ private slots:
     {
         Host h;
         h.document = row8();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.reveal("P3");
@@ -478,7 +479,7 @@ private slots:
     {
         Host h;
         h.document = row8();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus("P1");
@@ -491,7 +492,7 @@ private slots:
     {
         Host h;
         h.document = row8();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus("P1");
@@ -504,7 +505,7 @@ private slots:
     {
         Host h;
         h.document = three();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus("B");
@@ -532,7 +533,7 @@ private slots:
     {
         Host h;
         h.document = grid();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus("A");
@@ -547,7 +548,7 @@ private slots:
     {
         Host h;
         h.document = grid();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus("E");
@@ -558,7 +559,7 @@ private slots:
     {
         Host h;
         h.document = grid();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         QVERIFY(nav.zoomStep(false, {0.1, 0.2})); // drops the far column and the far row, keeping A
@@ -577,7 +578,7 @@ private slots:
         auto root = L::row({L::panel({L::view("t", "a")}, "A"), L::panel({L::view("t", "b")}, "B"),
                             L::panel({L::view("t", "c")}, "C"), L::panel({L::view("t", "d")}, "D")});
         h.document = createDocument(&root);
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         QVERIFY(nav.zoomStep(false, {0.1, 0.5}));
@@ -591,7 +592,7 @@ private slots:
     {
         Host h;
         h.document = grid();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.frameTiles({"B", "C", "E", "F"}); // the right two columns: a range node
@@ -607,7 +608,7 @@ private slots:
     {
         Host h;
         h.document = grid();
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         QVERIFY(nav.zoomStep(false, {0.1, 0.2})); // A B only: no node holds exactly those two
@@ -629,7 +630,7 @@ private slots:
         Host h;
         h.document = three();
         h.peek = 50; // 5% of the 1000 px viewport per side
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         QVERIFY(cam.target == UNIT); // showing everything has no neighbours
@@ -651,7 +652,7 @@ private slots:
         auto root = L::row({L::panel({L::view("t", "a")}, "A"), L::stage(&stageChild)});
         FloatSpec f{L::panel({L::view("t", "f")}, "F"), {0.1, 0.1, 0.2, 0.2}, FloatingLayer::Stage};
         h.document = createDocument(&root, {f});
-        RectSpring cam;
+        RectSpring cam(testSpringFactory());
         Navigator nav(h, cam);
         nav.sync();
         nav.focus("F"); // NAV-12: floating windows are never camera targets

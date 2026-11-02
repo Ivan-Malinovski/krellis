@@ -5,6 +5,7 @@
 
 #include <functional>
 #include <map>
+#include <memory>
 #include <string>
 
 namespace krellis {
@@ -28,17 +29,49 @@ double fade(double progress); // Bézier (.5,.5,.75,1)
 Rect collapsed(const Rect &rect, const Rect &output, const std::string &style);
 }
 
-/// A spring over a rect. Deterministic: step(dtSeconds).
+/// One dimension of a spring. `krellis_core` stays free of KWin, so the simulation is supplied by the host: the
+/// effect backs it with KWin's own `SpringMotion` (effect/kwin_spring.cpp) rather than a second implementation.
+class Spring1D
+{
+public:
+    virtual ~Spring1D() = default;
+    /// The value the spring is pulled towards. Setting it keeps the current value and velocity, so an interrupted
+    /// flight continues instead of restarting.
+    virtual void setAnchor(double anchor) = 0;
+    /// Advance the simulation by `seconds`.
+    virtual void advance(double seconds) = 0;
+    virtual double position() const = 0;
+    virtual double velocity() const = 0;
+    virtual bool moving() const = 0;
+    /// Force value and velocity (jump, stop, and the initial state).
+    virtual void reset(double position, double velocity) = 0;
+};
+
+/// Creates four independent springs for one RectSpring.
+using SpringFactory = Spring1D *(*)();
+
+/// A spring over a rect. Deterministic: step(dtSeconds). The four axes run on the host's spring.
 class RectSpring
 {
 public:
-    explicit RectSpring(const Rect &initial = {0, 0, 1, 1}) : value(initial), target(initial) {}
+    explicit RectSpring(SpringFactory make, const Rect &initial = {0, 0, 1, 1});
+    ~RectSpring();
+    RectSpring(const RectSpring &) = delete;
+    RectSpring &operator=(const RectSpring &) = delete;
+
+    // Mirrors of the springs, so "target = x" is how a caller asks for a new destination.
     Rect value, target, velocity{0, 0, 0, 0};
     bool moving() const;
     /// Returns true while still moving.
     bool step(double dt);
     void finish();
     void jump(const Rect &rect);
+    /// Keep the current value but drop the velocity (a gesture takes over from here).
+    void stop();
+
+private:
+    void apply(const Rect &rect, const Rect &speed);
+    std::unique_ptr<Spring1D> m_spring[4];
 };
 
 /// Per-element transitions from a captured rect to a live target.
