@@ -7,6 +7,7 @@
 - The nested test harness refuses to run while a stray `kwin_wayland --virtual` owns `org.kde.KWin` on the session bus, which otherwise silently kills every global shortcut in the real session and makes logout do nothing.
 - The optional Aurorae decoration helper (`tools/build-aurorae-fix.sh`) now pins 6.8.2 as well as 6.7.5 (the render-cache patch applies unchanged to both). A one-line upstream KWin patch that would let effects use `KWin::SpringMotion` without a local ABI declaration is in `patches/`.
 
+- **A hidden window that wants attention makes its drawer's tab blink.** Stashing a window (Meta+Shift+X) leaves a labelled tab on the edge, and that tab now pulses with the accent while the window demands attention, so a build that finished or a chat that needs an answer is visible without opening the drawer. It stops when the window is activated, when the drawer opens, or when urgent handling is off. Scenario `drawer-urgent`.
 - **KWin 6.8 (Plasma 6.8) support.** Ported to KWin 6.8's paint API, where the paint hooks report whether the frame rendered successfully; without the port the effect stops loading after a Plasma update. The camera and tile fades now run on KWin's own spring instead of a local integrator, with the same stiffness and damping, so motion is unchanged. This targets KWin 6.8: Plasma 6.7 stays on the v0.0.2 release. See [the 6.8 notes](README.md#kwin-68).
 - Added `tools/live.sh login` for startup automation: it waits for KWin and retains the crash-loop marker when loading the newest installed build.
 
