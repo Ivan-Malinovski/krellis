@@ -399,28 +399,25 @@ void KrellisEffect::capture(EffectWindow *w)
     m_capturing = false;
 }
 
-void KrellisEffect::drawWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data)
+bool KrellisEffect::drawWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data)
 {
-    if (m_capturing) {
-        Effect::drawWindow(rt, vp, w, mask, region, data);
-        return;
-    }
-    CrossFadeEffect::drawWindow(rt, vp, w, mask, region, data);
+    if (m_capturing)
+        return Effect::drawWindow(rt, vp, w, mask, region, data);
+    return CrossFadeEffect::drawWindow(rt, vp, w, mask, region, data);
 }
 
-void KrellisEffect::paintWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data)
+bool KrellisEffect::paintWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data)
 {
     if (auto *canvas = owner(w)) {
         // A zoomed or overshooting canvas must not paint onto its neighbour.
         if (!canvas->m_output || !effects->screens().contains(canvas->m_output))
-            return;
+            return true;
         const auto flight = canvas->m_flights.find(w);
         const bool crossing = flight != canvas->m_flights.end() && flight->second.crossOutput;
         const Region clipped = crossing ? region : region & vp.mapToDeviceCoordinatesAligned(Region(canvas->m_output->geometry()));
-        canvas->paintWindow(rt, vp, w, mask, clipped, data);
-    } else {
-        effects->paintWindow(rt, vp, w, mask, region, data);
+        return canvas->paintWindow(rt, vp, w, mask, clipped, data);
     }
+    return effects->paintWindow(rt, vp, w, mask, region, data);
 }
 
 bool KrellisEffect::handleButton(const PointerButtonEvent &e)

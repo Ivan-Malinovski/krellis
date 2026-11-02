@@ -71,7 +71,7 @@ public:
     void prePaintScreen(ScreenPrePaintData &data);
     void postPaintScreen();
     void prePaintWindow(RenderView *view, EffectWindow *w, WindowPrePaintData &data);
-    void paintWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data);
+    bool paintWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data);
 
     // NavigationHost
     const krellis::LayoutDocument &doc() const override { return m_doc; }
@@ -644,8 +644,8 @@ public:
     void prePaintScreen(ScreenPrePaintData &data) override;
     void postPaintScreen() override;
     void prePaintWindow(RenderView *view, EffectWindow *w, WindowPrePaintData &data) override;
-    void paintWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data) override;
-    void drawWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data) override;
+    bool paintWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data) override;
+    bool drawWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data) override;
     // Takes a fresh cross-fade snapshot. redirect() registers the window before rendering it through the
     // effect chain, so CrossFadeEffect::drawWindow would draw the empty snapshot into itself; m_capturing
     // sends that one render straight to the window.

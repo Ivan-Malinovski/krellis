@@ -2050,7 +2050,7 @@ void KrellisCanvas::prePaintWindow(RenderView *view, EffectWindow *w, WindowPreP
     }
 }
 
-void KrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data)
+bool KrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp, EffectWindow *w, int mask, const Region &region, WindowPaintData &data)
 {
     double opacity = 1;
     const auto drawn = visualRect(w, &opacity);
@@ -2058,11 +2058,11 @@ void KrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp
     // its hide flight is over (the scene can still offer it for a frame, at its restored baseline), and an edge tile
     // squeezed past the screen edge ends up with a negative width; either way the untransformed window would flash
     // at full size over the layout.
-    if (drawn && (drawn->w <= 0 || drawn->h <= 0)) return;
+    if (drawn && (drawn->w <= 0 || drawn->h <= 0)) return true; // skipped, but the frame is fine
     // Our close animation is over, but the scene still offers the deleted window for a frame or two (it holds its own
     // reference while painting); drawn natively it would flash at full size.
-    if (!drawn && !m_closing.count(w) && m_closed.count(w)) return;
-    if (!drawn && behindTab(w)) return; // a tab behind another one: it holds the tile's size, not its place in the picture
+    if (!drawn && !m_closing.count(w) && m_closed.count(w)) return true;
+    if (!drawn && behindTab(w)) return true; // a tab behind another one: it holds the tile's size, not its place in the picture
     if (drawn) {
         const TRect want = *drawn;
         if (auto *tracked = trackedFor(w)) tracked->lastDrawn = *drawn;
@@ -2077,7 +2077,7 @@ void KrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp
                 want.y + (expanded.y() - frame.y()) * sy, expanded.width() * sx, expanded.height() * sy);
             if (bounds.isValid() && !bounds.intersects(QRectF(vp.renderRect()))) {
                 ++m_cameraCulled;
-                return;
+                return true;
             }
         }
         if (const auto *tracked = trackedFor(w))
@@ -2143,7 +2143,7 @@ void KrellisCanvas::paintWindow(const RenderTarget &rt, const RenderViewport &vp
     } else if (w->data(WindowForceBlurRole).isValid()) {
         w->setData(WindowForceBlurRole, QVariant());
     }
-    effects->paintWindow(rt, vp, w, mask, clipped, data);
+    return effects->paintWindow(rt, vp, w, mask, clipped, data);
 }
 
 TRect KrellisCanvas::closingRect(const Closing &c, double *opacity) const
