@@ -1,0 +1,11 @@
+[General]
+glide=false
+map=false
+spawnTarget=end
+followTheme=false
+toasts=false
+whichKey=false
+
+[ViewRules]
+Alacritty\minWidth=1000
+Alacritty\minHeight=1000

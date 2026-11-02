@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Test-only kwin_wayland wrapper for scenarios/fractional-output.sh.
+#
+# KWin 6.8.2 has no runtime API that changes an output's scale (LogicalOutput::scale is a read-only
+# property and the scripting Workspace exposes no output configuration), and tools/nested.sh starts the
+# nested KWin with a fixed command line, so a scenario cannot ask for a fractional scale after startup.
+# The only lever that survives is the stored output configuration that KWin reads once at startup, so this
+# wrapper writes $XDG_CONFIG_HOME/kwinoutputconfig.json before handing over to the real binary:
+#
+#   KRELLIS_TEST_OUTPUT_SCALES="1.25 1.5"   one scale per output, left to right
+#   NEST_SIZE / --width --height            the pixel size of every output (set by tools/nested.sh)
+#
+# The output pixel size is unchanged and the scale differs, which is what a fractional-scale desktop looks
+# like to the effect: logical geometry is pixelSize / scale, so the render pass maps logical coordinates
+# onto device pixels at 1.25 and 1.5. tools/nested.sh only ever points at this file from a scenario .env
+# (PATH="$PWD/scenarios/fractional-output-kwin:$PATH"), so no other scenario sees it.
+set -eu
+real=/usr/bin/kwin_wayland
+[ -x "$real" ] || { echo "fractional-output-kwin: $real is missing" >&2; exit 1; }
+scales=${KRELLIS_TEST_OUTPUT_SCALES:?KRELLIS_TEST_OUTPUT_SCALES is not set}
+args=("$@")
+width=1280 height=800
+for ((i = 0; i < ${#args[@]}; ++i)); do
+    case ${args[i]} in
+        --width) width=${args[i+1]:-$width} ;;
+        --height) height=${args[i+1]:-$height} ;;
+        --width=*) width=${args[i]#*=} ;;
+        --height=*) height=${args[i]#*=} ;;
+    esac
+done
+case $width$height in
+    *[!0-9]*) echo "fractional-output-kwin: unreadable output size $width x $height" >&2; exit 1 ;;
+esac
+echo "fractional-output-kwin: scales=$scales size=${width}x${height} args=$*" >&2
+mkdir -p "${XDG_CONFIG_HOME:?XDG_CONFIG_HOME is not set}"
+awk -v scales="$scales" -v w="$width" -v h="$height" '
+BEGIN {
+    n = split(scales, s, " ")
+    printf "[\n    {\n        \"name\": \"outputs\",\n        \"data\": [\n"
+    x = 0
+    for (i = 1; i <= n; ++i) {
+        printf "%s            {\n", (i > 1 ? ",\n" : "")
+        printf "                \"connectorName\": \"Virtual-%d\",\n", i - 1
+        printf "                \"mode\": { \"basic\": { \"width\": %d, \"height\": %d, \"refreshRate\": 60000 }, \"flags\": 1 },\n", w, h
+        printf "                \"scale\": %s,\n", s[i]
+        printf "                \"transform\": \"Normal\",\n"
+        printf "                \"uuid\": \"00000000-0000-4000-8000-%012d\"\n", i
+        printf "            }"
+        logical[i] = int(w / s[i] + 0.5)
+    }
+    printf "\n        ]\n    },\n    {\n        \"name\": \"setups\",\n        \"data\": [\n            {\n                \"lidClosed\": false,\n                \"outputs\": [\n"
+    x = 0
+    for (i = 1; i <= n; ++i) {
+        printf "%s                    { \"enabled\": true, \"outputIndex\": %d, \"position\": { \"x\": %d, \"y\": 0 }, \"priority\": %d, \"replicationSource\": \"\" }",
+               (i > 1 ? ",\n" : ""), i - 1, x, i - 1
+        x += logical[i]
+    }
+    printf "\n                ]\n            }\n        ]\n    }\n]\n"
+}' >"$XDG_CONFIG_HOME/kwinoutputconfig.json"
+exec "$real" "${args[@]}"
