@@ -5,6 +5,7 @@
 #   tools/healthcheck.sh            PASS/FAIL per check; exit 0 (all pass) or 1 (any fail)
 #   tools/healthcheck.sh --quiet    print nothing when everything passes
 #   tools/healthcheck.sh --notify   ...and on failure send one desktop notification
+#   tools/healthcheck.sh --wait 30  ...but first wait up to 30 s for KWin's D-Bus name (for a login autostart)
 #   tools/healthcheck.sh --help
 #
 # Why it exists: the effect is ABI-locked to the KWin it was built against. When Plasma upgraded KWin 6.7.5 to
@@ -35,18 +36,23 @@ plugins=${KRELLIS_HEALTH_PLUGIN_DIR:-/usr/lib/qt6/plugins/kwin/effects/plugins}
 hook=/etc/pacman.d/hooks/krellis-kwin.hook
 kwinrc_file=${KRELLIS_HEALTH_KWINRC:-${XDG_CONFIG_HOME:-$HOME/.config}/kwinrc}
 
-usage() { sed -n '2,7p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,9p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 quiet=0
 notify=0
-for arg in "$@"; do
+wait_s=0
+while [ $# -gt 0 ]; do
+    arg=$1; shift
     case $arg in
         --quiet) quiet=1 ;;
         --notify) notify=1 ;;
+        --wait) wait_s=${1:-}; shift || true ;;
+        --wait=*) wait_s=${arg#--wait=} ;;
         -h|--help) usage; exit 0 ;;
-        *) echo "usage: healthcheck.sh [--quiet] [--notify] [--help]" >&2; exit 2 ;;
+        *) echo "usage: healthcheck.sh [--quiet] [--notify] [--wait seconds] [--help]" >&2; exit 2 ;;
     esac
 done
+case $wait_s in ''|*[!0-9]*) echo "--wait takes a number of seconds" >&2; exit 2 ;; esac
 
 lines=()
 fails=0
@@ -54,6 +60,14 @@ pass() { lines+=("PASS  $*"); }
 fail() { lines+=("FAIL  $*"); fails=$((fails + 1)); }
 fix() { lines+=("      fix: $*"); }
 info() { lines+=("info  $*"); }
+
+# A login autostart can run before KWin has taken its D-Bus name: wait for it rather than reporting a false failure.
+if [ "$wait_s" -gt 0 ] && [ -z "${KRELLIS_HEALTH_LOADED+set}" ]; then
+    for _ in $(seq "$wait_s"); do
+        qdbus6 org.kde.KWin /KWin >/dev/null 2>&1 && break
+        sleep 1
+    done
+fi
 
 # --- what is loaded, and what is installed -------------------------------------------------------------------
 loaded_raw=""

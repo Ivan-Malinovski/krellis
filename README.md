@@ -64,7 +64,18 @@ If an older Krellis was already running, log out and back in: KWin keeps a plugi
 
 The plugin only loads into the exact KWin it was built against. After a Plasma update that changes KWin, Krellis does not load (it logs why and sends one notification) until you rebuild: run `./install.sh` again and log out and back in. `./install.sh --check` tells you whether the installed plugin matches the installed KWin, and also prints `advisory:` lines for kwinrc entries whose plugin is missing or was built for another KWin (a local Aurorae decoration, an enabled effect from another package) without changing its exit code.
 
-If you are not sure whether Krellis is running at all, `tools/healthcheck.sh` answers it read-only: is a krellis effect loaded, is the running build the newest installed one, was that build made for the installed KWin, and does kwinrc enable it. It prints PASS/FAIL with the command that fixes a failure, exits 0/1, and takes `--quiet` (say nothing when healthy) or `--notify` (one desktop notification on failure) — suitable for a login autostart or a systemd user unit. The classic silent failure it catches: `kwinrc` still says `krellisEnabled=true` while nothing is loaded, so the desktop has quietly lost its tiling, bar and shortcuts.
+If you are not sure whether Krellis is running at all, `tools/healthcheck.sh` answers it read-only: is a krellis effect loaded, is the running build the newest installed one, was that build made for the installed KWin, and does kwinrc enable it. It prints PASS/FAIL with the command that fixes a failure, exits 0/1, and takes `--quiet` (say nothing when healthy) or `--notify` (one desktop notification on failure) — suitable for a login autostart or a systemd user unit. The classic silent failure it catches: `kwinrc` still says `krellisEnabled=true` while nothing is loaded, so the desktop has quietly lost its tiling, bar and shortcuts. To make it proactive, add a login autostart entry:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=Krellis health check
+Exec=/path/to/krellis/tools/healthcheck.sh --wait 60 --quiet --notify
+Terminal=false
+NoDisplay=true
+```
+
+It is silent while everything is fine and sends one notification naming the fix when it is not; `--wait 60` covers a login that starts the check before KWin has taken its D-Bus name.
 
 On Arch and CachyOS you can have pacman deal with it:
 
