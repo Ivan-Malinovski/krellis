@@ -12,7 +12,7 @@ I liked Hyprland, but I found it not mouse-friendly enough. Then I came across T
 
 The aim is to stay mouse-first without giving up keyboard friendliness or floatiness. The main actions work from the keyboard as well as the mouse, and you can still float any window, or make floating the default, instead of being forced into tiles.
 
-> **Status: 0.0.2, early, and entirely vibe coded with Sonnet 5.5.** I did not write the code by hand; I steered an AI model through it and tested the result on my own desktop. It runs daily on one machine (CachyOS, Plasma 6.7.5, two monitors). Expect rough edges, and read [Safety](#safety) before enabling it.
+> **Status: 0.0.2, early, and entirely vibe coded with Sonnet 5.5.** I did not write the code by hand; I steered an AI model through it and tested the result on my own desktop. It runs daily on one machine (CachyOS, Plasma 6.8.2, two monitors). Expect rough edges, and read [Safety](#safety) before enabling it.
 
 ## Features
 
@@ -34,7 +34,7 @@ The aim is to stay mouse-first without giving up keyboard friendliness or floati
 
 ## Requirements
 
-- KDE Plasma **6.7** on Wayland. The effect uses KWin's private C++ API, so it is **locked to the KWin it was built against**. Rebuild after every KWin upgrade (`./install.sh` again, or let the [pacman hook](#after-a-kwin-upgrade) do it). Only 6.7.x has been tried.
+- KDE Plasma **6.8** on Wayland (KWin 6.8.x; built and run against 6.8.2). The effect uses KWin's private C++ API, so it is **locked to the KWin it was built against**. Rebuild after every KWin upgrade (`./install.sh` again, or let the [pacman hook](#after-a-kwin-upgrade) do it). This branch targets 6.8 only: the paint hooks return the render result and the springs use KWin's own, see [6.8 notes](#kwin-68). For Plasma 6.7 use the v0.0.2 release.
 - A C++20 compiler, CMake 3.20+, and Ninja or Make.
 - Development packages for KWin and its dependencies: KWin, KDecoration3, Qt 6 (Gui, Widgets, Quick, DBus), KDE Frameworks 6 (CoreAddons, GlobalAccel, ColorScheme, Config, and for the settings module KCMUtils, I18n, Kirigami), extra-cmake-modules, and the Vulkan headers (KWin's CMake config asks for them).
 
@@ -71,6 +71,16 @@ On Arch and CachyOS you can have pacman deal with it:
 ```
 
 This installs `/etc/pacman.d/hooks/krellis-kwin.hook`. After a transaction that upgrades `kwin`, it rebuilds Krellis from this checkout as your user and installs it (`rebuild`), or just prints the rebuild command (`warn`). Keep the checkout where it is, or rerun the command after moving it. `./install.sh --no-pacman-hook` removes the hook. The hook has only been exercised against a staging directory, not through a real pacman upgrade.
+
+### KWin 6.8
+
+Plasma 6.8 is supported as of KWin 6.8.2, and is what this branch builds against; for Plasma 6.7 use the v0.0.2 release. Three things changed under the effect, all handled here:
+
+- `paintWindow`, `drawWindow` and `paintScreen` now return the **render result**, and KWin abandons the rest of the frame when it is `false`. A window Krellis decides not to paint (behind a tab, off screen, closing) therefore reports success and is simply skipped.
+- KWin's own spring moved into the effect API and now drives the camera and tile fades. KWin does not install its `effect/springmotion.h`, so `effect/kwin_springmotion.h` carries a size-checked declaration of it; a KWin that changes that layout fails the build instead of misbehaving. Each axis keeps Krellis' stiffness and damping, so motion is unchanged.
+- KWin's interactive move/resize geometry helpers are internal to KWin (not available to effects), so Krellis keeps its own canvas maths for dragging and border resizing.
+
+If you build on a different KWin than 6.8.2, `effect/kwin_springmotion.h` is the one file that may need re-deriving; the build stops at its assertions if the layout no longer matches.
 
 ### Uninstall
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **KWin 6.8 (Plasma 6.8) support.** Ported to KWin 6.8's paint API, where the paint hooks report whether the frame rendered successfully; without the port the effect stops loading after a Plasma update. The camera and tile fades now run on KWin's own spring instead of a local integrator, with the same stiffness and damping, so motion is unchanged. This targets KWin 6.8: Plasma 6.7 stays on the v0.0.2 release. See [the 6.8 notes](README.md#kwin-68).
+
 - Added `tools/live.sh login` for startup automation: it waits for KWin and retains the crash-loop marker when loading the newest installed build.
 
 - Added a depth-verified zoom-out diagnostic with persistent D-Bus latency measurement and generated terminal text. Documented an optional, separately licensed Aurorae 6.7.5 patch for long main-thread SVG cache compression pauses; the decoration artwork and transparency stay unchanged.

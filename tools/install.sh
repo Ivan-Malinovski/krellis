@@ -5,9 +5,8 @@
 # for the life of the process, so reusing the name would keep running the old code until a logout.
 set -euo pipefail
 project=$(cd -- "$(dirname -- "$0")/.." && pwd)
-built=6.7.5
-have=$(pacman -Q kwin | awk '{print $2}')
-case "$have" in $built-*|$built) ;; *) echo "Built against KWin $built but $have is installed. Rebuild first." >&2; exit 1;; esac
+# Every run configures and builds against the KWin that is installed, so there is no expected version to check here:
+# the effect refuses to load into a KWin other than the one it was built for, logs why and sends one notification.
 export PATH=$HOME/.local/bin:$PATH
 id=krellis_$(date +%m%d%H%M%S)
 cmake -S "$project" -B "$project/build-live" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
