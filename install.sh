@@ -94,6 +94,18 @@ plugin_dir() {
     die "cannot find the Qt 6 plugin directory (install qt6-base's tools, or pass -DKRELLIS_PLUGIN_DIR via CMAKE_ARGS)"
 }
 
+# Every build installs under a fresh id (krellis_<stamp>.so), so old builds pile up in the plugin dir.
+# Unlinking a plugin file KWin has mapped is safe: the running compositor keeps the old inode until it lets go.
+# With DESTDIR the sweep only looks inside the staging root, never at the real system directory.
+sweep_old_plugins() {
+    local keep=$1 d f
+    d=${DESTDIR:-}$(plugin_dir)/kwin/effects/plugins
+    for f in "$d"/krellis*.so "$d"/trellis*.so; do
+        [ -e "$f" ] || continue
+        [ "$(basename -- "$f")" = "$keep" ] || as_root rm -f -- "$f"
+    done
+}
+
 hook_file=${DESTDIR:-}/etc/pacman.d/hooks/krellis-kwin.hook
 hook_script=${DESTDIR:-}/usr/lib/krellis/kwin-upgrade
 
@@ -114,9 +126,50 @@ check_plugin() {
     return 1
 }
 
+# Other kwinrc entries that name a plugin file which is not installed. Advisory only: the exit code of --check stays
+# the effect's. A local Aurorae decoration is ABI-locked to KDecoration just as the effect is to KWin.
+check_config_plugins() {
+    local root=${DESTDIR:-} kwinrc=${DESTDIR:-$HOME}/.config/kwinrc lib f d built running
+    [ -r "$kwinrc" ] || return 0
+    lib=$(awk -F= '/^\[/{g=$0} g=="[org.kde.kdecoration2]" && $1=="library"{v=$2} END{print v}' "$kwinrc" 2>/dev/null || true)
+    if [ -n "$lib" ]; then
+        f=""
+        for d in org.kde.kdecoration3 org.kde.kdecoration2 org.kde.kdecoration; do
+            [ -f "$root$plugins/$d/$lib.so" ] && { f=$d; break; }
+        done
+        [ -n "$f" ] || echo "advisory: kwinrc selects decoration library $lib, but its plugin file is not installed"
+    fi
+    f="$root$plugins/kwin/effects/plugins/kwin4_effect_shapecorners.so"
+    if grep -qx 'kwin4_effect_shapecornersEnabled=true' "$kwinrc" 2>/dev/null; then
+        if [ ! -f "$f" ]; then
+            echo "advisory: kwin4_effect_shapecorners is enabled, but its plugin file is not installed"
+        else
+            built=$(grep -a -o -m1 'EffectPluginFactory[0-9][0-9.]*' "$f" 2>/dev/null | sed 's/.*y//' || true)
+            running=$(running_kwin)
+            if [ -n "$built" ] && [ -n "$running" ] && [ "$built" != "$running" ]; then
+                echo "advisory: kwin4_effect_shapecorners was built for KWin $built but KWin $running is installed: KWin refuses it silently"
+            fi
+        fi
+    fi
+    return 0
+}
+
 install_pacman_hook() {
     local mode=$1
     command -v pacman >/dev/null 2>&1 || [ -n "${DESTDIR:-}" ] || die "--pacman-hook is for Arch-based systems (no pacman here)"
+    # pkexec (PKEXEC_UID) and sudo (SUDO_USER) run this as root with a sanitised PATH, so ask who asked and which
+    # login PATH they build with: cmake and ninja are user tools here, and the hook must rebuild as that user.
+    local owner build_path login_path
+    owner=${SUDO_USER:-}
+    if [ -z "$owner" ] && [ -n "${PKEXEC_UID:-}" ]; then
+        owner=$(getent passwd "$PKEXEC_UID" 2>/dev/null | cut -d: -f1 || true)
+    fi
+    [ -n "$owner" ] || owner=$(id -un)
+    build_path=$PATH
+    if [ "$(id -u)" -eq 0 ]; then
+        login_path=$(runuser -u "$owner" -- sh -lc 'printf %s "$PATH"' 2>/dev/null || true)
+        [ -n "$login_path" ] && build_path=$login_path
+    fi
     local tmp; tmp=$(mktemp -d)
     cat >"$tmp/hook" <<HOOK
 [Trigger]
@@ -135,9 +188,9 @@ HOOK
 #!/bin/sh
 # Written by Krellis' install.sh --pacman-hook=$mode. Remove with ./install.sh --no-pacman-hook.
 src='$project'
-owner='$(id -un)'
+owner='$owner'
 mode='$mode'
-build_path='$PATH'
+build_path='$build_path'
 cmake_args='${CMAKE_ARGS:-}'
 SCRIPT
     cat >>"$tmp/script" <<'SCRIPT'
@@ -165,8 +218,11 @@ SCRIPT
 }
 
 if [ "$check" -eq 1 ]; then
-    check_plugin
-    exit $?
+    plugins=$(plugin_dir)
+    rc=0
+    check_plugin || rc=$?
+    check_config_plugins || true
+    exit "$rc"
 fi
 
 if [ "$remove_hook" -eq 1 ] && [ "$uninstall" -eq 0 ]; then
@@ -246,6 +302,10 @@ say "Installing to ${DESTDIR:-}$prefix"
 # file in place can take the compositor down.
 as_root rm -f -- "${DESTDIR:-}$plugins/kwin/effects/plugins/krellis.so"
 as_root cmake --install "$build"
+# The id this build was configured with is the file name that must survive the sweep.
+plugin_id=$(grep -m1 '^KRELLIS_ID:STRING=' "$build/CMakeCache.txt" 2>/dev/null | cut -d= -f2 || true)
+[ -n "$plugin_id" ] || plugin_id=krellis
+sweep_old_plugins "$plugin_id.so"
 [ -n "$hook" ] && install_pacman_hook "$hook"
 
 if [ -n "${DESTDIR:-}" ]; then

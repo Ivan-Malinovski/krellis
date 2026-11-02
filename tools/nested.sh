@@ -11,6 +11,73 @@ if [ -S "${XDG_RUNTIME_DIR:?}/$NEST_SOCKET" ]; then
     echo "Nested socket $NEST_SOCKET is already in use" >&2
     exit 1
 fi
+# Refuse to run while a foreign compositor owns org.kde.KWin on the session bus. A kwin_wayland
+# started with --virtual (or with its own --socket) outside dbus-run-session takes org.kde.KWin and
+# org.kde.kglobalaccel away from the real desktop; KWin's GlobalShortcutsManager::init() then deletes
+# its KGlobalAccelD for the life of that process with no retry (all global shortcuts dead, and
+# plasma-shutdown cannot log out: "KWin failed to complete logout"). Our own bus is created below by
+# dbus-run-session, so this only ever looks at the caller's bus. Exit status 1 means "dangerous owner".
+# Tests only: KRELLIS_TEST_BUS_OWNER_CMDLINE=<cmdline> replaces the detected owner command line.
+# Escape hatch: KRELLIS_ALLOW_SHARED_BUS=1 continues anyway (an intentional run).
+guard_session_bus() {
+    local pid line cmdline sock w i to="" dangerous=0
+    local -a words
+    if [ -n "${KRELLIS_TEST_BUS_OWNER_CMDLINE:-}" ]; then
+        pid=test; cmdline=$KRELLIS_TEST_BUS_OWNER_CMDLINE
+    else
+        command -v busctl >/dev/null 2>&1 || command -v qdbus6 >/dev/null 2>&1 || return 0
+        command -v timeout >/dev/null 2>&1 && to="timeout 5"
+        if command -v busctl >/dev/null 2>&1; then
+            line=$($to busctl --user call org.freedesktop.DBus /org/freedesktop/DBus \
+                org.freedesktop.DBus GetConnectionUnixProcessID s org.kde.KWin 2>/dev/null) || line=""
+        else
+            line=$($to qdbus6 org.freedesktop.DBus / \
+                org.freedesktop.DBus.GetConnectionUnixProcessID org.kde.KWin 2>/dev/null) || line=""
+        fi
+        pid=$(printf '%s\n' "$line" | awk '{print $NF}')
+        case $pid in ''|*[!0-9]*) return 0 ;; esac  # nobody owns org.kde.KWin, or nothing to parse
+        cmdline=$(tr '\0' ' ' 2>/dev/null <"/proc/$pid/cmdline" || true)
+        if [ -z "${cmdline// /}" ]; then
+            # Another user's (or a zombie) process: we cannot tell what it is, so warn but do not block.
+            echo "warning: org.kde.KWin on the session bus is owned by pid $pid, whose /proc/$pid/cmdline is not readable." >&2
+            echo "warning: if that is a stray kwin_wayland, global shortcuts and logout are broken until it exits." >&2
+            return 0
+        fi
+    fi
+    read -ra words <<<"$cmdline"
+    sock=""
+    for ((i = 0; i < ${#words[@]}; i++)); do
+        case ${words[i]} in
+            --socket) [ $((i + 1)) -lt ${#words[@]} ] && sock=${words[i + 1]} ;;
+            --socket=*) sock=${words[i]#--socket=} ;;
+        esac
+    done
+    case " $cmdline " in
+        *" --virtual "*) dangerous=1 ;;
+        *)
+            # Only compare when we know this session's socket: over SSH WAYLAND_DISPLAY is unset and a
+            # healthy desktop KWin would otherwise look foreign.
+            if [ -n "$sock" ] && [ -n "${WAYLAND_DISPLAY:-}" ] && [ "$sock" != "$WAYLAND_DISPLAY" ]; then dangerous=1; fi
+            ;;
+    esac
+    [ "$dangerous" = 1 ] || return 0  # plain desktop KWin (no --virtual, no foreign socket): healthy
+    { echo "ERROR: a foreign compositor owns org.kde.KWin on this session bus."
+      echo "  pid $pid: $cmdline"
+      echo "It was not started with --socket \"\$WAYLAND_DISPLAY\" (${WAYLAND_DISPLAY:-unset}) and/or runs --virtual, so it is not your desktop KWin."
+      echo "While it lives it holds org.kde.KWin and org.kde.kglobalaccel, KWin drops its KGlobalAccelD for good"
+      echo "(no retry: every global shortcut in the real session dies) and plasma-shutdown cannot log out."
+      echo "Nested tests must run under dbus-run-session; nested.sh does that for its own child only."
+    } >&2
+    return 1
+}
+if ! guard_session_bus; then
+    if [ "${KRELLIS_ALLOW_SHARED_BUS:-0}" = 1 ]; then
+        echo "KRELLIS_ALLOW_SHARED_BUS=1: continuing on a session bus owned by a test compositor." >&2
+    else
+        echo "Refusing to start a nested KWin. Kill the stray compositor, or set KRELLIS_ALLOW_SHARED_BUS=1 to run anyway." >&2
+        exit 1
+    fi
+fi
 export KRELLIS_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 root=$(realpath "$1"); effects=$2; scenario=$(realpath "$3"); W=${4:-1280}; H=${5:-800}
 work=${NEST_WORK:-/tmp/krellis-nest}; rm -rf "$work"; mkdir -p "$work/config" "$work/out" "$work/data" "$work/state/krellis"

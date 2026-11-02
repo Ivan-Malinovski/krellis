@@ -14,7 +14,7 @@ User-facing docs are `README.md` (install, keys, settings, safety) and `CHANGELO
 - `kcm/`: the System Settings module (`kcm_krellis`).
 - `tests/`: QtTest, one executable per core module (`ctest`).
 - `scenarios/`: nested-KWin test scripts (about 100 files, with `.rc` seeds and small Qt clients).
-- `tools/`: `nested.sh` (nested harness, exports `KRELLIS_ROOT`; scenarios use it instead of absolute paths), `shot`, `preview.sh`, `live.sh`, and Ivan's dev installer `install.sh` / `uninstall.sh`.
+- `tools/`: `nested.sh` (nested harness, exports `KRELLIS_ROOT`; scenarios use it instead of absolute paths), `shot`, `preview.sh`, `live.sh`, `healthcheck.sh` (read-only PASS/FAIL: is Krellis loaded, is it the newest installed build, was it built for the installed KWin, does kwinrc enable it; `--quiet`/`--notify`; exit 0/1/2; `KRELLIS_HEALTH_*` overrides to test the failure paths), and Ivan's dev installer `install.sh` / `uninstall.sh`.
 - `install.sh` (repo root): the public installer (see Installing).
 - `spikes/hello/`: minimal out-of-tree KWin effect used to prove the toolchain.
 - `third_party/`: ECM, Vulkan headers and the KWin 6.7 source on Ivan's machine only (gitignored, a workaround for missing dev packages). A normal checkout has none of it and uses system packages.

@@ -1,0 +1,10 @@
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -631,6 +631,7 @@
+     effect/offscreeneffect.h
+     effect/offscreenquickview.h
+     effect/quickeffect.h
++    effect/springmotion.h
+     effect/timeline.h
+     effect/xcb.h
+     DESTINATION ${KDE_INSTALL_INCLUDEDIR}/kwin/effect COMPONENT Devel)
