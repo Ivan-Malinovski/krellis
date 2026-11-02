@@ -48,6 +48,7 @@ check "and it is centred" "$(near "$(left p1)" "$want_left" 3)" yes
 check "the height is untouched" "$(near "$(rect p1 | awk '{print $4}')" "$fullh" 1)" yes
 check "the window is marked LONE" "$(lone p1)" 1
 check "the camera widened around it" "$(near "$(camw)" "$(awk 'BEGIN { printf "%.4f", 1 / 0.7 }')" 0.01)" yes
+$KRELLIS_ROOT/tools/shot lone-width >/dev/null 2>&1 || true
 
 echo "--- a second window brings the usual split back"
 "$NEST_WORK/input-client" krellis-other --small-min >>"$NEST_OUT/client-b.txt" 2>&1 & b=$!
