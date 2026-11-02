@@ -44,3 +44,11 @@ Ivan authorized installation once validation completes. Activation and exact sel
 
 
 Activated after Ivan's explicit authorization: `org.kde.kwin.aurorae.krellis_1030123148`. KWin reports that plugin with the unchanged `__aurorae__svg__FieldworkDark` theme. The installed binary matches the staged SHA256 `a5deab13c18ba3f7bfe887fd8f3c1c148465b5ae6b74833a5b9672aaedc480ec`. The original plugin is intact. Krellis remains `krellis_1030115620`, running/installed stamp `build Oct 30 2026 11:56:25`. Activation is verified, and Ivan reports improved performance on the live desktop. He requested committing and pushing all current project changes; final precommit validation is in progress.
+
+## Update 2026-11-02: rebuilt for KDE 6.8.2
+
+The plugin selected in `kwinrc` was still the 6.7.5 build (`org.kde.kwin.aurorae.krellis_1030123148`). `tools/build-aurorae-fix.sh` had pinned v6.7.5 with a hardcoded checksum, so the helper could not produce a matching build; it now takes a version with per-release checksums (6.7.5, 6.8.2). The render-cache patch applies unchanged to Aurorae v6.8.2, and the staged plugin links the installed `libkdecorations3.so.6` / `libkdecorations3private.so.2` (kdecoration 6.8.2) with the same `org.kde.kdecoration3` IID as the system Aurorae.
+
+Installed 2026-11-02 as `org.kde.kwin.aurorae.krellis_1102214419.so`, `kwinrc` `[org.kde.kdecoration2] library=` switched to it, `org.kde.KWin.reconfigure` applied. `kwin.supportInformation` then reported `Plugin: org.kde.kwin.aurorae.krellis_1102214419`, `Theme: __aurorae__svg__FieldworkDark` (unchanged), with no decoration errors in kwin's journal. `./install.sh --check` no longer prints a decoration advisory.
+
+Rollback: `kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key library org.kde.kwin.aurorae.krellis_1030123148` (the 6.7.5 file is still installed) or `org.kde.kwin.aurorae.v2` for the stock Aurorae, then `qdbus6 org.kde.KWin /KWin org.kde.KWin.reconfigure`. `~/.config/kwinrc.bak-aurorae-682` is the pre-change copy.
