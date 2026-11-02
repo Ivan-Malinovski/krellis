@@ -24,6 +24,10 @@ struct NavigationHost {
     virtual Point viewport() const = 0; // {w, h} in pixels
     /// Pixels of the neighbouring tiles left in view on each side of a zoomed framing (0 = none).
     virtual double peekPadding() const { return 0; }
+    /// Fraction of the viewport width a lone tile should occupy, 1 = full width. Asked only when the framing is
+    /// one tile or the whole layout, so a reading width can apply to a window that has the screen to itself
+    /// without changing what a frame of several tiles looks like.
+    virtual double loneShare() const { return 1; }
     virtual LayoutMetrics layoutMetrics() const = 0;
     virtual bool busy() const { return false; }
     /// Long jumps zoom out, pan and zoom in (needs the camera to glide).

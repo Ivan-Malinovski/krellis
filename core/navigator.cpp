@@ -144,22 +144,38 @@ void Navigator::sync()
 
 Rect Navigator::cameraFor(const Rect &frame) const
 {
+    // The peek gutter is for zoomed framings; the whole layout is shown as it is.
+    const bool overview = overviewing();
     const Point vp = m_host.viewport();
     const double px = m_host.peekPadding();
-    if (px <= 0 || overviewing() || vp.x <= 0 || vp.y <= 0)
-        return frame;
     const Rect root = rectOf(rootId());
     constexpr double EPS = 1e-6, MAX_SHARE = 0.06;
     Rect out = frame;
-    const auto widen = [&](double &lo, double &size, double rootLo, double rootSize, double view) {
-        const double share = std::min(px / view, MAX_SHARE);
-        const double before = lo > rootLo + EPS ? share : 0, after = lo + size < rootLo + rootSize - EPS ? share : 0;
-        const double whole = size / (1 - before - after);
-        lo -= before * whole;
-        size = whole;
-    };
-    widen(out.x, out.w, root.x, root.w, vp.x);
-    widen(out.y, out.h, root.y, root.h, vp.y);
+    if (!overview && px > 0 && vp.x > 0 && vp.y > 0) {
+        const auto widen = [&](double &lo, double &size, double rootLo, double rootSize, double view) {
+            const double share = std::min(px / view, MAX_SHARE);
+            const double before = lo > rootLo + EPS ? share : 0, after = lo + size < rootLo + rootSize - EPS ? share : 0;
+            const double whole = size / (1 - before - after);
+            lo -= before * whole;
+            size = whole;
+        };
+        widen(out.x, out.w, root.x, root.w, vp.x);
+        widen(out.y, out.h, root.y, root.h, vp.y);
+    }
+    // A lone tile may want a reading width rather than the whole screen: widen the camera around it so it covers
+    // that share of the viewport, centred. Done last so the peek gutter cannot nibble into the share.
+    //
+    // This applies to the whole-layout framing too. A canvas holding one window frames it as "everything", which
+    // is also what the overview is, and that is the case the share exists for: the host answers 1 unless the
+    // layout really is one tile (and its rule asks for a share), so a frame of several tiles is untouched.
+    if (m_framedLeaves.size() <= 1 && out.w > 0) {
+        const double share = m_host.loneShare();
+        if (share > 0 && share < 1) {
+            const double centre = out.x + out.w / 2;
+            out.w /= share;
+            out.x = centre - out.w / 2;
+        }
+    }
     return out;
 }
 

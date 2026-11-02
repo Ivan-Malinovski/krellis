@@ -60,6 +60,7 @@ void KrellisCanvas::loadRules()
         };
         rule.floatSize = {size("floatWidth"), size("floatHeight")};
         rule.floatAtPointer = config.value("floatAtPointer", false).toBool();
+        rule.loneWidth = std::clamp(config.value("loneWidth", -1).toInt(), -1, 100);
         m_rules[app] = rule;
         config.endGroup();
     }

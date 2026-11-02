@@ -13,6 +13,7 @@ struct ViewRules {
     bool scratchpad = false; // a floating overlay summoned and dismissed with the scratchpad shortcut
     Point floatSize{0, 0};   // size in pixels a new float opens at; 0 on an axis keeps the window's own size, both 0 the default rectangle
     bool floatAtPointer = false; // a new float opens with its top-left corner at the pointer, shifted to stay inside the screen
+    int loneWidth = -1;      // percent of the screen width this app takes when it is alone on the canvas; -1 = the general setting, 0 = full width
     bool allows(ViewPlacement where) const {
         switch (where) {
         case ViewPlacement::Side: return side;

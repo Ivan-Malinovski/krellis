@@ -8,7 +8,7 @@ class RulesModel : public QAbstractListModel
 {
     Q_OBJECT
 public:
-    enum Role { App = Qt::UserRole + 1, Placement, Scaling, MinWidth, MinHeight, AllowSide, AllowStage, AllowFloating, Singleton, Closable, Scratchpad };
+    enum Role { App = Qt::UserRole + 1, Placement, Scaling, MinWidth, MinHeight, AllowSide, AllowStage, AllowFloating, Singleton, Closable, Scratchpad, LoneWidth };
     using QAbstractListModel::QAbstractListModel;
 
     int rowCount(const QModelIndex &parent = {}) const override { return parent.isValid() ? 0 : m_rules.size(); }
@@ -51,6 +51,7 @@ class KrellisKcm : public KQuickConfigModule
     Q_PROPERTY(int tileMinWidth READ tileMinWidth WRITE setTileMinWidth NOTIFY settingsChanged)
     Q_PROPERTY(int tileMinHeight READ tileMinHeight WRITE setTileMinHeight NOTIFY settingsChanged)
     Q_PROPERTY(int iconBelow READ iconBelow WRITE setIconBelow NOTIFY settingsChanged)
+    Q_PROPERTY(int loneWidth READ loneWidth WRITE setLoneWidth NOTIFY settingsChanged) // percent; 0 = full width
     Q_PROPERTY(bool followTheme READ followTheme WRITE setFollowTheme NOTIFY settingsChanged)
     Q_PROPERTY(bool shakeFloat READ shakeFloat WRITE setShakeFloat NOTIFY settingsChanged)
     Q_PROPERTY(bool toasts READ toasts WRITE setToasts NOTIFY settingsChanged)
@@ -83,6 +84,7 @@ public:
     int tileMinWidth() const { return m_current.tileMinWidth; }
     int tileMinHeight() const { return m_current.tileMinHeight; }
     int iconBelow() const { return m_current.iconBelow; }
+    int loneWidth() const { return m_current.loneWidth; }
     bool followTheme() const { return m_current.followTheme; }
     bool shakeFloat() const { return m_current.shakeFloat; }
     bool toasts() const { return m_current.toasts; }
@@ -107,6 +109,7 @@ public:
     void setTileMinWidth(int v) { edit([&] { m_current.tileMinWidth = v; }); }
     void setTileMinHeight(int v) { edit([&] { m_current.tileMinHeight = v; }); }
     void setIconBelow(int v) { edit([&] { m_current.iconBelow = v; }); }
+    void setLoneWidth(int v) { edit([&] { m_current.loneWidth = std::clamp(v, 0, 100); }); }
     void setFollowTheme(bool v) { edit([&] { m_current.followTheme = v; }); }
     void setShakeFloat(bool v) { edit([&] { m_current.shakeFloat = v; }); }
     void setToasts(bool v) { edit([&] { m_current.toasts = v; }); }

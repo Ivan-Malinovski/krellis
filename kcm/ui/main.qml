@@ -74,6 +74,25 @@ KCM.SimpleKCM {
                     valueFromText: (t) => parseInt(t) || 1
                 }
             }
+            RowLayout {
+                Kirigami.FormData.label: i18n("A window alone on the canvas:")
+                QQC2.SpinBox {
+                    from: 0; to: 100; stepSize: 5
+                    value: kcm.loneWidth
+                    onValueModified: kcm.loneWidth = value
+                    textFromValue: (v) => v === 0 ? i18n("Full width") : v === 100 ? i18n("Full width") : i18n("%1 % of the width", v)
+                    valueFromText: (t) => parseInt(t) || 0
+                }
+            }
+            QQC2.Label {
+                Layout.fillWidth: true
+                Layout.preferredWidth: Kirigami.Units.gridUnit * 18
+                Layout.maximumWidth: Kirigami.Units.gridUnit * 24
+                wrapMode: Text.WordWrap
+                opacity: 0.7
+                font: Kirigami.Theme.smallFont
+                text: i18n("A single window is shown centred at this share of the screen instead of filling it, which keeps a browser readable on an ultrawide. As soon as a second window is on the canvas the usual split returns. A rule can override it for one application.")
+            }
             QQC2.Label {
                 Layout.fillWidth: true
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 18
@@ -348,6 +367,7 @@ KCM.SimpleKCM {
                 required property bool singleton
                 required property bool closable
                 required property bool scratchpad
+                required property int loneWidth
 
                 header: RowLayout {
                     Kirigami.Heading {
@@ -412,6 +432,14 @@ KCM.SimpleKCM {
                         text: i18n("Floating")
                         checked: allowFloating
                         onToggled: kcm.rules.set(index, "allowFloating", checked)
+                    }
+                    QQC2.SpinBox {
+                        Kirigami.FormData.label: i18n("Alone on the canvas:")
+                        from: -1; to: 100; stepSize: 5
+                        value: loneWidth
+                        onValueModified: kcm.rules.set(index, "loneWidth", value)
+                        textFromValue: (v) => v < 0 ? i18n("Same as the setting above") : (v === 0 || v === 100) ? i18n("Full width") : i18n("%1 % of the width", v)
+                        valueFromText: (t) => isNaN(parseInt(t)) ? -1 : parseInt(t)
                     }
                     QQC2.CheckBox {
                         Kirigami.FormData.label: i18n("Other:")

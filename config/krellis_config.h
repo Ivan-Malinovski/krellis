@@ -38,6 +38,7 @@ struct Settings
     int whichKeyDelayMs = 400;    // how long the chord is held before the cheat sheet shows
     int tileMinWidth = 1, tileMinHeight = 1; // pixel minimum of a tile for apps without a rule; 1 = pure proportions (deep splits keep shrinking), 320x200 = the old floor
     int iconBelow = 0;            // tiles drawn narrower than this many pixels show an icon; 0 (default) = windows stay live at any size
+    int loneWidth = 0;            // a window alone on the canvas takes this share of the screen width, centred; 0 = full width
     double landMs = 200;          // glide off: duration of the move-and-scale after a real geometry change
     bool operator==(const Settings &) const = default;
 };
@@ -52,6 +53,7 @@ struct AppRule
     bool singleton = false, closable = true, scratchpad = false;
     int floatWidth = 0, floatHeight = 0;   // pixels a new float opens at; 0 = the window's own size (both 0: the default rectangle)
     bool floatAtPointer = false;           // a new float opens with its top-left corner at the pointer
+    int loneWidth = -1;                    // overrides Settings::loneWidth for this app; -1 = follow the general setting, 0 = full width
     bool operator==(const AppRule &) const = default;
 };
 

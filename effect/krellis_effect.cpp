@@ -572,6 +572,21 @@ Point KrellisCanvas::viewport() const
     return {m_area.width(), m_area.height()};
 }
 
+// A window with the screen to itself gets a reading width instead of the full 3440 px: the navigator asks for the
+// share when it frames one tile, and widens its camera around the tile so the tile covers that share, centred.
+// A doc with more than one tile answers 1, so framing several tiles, or a tile beside others, is unchanged.
+double KrellisCanvas::loneShare() const
+{
+    if (!m_doc.root) return 1;
+    const auto leaves = krellis::leafIds(m_doc.root);
+    if (leaves.size() != 1) return 1;
+    const auto *t = presentedPanel(leaves.front());
+    if (!t) return 1;
+    const int rule = rulesFor(t->window).loneWidth;
+    const int pct = rule >= 0 ? rule : m_loneWidth; // -1 follows the general setting; 0 means full width
+    return pct >= 1 && pct < 100 ? pct / 100.0 : 1.0;
+}
+
 LayoutMetrics KrellisCanvas::layoutMetrics() const
 {
     LayoutMetrics m;
@@ -3462,6 +3477,7 @@ QString KrellisCanvas::dump()
         if (rule.scaling == krellis::ViewScaling::None) lines.back() += QStringLiteral(" NO_SCALE");
         if (!rule.closable) lines.back() += QStringLiteral(" NO_CLOSE");
         if (frameOnly(t.panel)) lines.back() += QStringLiteral(" ICON");
+        if (loneShare() < 1) lines.back() += QStringLiteral(" LONE");
         if (floatScreen(t.panel))
             lines.back() += QStringLiteral(" FLOAT");
         if (isPinned(t.panel))

@@ -229,6 +229,7 @@ void KrellisEffect::syncOutputs()
         canvas->configureAnimations(m_hyprland, m_windowAnimation);
         canvas->m_landMs = m_landMs;
         canvas->m_iconBelow = m_iconBelow;
+        canvas->m_loneWidth = m_loneWidth;
         canvas->m_tileMinimum = m_tileMinimum;
         canvas->m_toasts = m_toastsOn;
         canvas->m_shakeFloat = m_shakeFloatOn;
@@ -1184,6 +1185,7 @@ void KrellisEffect::applySettings(const krellis::config::Settings &settings)
     m_glide = settings.glide && !m_hyprland; // the presentation profile never enables resize/camera glides
     m_landMs = settings.landMs;
     m_iconBelow = settings.iconBelow;
+    m_loneWidth = settings.loneWidth;
     m_tileMinimum = {double(settings.tileMinWidth), double(settings.tileMinHeight)};
     m_theme.setFollow(settings.followTheme);
     m_toastsOn = settings.toasts;
@@ -1224,6 +1226,7 @@ void KrellisEffect::applySettings(const krellis::config::Settings &settings)
         canvas->configureAnimations(m_hyprland, m_windowAnimation);
         canvas->m_landMs = m_landMs;
         canvas->m_iconBelow = m_iconBelow;
+        canvas->m_loneWidth = m_loneWidth;
         canvas->m_tileMinimum = m_tileMinimum;
         canvas->m_toasts = m_toastsOn;
         canvas->m_shakeFloat = m_shakeFloatOn;

@@ -74,6 +74,7 @@ Settings load(const QString &file)
     s.tileMinWidth = std::clamp(c.value(QStringLiteral("tileMinWidth"), s.tileMinWidth).toInt(), 1, 4000);
     s.tileMinHeight = std::clamp(c.value(QStringLiteral("tileMinHeight"), s.tileMinHeight).toInt(), 1, 4000);
     s.iconBelow = std::clamp(c.value(QStringLiteral("iconBelow"), s.iconBelow).toInt(), 0, 1000);
+    s.loneWidth = std::clamp(c.value(QStringLiteral("loneWidth"), s.loneWidth).toInt(), 0, 100);
     s.followTheme = c.value(QStringLiteral("followTheme"), s.followTheme).toBool();
     s.toasts = c.value(QStringLiteral("toasts"), s.toasts).toBool();
     s.flyTo = c.value(QStringLiteral("flyTo"), s.flyTo).toBool();
@@ -107,6 +108,7 @@ bool save(const Settings &s, const QString &file)
     c.setValue(QStringLiteral("tileMinWidth"), s.tileMinWidth);
     c.setValue(QStringLiteral("tileMinHeight"), s.tileMinHeight);
     c.setValue(QStringLiteral("iconBelow"), s.iconBelow);
+    c.setValue(QStringLiteral("loneWidth"), s.loneWidth);
     c.setValue(QStringLiteral("followTheme"), s.followTheme);
     c.setValue(QStringLiteral("toasts"), s.toasts);
     c.setValue(QStringLiteral("flyTo"), s.flyTo);
@@ -148,6 +150,7 @@ QList<AppRule> loadRules(const QString &file)
         r.floatWidth = c.value(QStringLiteral("floatWidth"), r.floatWidth).toInt();
         r.floatHeight = c.value(QStringLiteral("floatHeight"), r.floatHeight).toInt();
         r.floatAtPointer = c.value(QStringLiteral("floatAtPointer"), r.floatAtPointer).toBool();
+        r.loneWidth = std::clamp(c.value(QStringLiteral("loneWidth"), r.loneWidth).toInt(), -1, 100);
         c.endGroup();
         rules.append(r);
     }
@@ -178,6 +181,7 @@ bool saveRules(const QList<AppRule> &rules, const QString &file)
         c.setValue(QStringLiteral("floatWidth"), r.floatWidth);
         c.setValue(QStringLiteral("floatHeight"), r.floatHeight);
         c.setValue(QStringLiteral("floatAtPointer"), r.floatAtPointer);
+        c.setValue(QStringLiteral("loneWidth"), r.loneWidth);
         c.endGroup();
     }
     c.endGroup();
