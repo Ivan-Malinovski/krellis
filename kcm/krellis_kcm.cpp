@@ -5,13 +5,15 @@
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusPendingCall>
+#include <QDBusPendingCallWatcher>
 
 using namespace krellis::config;
 
 QHash<int, QByteArray> RulesModel::roleNames() const
 {
     return {{App, "app"}, {Placement, "placement"}, {Scaling, "scaling"}, {MinWidth, "minWidth"}, {MinHeight, "minHeight"},
-            {AllowSide, "allowSide"}, {AllowStage, "allowStage"}, {AllowFloating, "allowFloating"}, {Singleton, "singleton"}, {Closable, "closable"}, {Scratchpad, "scratchpad"}, {LoneWidth, "loneWidth"}};
+            {AllowSide, "allowSide"}, {AllowStage, "allowStage"}, {AllowFloating, "allowFloating"}, {Singleton, "singleton"}, {Closable, "closable"}, {Scratchpad, "scratchpad"}, {LoneWidth, "loneWidth"},
+            {FloatWidth, "floatWidth"}, {FloatHeight, "floatHeight"}, {FloatAtPointer, "floatAtPointer"}};
 }
 
 QVariant RulesModel::data(const QModelIndex &index, int role) const
@@ -31,6 +33,9 @@ QVariant RulesModel::data(const QModelIndex &index, int role) const
     case Closable: return r.closable;
     case Scratchpad: return r.scratchpad;
     case LoneWidth: return r.loneWidth;
+    case FloatWidth: return r.floatWidth;
+    case FloatHeight: return r.floatHeight;
+    case FloatAtPointer: return r.floatAtPointer;
     }
     return {};
 }
@@ -52,6 +57,9 @@ bool RulesModel::setData(const QModelIndex &index, const QVariant &value, int ro
     case Closable: r.closable = value.toBool(); break;
     case Scratchpad: r.scratchpad = value.toBool(); break;
     case LoneWidth: r.loneWidth = std::clamp(value.toInt(), -1, 100); break;
+    case FloatWidth: r.floatWidth = std::max(0, value.toInt()); break;
+    case FloatHeight: r.floatHeight = std::max(0, value.toInt()); break;
+    case FloatAtPointer: r.floatAtPointer = value.toBool(); break;
     default: return false;
     }
     Q_EMIT dataChanged(index, index, {role});
@@ -127,6 +135,26 @@ void KrellisKcm::save()
     // Tell a running effect to re-read the file; with the effect off nobody answers and that is fine.
     QDBusConnection::sessionBus().asyncCall(QDBusMessage::createMethodCall(QStringLiteral("org.kde.KWin"), QStringLiteral("/Krellis"),
         QStringLiteral("org.kde.kwin.KWin.KrellisEffect"), QStringLiteral("reloadSettings")));
+}
+
+void KrellisKcm::pickWindow()
+{
+    // Same interactive selection KDE's own window-rules editor uses: a crosshair, then one reply.
+    const QDBusMessage call = QDBusMessage::createMethodCall(QStringLiteral("org.kde.KWin"), QStringLiteral("/KWin"),
+        QStringLiteral("org.kde.kwin.KWin"), QStringLiteral("queryWindowInfo"));
+    auto *watcher = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(call, 60000), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *w) {
+        const QDBusMessage reply = w->reply();
+        w->deleteLater();
+        if (reply.type() != QDBusMessage::ReplyMessage) { // cancelled, or no KWin to ask
+            Q_EMIT windowPicked(QString());
+            return;
+        }
+        const QVariantMap info = reply.arguments().value(0).toMap();
+        QString app = info.value(QStringLiteral("desktopFile")).toString();
+        if (app.isEmpty()) app = info.value(QStringLiteral("resourceClass")).toString();
+        Q_EMIT windowPicked(app);
+    });
 }
 
 void KrellisKcm::defaults()

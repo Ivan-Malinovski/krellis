@@ -8,7 +8,8 @@ class RulesModel : public QAbstractListModel
 {
     Q_OBJECT
 public:
-    enum Role { App = Qt::UserRole + 1, Placement, Scaling, MinWidth, MinHeight, AllowSide, AllowStage, AllowFloating, Singleton, Closable, Scratchpad, LoneWidth };
+    enum Role { App = Qt::UserRole + 1, Placement, Scaling, MinWidth, MinHeight, AllowSide, AllowStage, AllowFloating, Singleton, Closable, Scratchpad, LoneWidth,
+                FloatWidth, FloatHeight, FloatAtPointer };
     using QAbstractListModel::QAbstractListModel;
 
     int rowCount(const QModelIndex &parent = {}) const override { return parent.isValid() ? 0 : m_rules.size(); }
@@ -118,8 +119,13 @@ public:
     void setWhichKeyDelayMs(int v) { edit([&] { m_current.whichKeyDelayMs = std::clamp(v, 100, 2000); }); }
     RulesModel *rules() { return &m_rules; }
 
+    /// Asks KWin to let the user click a window, then answers with the app id Krellis keys its rules on
+    /// (the desktop file if the window has one, else its resource class). Empty when the user cancels.
+    Q_INVOKABLE void pickWindow();
+
 Q_SIGNALS:
     void settingsChanged();
+    void windowPicked(const QString &app);
 
 private:
     template<class F> void edit(F &&apply) { apply(); settingsChanged(); refreshState(); }
