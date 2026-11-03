@@ -21,7 +21,8 @@ struct Host : NavigationHost {
     double clockMs() const override { return clock; }
     const LayoutDocument &doc() const override { return document; }
     NavMode mode() const override { return navMode; }
-    Point viewport() const override { return {1000, 600}; }
+    bool turned = false; // the display is used on its side
+    Point viewport() const override { return turned ? Point{600, 1000} : Point{1000, 600}; }
     LayoutMetrics layoutMetrics() const override
     {
         LayoutMetrics m;
@@ -666,6 +667,23 @@ private slots:
         QVERIFY(qAbs(cam.target.h - 1) < 1e-9); // a reading width, not a letterbox
         QVERIFY(qAbs(cam.target.y) < 1e-9);
     }
+    void loneTileTakesItsShareOfATurnedDisplayHeight()
+    {
+        Host h;
+        h.turned = true; // 600x1000, the way a monitor is used on its side
+        auto root = L::panel({L::view("t", "a")}, "A");
+        h.document = createDocument(&root);
+        h.lone = 0.7;
+        RectSpring cam(testSpringFactory());
+        Navigator nav(h, cam);
+        nav.sync();
+        const double height = 1 / 0.7; // fewer rows, not fewer columns: a 1440-wide screen has no spare width
+        QVERIFY(qAbs(cam.target.h - height) < 1e-9);
+        QVERIFY(qAbs(cam.target.y - (0.5 - height / 2)) < 1e-9);
+        QVERIFY(qAbs(cam.target.w - 1) < 1e-9);
+        QVERIFY(qAbs(cam.target.x) < 1e-9);
+    }
+
     void fullWidthLoneTileIsUnchanged()
     {
         for (const double share : {1.0, 0.0}) { // 1 = no opinion, 0 = a share that would divide by zero
