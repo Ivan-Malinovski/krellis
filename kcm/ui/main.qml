@@ -173,15 +173,15 @@ KCM.SimpleKCM {
                 Explanation {
                     text: i18n("The only window on the canvas is centred at this share of the screen instead of filling it, which keeps a browser readable on an ultrawide. A second window brings the usual split back. A rule can set a different share for one application.")
                 }
+                // Not hidden when the share above is off: a rule can set a share of its own, and that is exactly
+                // the case this has to be reachable from.
                 QQC2.CheckBox {
-                    visible: kcm.loneWidth > 0 && kcm.loneWidth < 100
                     text: i18n("Take the share along the screen's longer side")
                     checked: kcm.loneLongAxis
                     onToggled: kcm.loneLongAxis = checked
                 }
                 Explanation {
-                    visible: kcm.loneWidth > 0 && kcm.loneWidth < 100
-                    text: i18n("On a screen used on its side this gives the window fewer rows instead of fewer columns, so a portrait monitor gets a full-width window rather than a narrow strip. Off, the share is always taken out of the width.")
+                    text: i18n("On a screen used on its side this gives the window fewer rows instead of fewer columns, so a portrait monitor gets a full-width window rather than a narrow strip. Off, the share is always taken out of the width. This applies to every window with a share, the setting above and the rules alike.")
                 }
             }
 
