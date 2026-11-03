@@ -1,0 +1,16 @@
+[General]
+glide=true
+loneWidth=70
+
+[ViewRules]
+org.kde.dolphin\placement=floating
+org.kde.dolphin\minWidth=520
+org.kde.dolphin\minHeight=380
+org.kde.dolphin\floatWidth=900
+org.kde.dolphin\floatHeight=600
+org.kde.dolphin\loneWidth=-1
+System Settings\placement=side
+System Settings\minWidth=160
+System Settings\minHeight=120
+System Settings\singleton=true
+System Settings\loneWidth=55

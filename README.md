@@ -158,7 +158,7 @@ Moving a panel: it behaves as if you dropped it in the middle of the neighbour. 
 
 ## Configuration
 
-Use the settings module (System Settings → Window Management → Krellis, or the Configure button of the effect), or edit `~/.config/krellisrc`. Settings go under `[General]`; per-app rules go under `[ViewRules]`. The effect reloads them when the module saves.
+Use the settings module (System Settings → Window Management → Krellis, or the Configure button of the effect), or edit `~/.config/krellisrc`. To add a rule without knowing an application's identifier, click **Pick a window…** and then the window: the field is filled in with its desktop file, or its window class when it has none. Settings go under `[General]`; per-app rules go under `[ViewRules]`. The effect reloads them when the module saves.
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -209,6 +209,8 @@ org.mozilla.firefox\loneWidth=70
 ```
 
 Neither `-1` (the default: follow `[General] loneWidth`) nor `0` (full width) narrows anything. The width is a share of the screen, applied only while that window is the only tile; a second window, a tab or a stashed drawer does not count as one, so `loneWidth` never changes a split.
+
+The settings module edits all of these under **Application rules**; the file is the same either way.
 
 A floating window otherwise opens at 60% × 65% of the screen. Three more rule keys change that for one app: `floatWidth` and `floatHeight` (pixels; 0 or absent on an axis keeps the window's own size) and `floatAtPointer=true` (its top-left corner opens at the pointer, shifted to stay on the screen). To make the Emoji Selector a small popup where you are working:
 
