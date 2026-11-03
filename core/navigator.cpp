@@ -168,12 +168,21 @@ Rect Navigator::cameraFor(const Rect &frame) const
     // This applies to the whole-layout framing too. A canvas holding one window frames it as "everything", which
     // is also what the overview is, and that is the case the share exists for: the host answers 1 unless the
     // layout really is one tile (and its rule asks for a share), so a frame of several tiles is untouched.
-    if (m_framedLeaves.size() <= 1 && out.w > 0) {
+    if (m_framedLeaves.size() <= 1 && out.w > 0 && out.h > 0) {
         const double share = m_host.loneShare();
         if (share > 0 && share < 1) {
-            const double centre = out.x + out.w / 2;
-            out.w /= share;
-            out.x = centre - out.w / 2;
+            // The share is a reading width, so it is taken along the display's long axis: a wide screen gives the
+            // window fewer columns, a turned one fewer rows. Narrowing the width on a portrait output instead is
+            // what turned a 1440x2560 monitor into a 1008-pixel sliver with gutters down both sides.
+            if (vp.y > vp.x) {
+                const double centre = out.y + out.h / 2;
+                out.h /= share;
+                out.y = centre - out.h / 2;
+            } else {
+                const double centre = out.x + out.w / 2;
+                out.w /= share;
+                out.x = centre - out.w / 2;
+            }
         }
     }
     return out;
