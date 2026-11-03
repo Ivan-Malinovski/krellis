@@ -23,6 +23,9 @@ KCM.SimpleKCM {
     readonly property var spawnTargets: [i18n("Beside the tile under the pointer"), i18n("Beside the focused window"), i18n("At the end of the row"), i18n("Halving the focused tile (dwindle)")]
     readonly property var dwindleSides: [i18n("The half the pointer is in"), i18n("To the right, or below")]
     readonly property var windowAnimations: ["popin", "slide", "gnomed"]
+    // Controls get their inset from the widget style, and a style is free to leave it at zero, which puts the
+    // value against the frame. These fields set it themselves so they look the same in every style.
+    readonly property int fieldPadding: Kirigami.Units.smallSpacing * 2
 
     // One explanation style everywhere: small, dimmed, wrapped, and part of its own row.
     component Explanation: QQC2.Label {
@@ -46,6 +49,8 @@ KCM.SimpleKCM {
     component Pixels: QQC2.SpinBox {
         Layout.preferredWidth: Kirigami.Units.gridUnit * 8
         editable: true
+        leftPadding: root.fieldPadding
+        rightPadding: Kirigami.Units.smallSpacing
         from: 0
         to: 4000
         stepSize: 20
@@ -64,6 +69,7 @@ KCM.SimpleKCM {
             Setting {
                 Kirigami.FormData.label: i18n("New tiled windows open:")
                 QQC2.ComboBox {
+                    leftPadding: root.fieldPadding
                     model: root.spawnTargets
                     currentIndex: kcm.spawnTarget
                     onActivated: index => kcm.spawnTarget = index
@@ -76,6 +82,7 @@ KCM.SimpleKCM {
                 Kirigami.FormData.label: i18n("A halved tile:")
                 visible: kcm.spawnTarget === 3
                 QQC2.ComboBox {
+                    leftPadding: root.fieldPadding
                     model: root.dwindleSides
                     currentIndex: kcm.dwindleSide
                     onActivated: index => kcm.dwindleSide = index
@@ -153,6 +160,8 @@ KCM.SimpleKCM {
                 QQC2.SpinBox {
                     Layout.preferredWidth: Kirigami.Units.gridUnit * 12
                     editable: true
+                    leftPadding: root.fieldPadding
+                    rightPadding: Kirigami.Units.smallSpacing
                     from: 0
                     to: 100
                     stepSize: 5
@@ -250,6 +259,7 @@ KCM.SimpleKCM {
             Setting {
                 Kirigami.FormData.label: i18n("Animation profile:")
                 QQC2.ComboBox {
+                    leftPadding: root.fieldPadding
                     model: [i18n("Trellis"), i18n("Hyprland")]
                     currentIndex: kcm.animationProfile === "hyprland" ? 1 : 0
                     onActivated: kcm.animationProfile = currentIndex === 1 ? "hyprland" : "trellis"
@@ -262,6 +272,7 @@ KCM.SimpleKCM {
                 Kirigami.FormData.label: i18n("Window opening and closing:")
                 visible: kcm.animationProfile === "hyprland"
                 QQC2.ComboBox {
+                    leftPadding: root.fieldPadding
                     model: [i18n("Pop in (87%)"), i18n("Slide from the nearest edge"), i18n("Vertical collapse")]
                     currentIndex: Math.max(0, root.windowAnimations.indexOf(kcm.windowAnimation))
                     onActivated: kcm.windowAnimation = root.windowAnimations[currentIndex]
@@ -281,6 +292,8 @@ KCM.SimpleKCM {
                 QQC2.SpinBox {
                     Layout.preferredWidth: Kirigami.Units.gridUnit * 8
                     editable: true
+                    leftPadding: root.fieldPadding
+                    rightPadding: Kirigami.Units.smallSpacing
                     from: 0
                     to: 1000
                     stepSize: 25
@@ -336,6 +349,8 @@ KCM.SimpleKCM {
                 QQC2.SpinBox {
                     Layout.preferredWidth: Kirigami.Units.gridUnit * 8
                     editable: true
+                    leftPadding: root.fieldPadding
+                    rightPadding: Kirigami.Units.smallSpacing
                     from: 100
                     to: 2000
                     stepSize: 100
@@ -367,6 +382,8 @@ KCM.SimpleKCM {
             QQC2.TextField {
                 id: newApp
                 Layout.fillWidth: true
+                leftPadding: root.fieldPadding
+                rightPadding: root.fieldPadding
                 placeholderText: i18n("Desktop file or window class, for example org.kde.dolphin")
                 onAccepted: addButton.clicked()
             }
@@ -446,6 +463,7 @@ KCM.SimpleKCM {
 
                 contentItem: Kirigami.FormLayout {
                     QQC2.ComboBox {
+                    leftPadding: root.fieldPadding
                         Kirigami.FormData.label: i18n("Opens:")
                         model: root.placements
                         textRole: "text"
@@ -519,6 +537,7 @@ KCM.SimpleKCM {
                         onToggled: kcm.rules.set(index, "floatAtPointer", checked)
                     }
                     QQC2.ComboBox {
+                    leftPadding: root.fieldPadding
                         Kirigami.FormData.label: i18n("Scaling:")
                         model: root.scalings
                         textRole: "text"
@@ -530,6 +549,8 @@ KCM.SimpleKCM {
                         Kirigami.FormData.label: i18n("Alone on the canvas:")
                         Layout.preferredWidth: Kirigami.Units.gridUnit * 12
                         editable: true
+                        leftPadding: root.fieldPadding
+                        rightPadding: Kirigami.Units.smallSpacing
                         from: -1
                         to: 100
                         stepSize: 5
