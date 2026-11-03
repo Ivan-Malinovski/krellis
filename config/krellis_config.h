@@ -39,6 +39,7 @@ struct Settings
     int tileMinWidth = 1, tileMinHeight = 1; // pixel minimum of a tile for apps without a rule; 1 = pure proportions (deep splits keep shrinking), 320x200 = the old floor
     int iconBelow = 0;            // tiles drawn narrower than this many pixels show an icon; 0 (default) = windows stay live at any size
     int loneWidth = 0;            // a window alone on the canvas takes this share of the screen width, centred; 0 = full width
+    bool loneLongAxis = true;     // take that share along the display's longer side (rows on a turned output)
     double landMs = 200;          // glide off: duration of the move-and-scale after a real geometry change
     bool operator==(const Settings &) const = default;
 };

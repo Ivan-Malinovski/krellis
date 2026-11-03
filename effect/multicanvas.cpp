@@ -230,6 +230,7 @@ void KrellisEffect::syncOutputs()
         canvas->m_landMs = m_landMs;
         canvas->m_iconBelow = m_iconBelow;
         canvas->m_loneWidth = m_loneWidth;
+        canvas->m_loneLongAxis = m_loneLongAxis;
         canvas->m_tileMinimum = m_tileMinimum;
         canvas->m_toasts = m_toastsOn;
         canvas->m_shakeFloat = m_shakeFloatOn;
@@ -1186,6 +1187,7 @@ void KrellisEffect::applySettings(const krellis::config::Settings &settings)
     m_landMs = settings.landMs;
     m_iconBelow = settings.iconBelow;
     m_loneWidth = settings.loneWidth;
+    m_loneLongAxis = settings.loneLongAxis;
     m_tileMinimum = {double(settings.tileMinWidth), double(settings.tileMinHeight)};
     m_theme.setFollow(settings.followTheme);
     m_toastsOn = settings.toasts;
@@ -1227,6 +1229,7 @@ void KrellisEffect::applySettings(const krellis::config::Settings &settings)
         canvas->m_landMs = m_landMs;
         canvas->m_iconBelow = m_iconBelow;
         canvas->m_loneWidth = m_loneWidth;
+        canvas->m_loneLongAxis = m_loneLongAxis;
         canvas->m_tileMinimum = m_tileMinimum;
         canvas->m_toasts = m_toastsOn;
         canvas->m_shakeFloat = m_shakeFloatOn;

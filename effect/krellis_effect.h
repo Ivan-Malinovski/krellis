@@ -81,6 +81,7 @@ public:
     krellis::FloatMargin floatMargin() const override { return m_doc.floatMargin; }
     double peekPadding() const override { return m_peekPx; }
     double loneShare() const override; // a lone tile may take a reading width instead of the whole screen
+    bool loneShareAlongLongAxis() const override { return m_loneLongAxis; }
     krellis::LayoutMetrics layoutMetrics() const override;
     void schedule() override;
     void changed() override { if (m_changed) m_changed(); }
@@ -547,6 +548,7 @@ private:
     krellis::Point m_tileMinimum{1, 1}; // layout floor of an app without a rule ([General] tileMinWidth/tileMinHeight)
     int m_iconBelow = 0;   // tiles drawn narrower than this show an icon instead of the window; 0 = never
     int m_loneWidth = 0;   // percent of the screen width a tile takes when it is alone on the canvas; 0 = full width
+    bool m_loneLongAxis = true; // take that share along the display's longer side
     double m_landMs = 200; // glide off: duration of the move-and-scale a window plays when its real geometry changes; 0 = none
     struct Landing { TRect from; double start; };
     std::map<EffectWindow *, Landing> m_landings;
@@ -899,6 +901,7 @@ private:
     krellis::Point m_tileMinimum{1, 1}; // loaded from krellisrc; mirrored into every canvas
     int m_iconBelow = 0;   // loaded from krellisrc ([General] iconBelow); mirrored into every canvas
     int m_loneWidth = 0;   // loaded from krellisrc ([General] loneWidth); mirrored into every canvas
+    bool m_loneLongAxis = true; // loaded from krellisrc ([General] loneLongAxis); mirrored into every canvas
     double m_landMs = 200; // loaded from krellisrc ([General] landMs); mirrored into every canvas
     bool m_shakeFloatOn = true;
     bool m_toastsOn = true, m_flyToOn = false; // loaded from krellisrc; mirrored into every canvas

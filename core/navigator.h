@@ -29,6 +29,9 @@ struct NavigationHost {
     /// layout, so a reading width can apply to a window that has the screen to itself without changing what a
     /// frame of several tiles looks like.
     virtual double loneShare() const { return 1; }
+    /// Whether that share is taken along the display's longer side (the default: rows on a turned output) or
+    /// always along its width.
+    virtual bool loneShareAlongLongAxis() const { return true; }
     virtual LayoutMetrics layoutMetrics() const = 0;
     virtual bool busy() const { return false; }
     /// Long jumps zoom out, pan and zoom in (needs the camera to glide).

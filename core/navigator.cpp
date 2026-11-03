@@ -173,8 +173,9 @@ Rect Navigator::cameraFor(const Rect &frame) const
         if (share > 0 && share < 1) {
             // The share is a reading width, so it is taken along the display's long axis: a wide screen gives the
             // window fewer columns, a turned one fewer rows. Narrowing the width on a portrait output instead is
-            // what turned a 1440x2560 monitor into a 1008-pixel sliver with gutters down both sides.
-            if (vp.y > vp.x) {
+            // what turned a 1440x2560 monitor into a 1008-pixel sliver with gutters down both sides. The host can
+            // ask for the width anyway ([General] loneLongAxis=false).
+            if (m_host.loneShareAlongLongAxis() && vp.y > vp.x) {
                 const double centre = out.y + out.h / 2;
                 out.h /= share;
                 out.y = centre - out.h / 2;

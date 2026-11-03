@@ -75,6 +75,7 @@ Settings load(const QString &file)
     s.tileMinHeight = std::clamp(c.value(QStringLiteral("tileMinHeight"), s.tileMinHeight).toInt(), 1, 4000);
     s.iconBelow = std::clamp(c.value(QStringLiteral("iconBelow"), s.iconBelow).toInt(), 0, 1000);
     s.loneWidth = std::clamp(c.value(QStringLiteral("loneWidth"), s.loneWidth).toInt(), 0, 100);
+    s.loneLongAxis = c.value(QStringLiteral("loneLongAxis"), s.loneLongAxis).toBool();
     s.followTheme = c.value(QStringLiteral("followTheme"), s.followTheme).toBool();
     s.toasts = c.value(QStringLiteral("toasts"), s.toasts).toBool();
     s.flyTo = c.value(QStringLiteral("flyTo"), s.flyTo).toBool();
@@ -109,6 +110,7 @@ bool save(const Settings &s, const QString &file)
     c.setValue(QStringLiteral("tileMinHeight"), s.tileMinHeight);
     c.setValue(QStringLiteral("iconBelow"), s.iconBelow);
     c.setValue(QStringLiteral("loneWidth"), s.loneWidth);
+    c.setValue(QStringLiteral("loneLongAxis"), s.loneLongAxis);
     c.setValue(QStringLiteral("followTheme"), s.followTheme);
     c.setValue(QStringLiteral("toasts"), s.toasts);
     c.setValue(QStringLiteral("flyTo"), s.flyTo);
