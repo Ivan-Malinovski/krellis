@@ -17,9 +17,11 @@ geom() { rect "$1" | awk -v k="$2" '{print $k}'; }  # 1 x, 2 y, 3 w, 4 h
 cam() { call dump | sed -nE "s/^camera .*\\(target [^ ]+ [^ ]+ ([0-9.]+) ([0-9.]+).*/\\$1/p"; }
 lone() { call dump | grep -c "^$1 '.* LONE"; }
 share() { awk -v a="$1" -v b="$2" 'BEGIN { printf "%.4f", a / b }'; }
+# [General] with a lone width and whether the share follows the longer side, plus any rule lines
+# (QSettings group syntax: "app\key=value").
 config() {
-    local wide=$1; shift
-    { printf '[General]\nglide=true\nmap=false\nfollowTheme=false\ntoasts=false\nwhichKey=false\nloneWidth=%s\n' "$wide"
+    local wide=$1 axis=$2; shift 2
+    { printf '[General]\nglide=true\nmap=false\nfollowTheme=false\ntoasts=false\nwhichKey=false\nloneWidth=%s\nloneLongAxis=%s\n' "$wide" "$axis"
       if [ $# -gt 0 ]; then printf '[ViewRules]\n'; printf '%s\n' "$@"; fi
     } >"$XDG_CONFIG_HOME/krellisrc"
     call reloadSettings; sleep 1.5
@@ -31,7 +33,7 @@ sleep 2
 
 echo "--- the output is turned, and the share is off: the lone window fills it"
 check "the nested output is taller than it is wide" "$(awk -v w="$(geom p1 3)" -v h="$(geom p1 4)" 'BEGIN { print (h > w) }')" 1
-config 0
+config 0 true
 fullw=$(geom p1 3)
 fullh=$(geom p1 4)
 top=$(geom p1 2)
@@ -39,7 +41,7 @@ check "no reading width is applied" "$(lone p1)" 0
 check "the camera frames the tile" "$(near "$(cam 1)" 1 0.01)" yes
 
 echo "--- 70% takes rows, not columns"
-config 70
+config 70 true
 check "the width is untouched" "$(near "$(share "$(geom p1 3)" "$fullw")" 1 0.002)" yes
 check "the tile takes 70% of the height" "$(near "$(share "$(geom p1 4)" "$fullh")" 0.7 0.02)" yes
 want_top=$(awk -v y="$top" -v h="$fullh" 'BEGIN { printf "%.1f", y + 0.15 * h }')
@@ -67,6 +69,14 @@ check "one tile again" "$(call dump | grep -c "^p[0-9] '")" 1
 check "the height is back to 70%" "$(near "$(share "$(geom p1 4)" "$fullh")" 0.7 0.02)" yes
 
 echo "--- a rule can still opt out"
-config 70 'krellis-lone\loneWidth=0'
+config 70 true 'krellis-lone\loneWidth=0'
 check "a rule's 0 is full height" "$(near "$(share "$(geom p1 4)" "$fullh")" 1 0.002)" yes
 check "and no LONE mark" "$(lone p1)" 0
+
+echo "--- the long side is a setting, and turning it off takes the share out of the width again"
+config 70 false
+check "the width is the share now" "$(near "$(share "$(geom p1 3)" "$fullw")" 0.7 0.02)" yes
+check "and the height is whole" "$(near "$(share "$(geom p1 4)" "$fullh")" 1 0.002)" yes
+check "centred across the screen" "$(near "$(geom p1 1)" "$(awk -v x="6" -v w="$fullw" 'BEGIN { printf "%.1f", x + 0.15 * w }')" 3)" yes
+config 70 true
+check "back on, the height is the share" "$(near "$(share "$(geom p1 4)" "$fullh")" 0.7 0.02)" yes

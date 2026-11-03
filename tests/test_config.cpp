@@ -63,6 +63,12 @@ private Q_SLOTS:
         QCOMPARE(load(file).loneWidth, 100);           // clamped, never a camera narrower than nothing
         QVERIFY(saveValue("loneWidth", -5, file));
         QCOMPARE(load(file).loneWidth, 0);
+        // The share follows the display's longer side unless the file says otherwise, and old files keep that.
+        QVERIFY(Settings{}.loneLongAxis);
+        QVERIFY(load(file).loneLongAxis);
+        s.loneLongAxis = false;
+        QVERIFY(save(s, file));
+        QVERIFY(!load(file).loneLongAxis);
 
         QList<AppRule> rules;
         AppRule inherit, off, narrow;

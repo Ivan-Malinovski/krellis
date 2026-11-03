@@ -22,6 +22,7 @@ struct Host : NavigationHost {
     const LayoutDocument &doc() const override { return document; }
     NavMode mode() const override { return navMode; }
     bool turned = false; // the display is used on its side
+    bool longAxis = true; // whether the lone share follows the longer side
     Point viewport() const override { return turned ? Point{600, 1000} : Point{1000, 600}; }
     LayoutMetrics layoutMetrics() const override
     {
@@ -34,6 +35,7 @@ struct Host : NavigationHost {
     void changed() override { ++changes; }
     double peekPadding() const override { return peek; }
     double loneShare() const override { return lone; }
+    bool loneShareAlongLongAxis() const override { return longAxis; }
 };
 
 static LayoutDocument three()
@@ -682,6 +684,24 @@ private slots:
         QVERIFY(qAbs(cam.target.y - (0.5 - height / 2)) < 1e-9);
         QVERIFY(qAbs(cam.target.w - 1) < 1e-9);
         QVERIFY(qAbs(cam.target.x) < 1e-9);
+    }
+
+    void loneShareIgnoresTheTurnedDisplayWhenAsked()
+    {
+        Host h;
+        h.turned = true;
+        h.lone = 0.7;
+        h.longAxis = false; // [General] loneLongAxis=false: always out of the width
+        auto root = L::panel({L::view("t", "a")}, "A");
+        h.document = createDocument(&root);
+        RectSpring cam(testSpringFactory());
+        Navigator nav(h, cam);
+        nav.sync();
+        const double w = 1 / 0.7;
+        QVERIFY(qAbs(cam.target.w - w) < 1e-9);
+        QVERIFY(qAbs(cam.target.x - (0.5 - w / 2)) < 1e-9);
+        QVERIFY(qAbs(cam.target.h - 1) < 1e-9);
+        QVERIFY(qAbs(cam.target.y) < 1e-9);
     }
 
     void fullWidthLoneTileIsUnchanged()
